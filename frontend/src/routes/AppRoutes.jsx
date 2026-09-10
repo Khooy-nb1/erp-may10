@@ -13,6 +13,7 @@ import Login from '../pages/Login';
 import Forbidden from '../pages/Forbidden';
 import NotFound from '../pages/NotFound';
 import WarehouseModule from '../pages/WarehouseModule';
+import ProductionModule from '../pages/ProductionModule';
 import PlaceholderModule from '../pages/PlaceholderModule';
 
 // Admin Pages
@@ -76,7 +77,7 @@ export default function AppRoutes() {
               redirect={true}
               fallback={<Forbidden />}
             >
-              <PlaceholderModule />
+              <ProductionModule />
             </PermissionGuard>
           }
         />
