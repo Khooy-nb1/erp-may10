@@ -242,10 +242,16 @@ async function getSuppliers(req, res, next) {
     const { search, trang_thai, limit = 50, offset = 0 } = req.query;
     let query = `
       SELECT ncc.*,
-             COUNT(dmh.id) AS tong_don_mua,
-             COALESCE(SUM(dmh.tong_thanh_toan) FILTER (WHERE dmh.trang_thai != 'huy'), 0) AS tong_gia_tri_mua
+             COALESCE(agg.tong_don_mua, 0) AS tong_don_mua,
+             COALESCE(agg.tong_gia_tri_mua, 0) AS tong_gia_tri_mua
       FROM nha_cung_cap ncc
-      LEFT JOIN don_mua_hang dmh ON ncc.id = dmh.ma_nha_cung_cap
+      LEFT JOIN (
+        SELECT ma_nha_cung_cap,
+               COUNT(id) AS tong_don_mua,
+               SUM(CASE WHEN trang_thai != 'huy' THEN tong_thanh_toan ELSE 0 END) AS tong_gia_tri_mua
+        FROM don_mua_hang
+        GROUP BY ma_nha_cung_cap
+      ) agg ON ncc.id = agg.ma_nha_cung_cap
       WHERE 1=1
     `;
     const params = [];
@@ -261,7 +267,6 @@ async function getSuppliers(req, res, next) {
     }
 
     query += `
-      GROUP BY ncc.id
       ORDER BY ncc.id DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
@@ -521,13 +526,20 @@ async function getPurchaseOrders(req, res, next) {
              dmh.ngay_tao,
              ncc.id AS ncc_id, ncc.ma_nha_cung_cap, ncc.ten_nha_cung_cap,
              nd_dat.ho_ten AS ten_nguoi_dat,
-             COUNT(ct.id) AS so_mat_hang,
-             COALESCE(SUM(ct.so_luong_dat), 0) AS tong_so_luong_dat,
-             COALESCE(SUM(ct.so_luong_da_nhap), 0) AS tong_so_luong_da_nhap
+             COALESCE(ct_agg.so_mat_hang, 0) AS so_mat_hang,
+             COALESCE(ct_agg.tong_so_luong_dat, 0) AS tong_so_luong_dat,
+             COALESCE(ct_agg.tong_so_luong_da_nhap, 0) AS tong_so_luong_da_nhap
       FROM don_mua_hang dmh
       JOIN nha_cung_cap ncc ON dmh.ma_nha_cung_cap = ncc.id
       LEFT JOIN nguoi_dung nd_dat ON dmh.nguoi_dat_hang = nd_dat.id
-      LEFT JOIN chi_tiet_don_mua ct ON dmh.id = ct.ma_don_mua_hang
+      LEFT JOIN (
+        SELECT ma_don_mua_hang,
+               COUNT(id) AS so_mat_hang,
+               SUM(so_luong_dat) AS tong_so_luong_dat,
+               SUM(so_luong_da_nhap) AS tong_so_luong_da_nhap
+        FROM chi_tiet_don_mua
+        GROUP BY ma_don_mua_hang
+      ) ct_agg ON dmh.id = ct_agg.ma_don_mua_hang
       WHERE 1=1
     `;
     const params = [];
@@ -558,7 +570,6 @@ async function getPurchaseOrders(req, res, next) {
     }
 
     query += `
-      GROUP BY dmh.id, ncc.id, nd_dat.ho_ten
       ORDER BY dmh.id DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
@@ -1333,7 +1344,7 @@ async function getReports(req, res, next) {
       SELECT 
         TO_CHAR(ngay_dat_hang, 'YYYY-MM') AS thang,
         COUNT(*) AS so_don,
-        COALESCE(SUM(tong_thanh_toan) FILTER (WHERE trang_thai != 'huy'), 0) AS gia_tri
+        COALESCE(SUM(CASE WHEN trang_thai != 'huy' THEN tong_thanh_toan ELSE 0 END), 0) AS gia_tri
       FROM don_mua_hang
       WHERE ngay_dat_hang >= NOW() - INTERVAL '6 months'
       GROUP BY thang
@@ -1392,17 +1403,24 @@ async function getPurchaseRequisitions(req, res, next) {
 
     params.push(limitNum, offset);
     const listRes = await db.query(
-      `SELECT ycm.*,
+      `SELECT ycm.id, ycm.ma_yeu_cau_mua, ycm.nguon_yeu_cau, ycm.ma_nhu_cau_npl,
+              ycm.ngay_yeu_cau, ycm.nguoi_yeu_cau, ycm.nguoi_phe_duyet, ycm.ngay_phe_duyet,
+              ycm.ghi_chu, ycm.trang_thai, ycm.ngay_tao, ycm.ngay_cap_nhat,
               nd_yc.ho_ten AS ten_nguoi_yeu_cau,
               nd_pd.ho_ten AS ten_nguoi_phe_duyet,
-              COUNT(ct.id) AS so_mat_hang,
-              COALESCE(SUM(ct.so_luong_yeu_cau), 0) AS tong_so_luong
+              COALESCE(ct_agg.so_mat_hang, 0) AS so_mat_hang,
+              COALESCE(ct_agg.tong_so_luong, 0) AS tong_so_luong
        FROM yeu_cau_mua_hang ycm
        LEFT JOIN nguoi_dung nd_yc ON ycm.nguoi_yeu_cau = nd_yc.id
        LEFT JOIN nguoi_dung nd_pd ON ycm.nguoi_phe_duyet = nd_pd.id
-       LEFT JOIN chi_tiet_yeu_cau_mua ct ON ycm.id = ct.ma_yeu_cau_mua_hang
+       LEFT JOIN (
+         SELECT ma_yeu_cau_mua_hang,
+                COUNT(id) AS so_mat_hang,
+                SUM(so_luong_yeu_cau) AS tong_so_luong
+         FROM chi_tiet_yeu_cau_mua
+         GROUP BY ma_yeu_cau_mua_hang
+       ) ct_agg ON ycm.id = ct_agg.ma_yeu_cau_mua_hang
        ${whereClause}
-       GROUP BY ycm.id, nd_yc.ho_ten, nd_pd.ho_ten
        ORDER BY ycm.id DESC
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
@@ -1840,13 +1858,18 @@ async function getRfqs(req, res, next) {
   try {
     await ensurePh3Tables();
     const listRes = await db.query(`
-      SELECT rfq.*,
+      SELECT rfq.id, rfq.ma_rfq, rfq.ma_yeu_cau_mua_hang, rfq.tieu_de,
+             rfq.ngay_gui, rfq.han_bao_gia, rfq.dieu_khoan_thuong_mai, rfq.ghi_chu,
+             rfq.trang_thai, rfq.ngay_tao, rfq.ngay_cap_nhat,
              ycm.ma_yeu_cau_mua,
-             COUNT(ct.id) AS so_bao_gia_nhan_duoc
+             COALESCE(ct_agg.so_bao_gia_nhan_duoc, 0) AS so_bao_gia_nhan_duoc
       FROM yeu_cau_bao_gia rfq
       LEFT JOIN yeu_cau_mua_hang ycm ON rfq.ma_yeu_cau_mua_hang = ycm.id
-      LEFT JOIN chi_tiet_bao_gia_ncc ct ON rfq.id = ct.ma_rfq
-      GROUP BY rfq.id, ycm.ma_yeu_cau_mua
+      LEFT JOIN (
+        SELECT ma_rfq, COUNT(id) AS so_bao_gia_nhan_duoc
+        FROM chi_tiet_bao_gia_ncc
+        GROUP BY ma_rfq
+      ) ct_agg ON rfq.id = ct_agg.ma_rfq
       ORDER BY rfq.id DESC
     `);
     res.json({ success: true, data: listRes.rows });
