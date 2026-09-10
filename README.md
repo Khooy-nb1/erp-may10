@@ -1,4 +1,4 @@
-# Mọi người xem cách dùng GIT tại đây
+# Mọi người xem cách dùng Git tại đây
 # Git Commands
 
 ## 1. Kiểm tra trạng thái
