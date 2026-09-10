@@ -1,0 +1,441 @@
+[
+  {
+    "tab": "dashboard",
+    "name": "PH4_01_Dashboard",
+    "info": {
+      "title": "ERP May 10 — Phân hệ 4: Kho & Quản lý vật tư",
+      "currentUrl": "http://localhost:5173/warehouse?tab=dashboard",
+      "hasHeader": true,
+      "hasSidebar": true,
+      "hasBreadcrumb": true,
+      "breadcrumbText": "Trang chủ Portal > PH4 — Kho & Quản lý vật tư",
+      "activeTab": "Tổng Quan Kho",
+      "moduleTitle": "Kho & Quản lý vật tư",
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableClasses": "w-full text-left text-xs sm:text-sm",
+          "containerClasses": "bg-white rounded-2xl p-5 sm:p-6 border border-[#E2EDF5] shadow-xs",
+          "theadClasses": "bg-[#F7FAFC] text-[#5F6F82] text-[11px] font-semibold uppercase tracking-wider border-b border-[#E2EDF5]",
+          "rowsCount": 4,
+          "firstRowClasses": "hover:bg-[#F9FBFC] transition-colors"
+        }
+      ],
+      "filterBarsCount": 0,
+      "filterBars": [],
+      "primaryButtonsCount": 11,
+      "primaryButtons": [
+        {
+          "text": "",
+          "className": "p-1.5 -ml-1 rounded-lg text-[#0F5FAF] hover:text-[#0b4885] hover:bg-[#EAF5FC] lg:hidden transition-colors"
+        },
+        {
+          "text": "",
+          "className": "relative p-2 rounded-full transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "",
+          "className": "p-2 rounded-full xl:hidden transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "Tổng Quan Kho",
+          "className": "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs whitespace-nowrap transition-all font-semibold bg-[#0F5FAF] text-white shadow-2xs"
+        }
+      ],
+      "kpisCount": 4,
+      "kpis": [
+        {
+          "classes": "bg-white rounded-2xl p-4 sm:p-5 border border-[#E2EDF5] shadow-xs hover:border-[#96C8EB] transition-all flex flex-col justify-between min-h-[140px]",
+          "title": "Tổng giá trị tồn kho",
+          "value": "19.487.000 ₫"
+        },
+        {
+          "classes": "bg-white rounded-2xl p-4 sm:p-5 border border-[#E2EDF5] shadow-xs hover:border-[#96C8EB] transition-all flex flex-col justify-between min-h-[140px]",
+          "title": "Mặt hàng có tồn kho",
+          "value": "5 mặt hàng"
+        },
+        {
+          "classes": "bg-white rounded-2xl p-4 sm:p-5 border border-[#E2EDF5] shadow-xs hover:border-[#96C8EB] transition-all flex flex-col justify-between min-h-[140px]",
+          "title": "Cảnh báo thiếu hụt",
+          "value": "3 mặt hàng"
+        },
+        {
+          "classes": "bg-white rounded-2xl p-4 sm:p-5 border border-[#E2EDF5] shadow-xs hover:border-[#96C8EB] transition-all flex flex-col justify-between min-h-[140px]",
+          "title": "Giao dịch kho tháng này",
+          "value": ""
+        }
+      ]
+    }
+  },
+  {
+    "tab": "ton-kho",
+    "name": "PH4_02_TonKho",
+    "info": {
+      "title": "ERP May 10 — Phân hệ 4: Kho & Quản lý vật tư",
+      "currentUrl": "http://localhost:5173/warehouse?tab=ton-kho",
+      "hasHeader": true,
+      "hasSidebar": true,
+      "hasBreadcrumb": true,
+      "breadcrumbText": "Trang chủ Portal > PH4 — Kho & Quản lý vật tư",
+      "activeTab": "Tồn Kho & Thẻ Kho",
+      "moduleTitle": "Kho & Quản lý vật tư",
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableClasses": "w-full text-left text-xs sm:text-sm",
+          "containerClasses": "bg-white rounded-2xl border border-[#E2EDF5] shadow-xs overflow-hidden",
+          "theadClasses": "bg-[#F7FAFC] text-[#5F6F82] text-xs font-semibold uppercase tracking-wider border-b border-[#E2EDF5]",
+          "rowsCount": 5,
+          "firstRowClasses": "hover:bg-[#F9FBFC] transition-colors"
+        }
+      ],
+      "filterBarsCount": 1,
+      "filterBars": [
+        {
+          "classes": "bg-white p-4 sm:p-5 rounded-2xl border border-[#E2EDF5] shadow-xs flex flex-wrap items-center justify-between gap-4",
+          "hasInput": true,
+          "hasSelect": true
+        }
+      ],
+      "primaryButtonsCount": 12,
+      "primaryButtons": [
+        {
+          "text": "",
+          "className": "p-1.5 -ml-1 rounded-lg text-[#0F5FAF] hover:text-[#0b4885] hover:bg-[#EAF5FC] lg:hidden transition-colors"
+        },
+        {
+          "text": "",
+          "className": "relative p-2 rounded-full transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "",
+          "className": "p-2 rounded-full xl:hidden transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "Tổng Quan Kho",
+          "className": "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs whitespace-nowrap transition-all font-semibold text-[#5F6F82] hover:text-[#0F5FAF] hover:bg-[#F4FAFE]"
+        }
+      ],
+      "kpisCount": 0,
+      "kpis": []
+    }
+  },
+  {
+    "tab": "vi-tri",
+    "name": "PH4_03_ViTriKho",
+    "info": {
+      "title": "ERP May 10 — Phân hệ 4: Kho & Quản lý vật tư",
+      "currentUrl": "http://localhost:5173/warehouse?tab=vi-tri",
+      "hasHeader": true,
+      "hasSidebar": true,
+      "hasBreadcrumb": true,
+      "breadcrumbText": "Trang chủ Portal > PH4 — Kho & Quản lý vật tư",
+      "activeTab": "Sơ Đồ Kệ Kho",
+      "moduleTitle": "Kho & Quản lý vật tư",
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableClasses": "w-full text-left text-xs sm:text-sm",
+          "containerClasses": "bg-white rounded-2xl border border-[#E2EDF5] shadow-xs overflow-hidden",
+          "theadClasses": "bg-[#F7FAFC] text-[#5F6F82] text-xs font-semibold uppercase tracking-wider border-b border-[#E2EDF5]",
+          "rowsCount": 38,
+          "firstRowClasses": "hover:bg-[#F9FBFC] transition-colors"
+        }
+      ],
+      "filterBarsCount": 1,
+      "filterBars": [
+        {
+          "classes": "bg-white p-4 sm:p-5 rounded-2xl border border-[#E2EDF5] shadow-xs flex flex-wrap items-center justify-between gap-4",
+          "hasInput": true,
+          "hasSelect": true
+        }
+      ],
+      "primaryButtonsCount": 12,
+      "primaryButtons": [
+        {
+          "text": "",
+          "className": "p-1.5 -ml-1 rounded-lg text-[#0F5FAF] hover:text-[#0b4885] hover:bg-[#EAF5FC] lg:hidden transition-colors"
+        },
+        {
+          "text": "",
+          "className": "relative p-2 rounded-full transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "",
+          "className": "p-2 rounded-full xl:hidden transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "Tổng Quan Kho",
+          "className": "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs whitespace-nowrap transition-all font-semibold text-[#5F6F82] hover:text-[#0F5FAF] hover:bg-[#F4FAFE]"
+        }
+      ],
+      "kpisCount": 0,
+      "kpis": []
+    }
+  },
+  {
+    "tab": "lo-vat-tu",
+    "name": "PH4_04_LoVatTu",
+    "info": {
+      "title": "ERP May 10 — Phân hệ 4: Kho & Quản lý vật tư",
+      "currentUrl": "http://localhost:5173/warehouse?tab=lo-vat-tu",
+      "hasHeader": true,
+      "hasSidebar": true,
+      "hasBreadcrumb": true,
+      "breadcrumbText": "Trang chủ Portal > PH4 — Kho & Quản lý vật tư",
+      "activeTab": "Lô Vật Tư & Vải",
+      "moduleTitle": "Kho & Quản lý vật tư",
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableClasses": "w-full text-left text-xs sm:text-sm",
+          "containerClasses": "bg-white rounded-2xl border border-[#E2EDF5] shadow-xs overflow-hidden",
+          "theadClasses": "bg-[#F7FAFC] text-[#5F6F82] text-xs font-semibold uppercase tracking-wider border-b border-[#E2EDF5]",
+          "rowsCount": 1,
+          "firstRowClasses": "hover:bg-[#F9FBFC] transition-colors"
+        }
+      ],
+      "filterBarsCount": 1,
+      "filterBars": [
+        {
+          "classes": "bg-white p-4 sm:p-5 rounded-2xl border border-[#E2EDF5] shadow-xs flex flex-wrap items-center justify-between gap-4",
+          "hasInput": true,
+          "hasSelect": true
+        }
+      ],
+      "primaryButtonsCount": 12,
+      "primaryButtons": [
+        {
+          "text": "",
+          "className": "p-1.5 -ml-1 rounded-lg text-[#0F5FAF] hover:text-[#0b4885] hover:bg-[#EAF5FC] lg:hidden transition-colors"
+        },
+        {
+          "text": "",
+          "className": "relative p-2 rounded-full transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "",
+          "className": "p-2 rounded-full xl:hidden transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "Tổng Quan Kho",
+          "className": "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs whitespace-nowrap transition-all font-semibold text-[#5F6F82] hover:text-[#0F5FAF] hover:bg-[#F4FAFE]"
+        }
+      ],
+      "kpisCount": 0,
+      "kpis": []
+    }
+  },
+  {
+    "tab": "phieu-nhap",
+    "name": "PH4_05_PhieuNhap",
+    "info": {
+      "title": "ERP May 10 — Phân hệ 4: Kho & Quản lý vật tư",
+      "currentUrl": "http://localhost:5173/warehouse?tab=phieu-nhap",
+      "hasHeader": true,
+      "hasSidebar": true,
+      "hasBreadcrumb": true,
+      "breadcrumbText": "Trang chủ Portal > PH4 — Kho & Quản lý vật tư",
+      "activeTab": "Phiếu Nhập Kho",
+      "moduleTitle": "Kho & Quản lý vật tư",
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableClasses": "w-full text-left text-xs sm:text-sm",
+          "containerClasses": "bg-white rounded-2xl border border-[#E2EDF5] shadow-xs overflow-hidden",
+          "theadClasses": "bg-[#F7FAFC] text-[#5F6F82] text-xs font-semibold uppercase tracking-wider border-b border-[#E2EDF5]",
+          "rowsCount": 143,
+          "firstRowClasses": "hover:bg-[#F9FBFC] transition-colors"
+        }
+      ],
+      "filterBarsCount": 1,
+      "filterBars": [
+        {
+          "classes": "bg-white p-4 sm:p-5 rounded-2xl border border-[#E2EDF5] shadow-xs flex flex-wrap items-center justify-between gap-4",
+          "hasInput": true,
+          "hasSelect": true
+        }
+      ],
+      "primaryButtonsCount": 155,
+      "primaryButtons": [
+        {
+          "text": "",
+          "className": "p-1.5 -ml-1 rounded-lg text-[#0F5FAF] hover:text-[#0b4885] hover:bg-[#EAF5FC] lg:hidden transition-colors"
+        },
+        {
+          "text": "",
+          "className": "relative p-2 rounded-full transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "",
+          "className": "p-2 rounded-full xl:hidden transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "Tổng Quan Kho",
+          "className": "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs whitespace-nowrap transition-all font-semibold text-[#5F6F82] hover:text-[#0F5FAF] hover:bg-[#F4FAFE]"
+        }
+      ],
+      "kpisCount": 0,
+      "kpis": []
+    }
+  },
+  {
+    "tab": "phieu-xuat",
+    "name": "PH4_06_PhieuXuat",
+    "info": {
+      "title": "ERP May 10 — Phân hệ 4: Kho & Quản lý vật tư",
+      "currentUrl": "http://localhost:5173/warehouse?tab=phieu-xuat",
+      "hasHeader": true,
+      "hasSidebar": true,
+      "hasBreadcrumb": true,
+      "breadcrumbText": "Trang chủ Portal > PH4 — Kho & Quản lý vật tư",
+      "activeTab": "Phiếu Xuất Kho",
+      "moduleTitle": "Kho & Quản lý vật tư",
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableClasses": "w-full text-left text-xs sm:text-sm",
+          "containerClasses": "bg-white rounded-2xl border border-[#E2EDF5] shadow-xs overflow-hidden",
+          "theadClasses": "bg-[#F7FAFC] text-[#5F6F82] text-xs font-semibold uppercase tracking-wider border-b border-[#E2EDF5]",
+          "rowsCount": 136,
+          "firstRowClasses": "hover:bg-[#F9FBFC] transition-colors"
+        }
+      ],
+      "filterBarsCount": 1,
+      "filterBars": [
+        {
+          "classes": "bg-white p-4 sm:p-5 rounded-2xl border border-[#E2EDF5] shadow-xs flex flex-wrap items-center justify-between gap-4",
+          "hasInput": true,
+          "hasSelect": true
+        }
+      ],
+      "primaryButtonsCount": 148,
+      "primaryButtons": [
+        {
+          "text": "",
+          "className": "p-1.5 -ml-1 rounded-lg text-[#0F5FAF] hover:text-[#0b4885] hover:bg-[#EAF5FC] lg:hidden transition-colors"
+        },
+        {
+          "text": "",
+          "className": "relative p-2 rounded-full transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "",
+          "className": "p-2 rounded-full xl:hidden transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "Tổng Quan Kho",
+          "className": "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs whitespace-nowrap transition-all font-semibold text-[#5F6F82] hover:text-[#0F5FAF] hover:bg-[#F4FAFE]"
+        }
+      ],
+      "kpisCount": 0,
+      "kpis": []
+    }
+  },
+  {
+    "tab": "phieu-chuyen",
+    "name": "PH4_07_PhieuChuyen",
+    "info": {
+      "title": "ERP May 10 — Phân hệ 4: Kho & Quản lý vật tư",
+      "currentUrl": "http://localhost:5173/warehouse?tab=phieu-chuyen",
+      "hasHeader": true,
+      "hasSidebar": true,
+      "hasBreadcrumb": true,
+      "breadcrumbText": "Trang chủ Portal > PH4 — Kho & Quản lý vật tư",
+      "activeTab": "Điều Chuyển Kho",
+      "moduleTitle": "Kho & Quản lý vật tư",
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableClasses": "w-full text-left text-sm",
+          "containerClasses": "bg-white rounded-2xl border border-[#E2EDF5] shadow-xs overflow-hidden",
+          "theadClasses": "bg-[#F7FAFC] text-[#5F6F82] text-xs font-semibold uppercase tracking-wider border-b border-[#E2EDF5]",
+          "rowsCount": 96,
+          "firstRowClasses": "hover:bg-[#F9FBFC] transition-colors"
+        }
+      ],
+      "filterBarsCount": 1,
+      "filterBars": [
+        {
+          "classes": "bg-white p-4 rounded-2xl border border-[#E2EDF5] shadow-xs flex flex-wrap items-center justify-between gap-4",
+          "hasInput": true,
+          "hasSelect": true
+        }
+      ],
+      "primaryButtonsCount": 108,
+      "primaryButtons": [
+        {
+          "text": "",
+          "className": "p-1.5 -ml-1 rounded-lg text-[#0F5FAF] hover:text-[#0b4885] hover:bg-[#EAF5FC] lg:hidden transition-colors"
+        },
+        {
+          "text": "",
+          "className": "relative p-2 rounded-full transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "",
+          "className": "p-2 rounded-full xl:hidden transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "Tổng Quan Kho",
+          "className": "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs whitespace-nowrap transition-all font-semibold text-[#5F6F82] hover:text-[#0F5FAF] hover:bg-[#F4FAFE]"
+        }
+      ],
+      "kpisCount": 0,
+      "kpis": []
+    }
+  },
+  {
+    "tab": "kiem-ke",
+    "name": "PH4_08_PhieuKiemKe",
+    "info": {
+      "title": "ERP May 10 — Phân hệ 4: Kho & Quản lý vật tư",
+      "currentUrl": "http://localhost:5173/warehouse?tab=kiem-ke",
+      "hasHeader": true,
+      "hasSidebar": true,
+      "hasBreadcrumb": true,
+      "breadcrumbText": "Trang chủ Portal > PH4 — Kho & Quản lý vật tư",
+      "activeTab": "Kiểm Kê Kho",
+      "moduleTitle": "Kho & Quản lý vật tư",
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableClasses": "w-full text-left text-sm",
+          "containerClasses": "bg-white rounded-2xl border border-[#E2EDF5] shadow-xs overflow-hidden",
+          "theadClasses": "bg-[#F7FAFC] text-[#5F6F82] text-xs font-semibold uppercase tracking-wider border-b border-[#E2EDF5]",
+          "rowsCount": 159,
+          "firstRowClasses": "hover:bg-[#F9FBFC] transition-colors"
+        }
+      ],
+      "filterBarsCount": 1,
+      "filterBars": [
+        {
+          "classes": "bg-white p-4 rounded-2xl border border-[#E2EDF5] shadow-xs flex flex-wrap items-center justify-between gap-4",
+          "hasInput": true,
+          "hasSelect": true
+        }
+      ],
+      "primaryButtonsCount": 171,
+      "primaryButtons": [
+        {
+          "text": "",
+          "className": "p-1.5 -ml-1 rounded-lg text-[#0F5FAF] hover:text-[#0b4885] hover:bg-[#EAF5FC] lg:hidden transition-colors"
+        },
+        {
+          "text": "",
+          "className": "relative p-2 rounded-full transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "",
+          "className": "p-2 rounded-full xl:hidden transition-colors text-[#0F3B66] hover:text-[#0F5FAF] hover:bg-[#EAF5FC]"
+        },
+        {
+          "text": "Tổng Quan Kho",
+          "className": "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs whitespace-nowrap transition-all font-semibold text-[#5F6F82] hover:text-[#0F5FAF] hover:bg-[#F4FAFE]"
+        }
+      ],
+      "kpisCount": 0,
+      "kpis": []
+    }
+  }
+]
