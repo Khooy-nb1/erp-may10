@@ -13,6 +13,7 @@ import Login from '../pages/Login';
 import Forbidden from '../pages/Forbidden';
 import NotFound from '../pages/NotFound';
 import WarehouseModule from '../pages/WarehouseModule';
+import PurchasingModule from '../pages/PurchasingModule';
 import PlaceholderModule from '../pages/PlaceholderModule';
 
 // Admin Pages
@@ -83,14 +84,14 @@ export default function AppRoutes() {
 
         {/* PH3: Mua hàng */}
         <Route
-          path="purchasing"
+          path="purchasing/*"
           element={
             <PermissionGuard
               permission="purchasing.view"
               redirect={true}
               fallback={<Forbidden />}
             >
-              <PlaceholderModule />
+              <PurchasingModule />
             </PermissionGuard>
           }
         />

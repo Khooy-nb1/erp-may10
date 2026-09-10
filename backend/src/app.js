@@ -13,6 +13,7 @@ const phieuNhapRoutes = require('./routes/phieuNhapRoutes');
 const phieuXuatRoutes = require('./routes/phieuXuatRoutes');
 const phieuChuyenRoutes = require('./routes/phieuChuyenRoutes');
 const phieuKiemKeRoutes = require('./routes/phieuKiemKeRoutes');
+const purchasingRoutes = require('./routes/purchasingRoutes');
 const portalRoutes = require('./routes/portalRoutes');
 
 const app = express();
@@ -74,6 +75,7 @@ app.use('/api/v1/phieu-nhap', phieuNhapRoutes);
 app.use('/api/v1/phieu-xuat', phieuXuatRoutes);
 app.use('/api/v1/phieu-chuyen', phieuChuyenRoutes);
 app.use('/api/v1/phieu-kiem-ke', phieuKiemKeRoutes);
+app.use('/api/v1/purchasing', purchasingRoutes);
 app.use('/api/v1', portalRoutes);
 
 // Xử lý route không tồn tại và lỗi
