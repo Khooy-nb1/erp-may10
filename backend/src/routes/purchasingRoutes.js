@@ -84,7 +84,78 @@ router.post(
   purchasingController.receiveStatusUpdate
 );
 
-// 7. Báo cáo mua hàng
+// 7. Yêu cầu mua sắm (Purchase Requisitions - PR)
+router.get(
+  '/requisitions',
+  requireRoles('mua_hang', 'admin', 'kho'),
+  purchasingController.getPurchaseRequisitions
+);
+router.get(
+  '/requisitions/:id',
+  requireRoles('mua_hang', 'admin', 'kho'),
+  purchasingController.getRequisitionDetail
+);
+router.post(
+  '/requisitions',
+  requireRoles('mua_hang', 'admin'),
+  purchasingController.createPurchaseRequisition
+);
+router.post(
+  '/requisitions/:id/approve',
+  requireRoles('mua_hang', 'admin'),
+  purchasingController.approveRequisition
+);
+router.post(
+  '/requisitions/:id/reject',
+  requireRoles('mua_hang', 'admin'),
+  purchasingController.rejectRequisition
+);
+router.post(
+  '/requisitions/:id/create-po',
+  requireRoles('mua_hang', 'admin'),
+  purchasingController.convertPrToPo
+);
+
+// 8. Yêu cầu báo giá & So sánh lựa chọn NCC (RFQ)
+router.get(
+  '/rfqs',
+  requireRoles('mua_hang', 'admin'),
+  purchasingController.getRfqs
+);
+router.get(
+  '/rfqs/:id',
+  requireRoles('mua_hang', 'admin'),
+  purchasingController.getRfqDetail
+);
+router.post(
+  '/rfqs',
+  requireRoles('mua_hang', 'admin'),
+  purchasingController.createRfq
+);
+router.post(
+  '/rfqs/:id/quotes',
+  requireRoles('mua_hang', 'admin'),
+  purchasingController.submitQuote
+);
+router.post(
+  '/rfqs/:id/select-vendor',
+  requireRoles('mua_hang', 'admin'),
+  purchasingController.selectVendorQuote
+);
+
+// 9. Đánh giá Nhà cung cấp (Supplier Evaluations)
+router.get(
+  '/suppliers/:id/evaluations',
+  requireRoles('mua_hang', 'admin'),
+  purchasingController.getSupplierEvaluations
+);
+router.post(
+  '/suppliers/:id/evaluations',
+  requireRoles('mua_hang', 'admin'),
+  purchasingController.createSupplierEvaluation
+);
+
+// 10. Báo cáo mua hàng
 router.get(
   '/reports',
   requireRoles('mua_hang', 'admin'),

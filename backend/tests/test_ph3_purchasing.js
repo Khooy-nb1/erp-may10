@@ -216,6 +216,8 @@ async function setupDatabaseIfNeeded() {
         don_gia NUMERIC(18,2) NOT NULL,
         thanh_tien NUMERIC(18,2) NOT NULL,
         so_luong_da_nhap NUMERIC(18,3) DEFAULT 0,
+        so_luong_loi_hong NUMERIC(18,3) DEFAULT 0,
+        ghi_chu_kiem_dinh TEXT,
         ghi_chu TEXT,
         ngay_tao TIMESTAMPTZ DEFAULT NOW(),
         ngay_cap_nhat TIMESTAMPTZ DEFAULT NOW(),
@@ -256,6 +258,56 @@ async function setupDatabaseIfNeeded() {
         ngay_tao TIMESTAMPTZ DEFAULT NOW(),
         nguoi_tao BIGINT
       );
+
+      CREATE TABLE IF NOT EXISTS chi_tiet_yeu_cau_mua (
+        id SERIAL PRIMARY KEY,
+        ma_yeu_cau_mua_hang BIGINT NOT NULL,
+        ma_vat_tu BIGINT NOT NULL,
+        so_luong_yeu_cau NUMERIC(18,3) NOT NULL,
+        don_gia_du_kien NUMERIC(18,2),
+        ngay_can_giao TIMESTAMPTZ NOT NULL,
+        ma_kho_nhap BIGINT,
+        ghi_chu TEXT,
+        ngay_tao TIMESTAMPTZ DEFAULT NOW(),
+        nguoi_tao BIGINT
+      );
+
+      CREATE TABLE IF NOT EXISTS yeu_cau_bao_gia (
+        id SERIAL PRIMARY KEY,
+        ma_rfq VARCHAR(50) UNIQUE NOT NULL,
+        ma_yeu_cau_mua_hang BIGINT,
+        tieu_de VARCHAR(200) NOT NULL,
+        ngay_gui TIMESTAMPTZ DEFAULT NOW(),
+        han_bao_gia TIMESTAMPTZ NOT NULL,
+        dieu_khoan_thuong_mai TEXT,
+        ghi_chu TEXT,
+        trang_thai VARCHAR(20) DEFAULT 'dang_mo',
+        ngay_tao TIMESTAMPTZ DEFAULT NOW(),
+        ngay_cap_nhat TIMESTAMPTZ DEFAULT NOW(),
+        nguoi_tao BIGINT,
+        nguoi_cap_nhat BIGINT
+      );
+
+      CREATE TABLE IF NOT EXISTS chi_tiet_bao_gia_ncc (
+        id SERIAL PRIMARY KEY,
+        ma_rfq BIGINT NOT NULL,
+        ma_nha_cung_cap BIGINT NOT NULL,
+        ma_vat_tu BIGINT NOT NULL,
+        so_luong_chao NUMERIC(18,3) NOT NULL,
+        don_gia_chao NUMERIC(18,2) NOT NULL,
+        thoi_gian_giao_hang_ngay INTEGER DEFAULT 7,
+        dieu_kien_thanh_toan TEXT,
+        ghi_chu TEXT,
+        da_chon BOOLEAN DEFAULT FALSE,
+        ly_do_chon TEXT,
+        ngay_tao TIMESTAMPTZ DEFAULT NOW(),
+        nguoi_tao BIGINT
+      );
+
+      ALTER TABLE nha_cung_cap ADD COLUMN IF NOT EXISTS so_tai_khoan_ngan_hang VARCHAR(50);
+      ALTER TABLE nha_cung_cap ADD COLUMN IF NOT EXISTS ten_ngan_hang VARCHAR(100);
+      ALTER TABLE nha_cung_cap ADD COLUMN IF NOT EXISTS chi_nhanh_ngan_hang VARCHAR(150);
+      ALTER TABLE nha_cung_cap ADD COLUMN IF NOT EXISTS so_gpkd VARCHAR(50);
     `);
 
     // Insert Seed Data
@@ -608,6 +660,184 @@ async function runAllPurchasingTests() {
     assert(coreKpiRes.status === 200, 'Core Homepage contract endpoint trả về 200 OK');
     assert(coreKpiRes.data?.data?.so_po >= 1, `Số PO: ${coreKpiRes.data?.data?.so_po}`);
     assert(coreKpiRes.data?.data?.ncc >= 1, `Số NCC: ${coreKpiRes.data?.data?.ncc}`);
+
+    // -------------------------------------------------------------------------
+    // TEST 13: Purchase Requisition (PR) lifecycle (Lập, duyệt, chuyển PO)
+    // -------------------------------------------------------------------------
+    console.log('\n13. TEST 13: Purchase Requisitions (Lập, duyệt và chuyển PR sang PO):');
+    const prNeedDate = new Date();
+    prNeedDate.setDate(prNeedDate.getDate() + 10);
+    const prRes = await request(
+      '/api/v1/purchasing/requisitions',
+      'POST',
+      {
+        nguon_yeu_cau: 'san_xuat',
+        ghi_chu: 'Yêu cầu vải may sơ mi lô hè xuất khẩu',
+        chiTiet: [
+          {
+            ma_vat_tu: 1,
+            so_luong_yeu_cau: 800,
+            don_gia_du_kien: 65000,
+            ngay_can_giao: prNeedDate.toISOString(),
+            ma_kho_nhap: 1,
+          },
+        ],
+      },
+      tokenMuaHang
+    );
+    assert(prRes.status === 201, `Tạo PR trả về HTTP 201 Created (Nhận ${prRes.status})`);
+    const createdPrId = prRes.data?.data?.id;
+    assert(createdPrId !== undefined, `PR tạo thành công với ID: ${createdPrId}`);
+    assert(prRes.data?.data?.trang_thai === 'cho_duyet', 'Trạng thái PR ban đầu: cho_duyet');
+
+    // Phê duyệt PR
+    const approvePrRes = await request(
+      `/api/v1/purchasing/requisitions/${createdPrId}/approve`,
+      'POST',
+      {},
+      tokenMuaHang
+    );
+    assert(approvePrRes.status === 200, `Phê duyệt PR trả về HTTP 200 OK (Nhận ${approvePrRes.status})`);
+    assert(approvePrRes.data?.data?.trang_thai === 'da_duyet', 'Trạng thái PR sau duyệt: da_duyet');
+
+    // Chuyển PR sang PO
+    const convertPrRes = await request(
+      `/api/v1/purchasing/requisitions/${createdPrId}/create-po`,
+      'POST',
+      {
+        ma_nha_cung_cap: 1,
+        ngay_giao_hang_yc: prNeedDate.toISOString(),
+        dieu_kien_thanh_toan: 'Chuyển khoản 30 ngày',
+        chiTiet: [
+          {
+            ma_vat_tu: 1,
+            so_luong_dat: 800,
+            don_gia: 64000,
+          },
+        ],
+      },
+      tokenMuaHang
+    );
+    assert(convertPrRes.status === 201, `Chuyển PR sang PO trả về HTTP 201 Created (Nhận ${convertPrRes.status})`);
+    assert(convertPrRes.data?.data?.po?.id !== undefined, 'Đơn PO mới sinh ra từ PR thành công');
+    assert(convertPrRes.data?.data?.requisition?.trang_thai === 'da_tao_don', 'Trạng thái PR cập nhật: da_tao_don');
+
+    // -------------------------------------------------------------------------
+    // TEST 14: RFQ & Multi-vendor comparison & Selection
+    // -------------------------------------------------------------------------
+    console.log('\n14. TEST 14: RFQ & Báo giá so sánh đa nhà cung cấp:');
+    const rfqDeadline = new Date();
+    rfqDeadline.setDate(rfqDeadline.getDate() + 5);
+    const rfqRes = await request(
+      '/api/v1/purchasing/rfqs',
+      'POST',
+      {
+        tieu_de: 'RFQ Bông và vải kate lụa quý 3',
+        han_bao_gia: rfqDeadline.toISOString(),
+        dieu_khoan_thuong_mai: 'Giao tại kho May 10, thanh toán LC 30 ngày',
+      },
+      tokenMuaHang
+    );
+    assert(rfqRes.status === 201, `Tạo RFQ trả về HTTP 201 Created (Nhận ${rfqRes.status})`);
+    const createdRfqId = rfqRes.data?.data?.id;
+
+    // NCC001 gửi báo giá
+    const quote1Res = await request(
+      `/api/v1/purchasing/rfqs/${createdRfqId}/quotes`,
+      'POST',
+      {
+        ma_nha_cung_cap: 1,
+        ma_vat_tu: 1,
+        so_luong_chao: 1000,
+        don_gia_chao: 62000,
+        thoi_gian_giao_hang_ngay: 5,
+        dieu_kien_thanh_toan: 'TTR 30 ngày',
+      },
+      tokenMuaHang
+    );
+    assert(quote1Res.status === 201, 'NCC 1 gửi báo giá thành công (HTTP 201)');
+    const quote1Id = quote1Res.data?.data?.id;
+
+    // NCC002 gửi báo giá
+    const quote2Res = await request(
+      `/api/v1/purchasing/rfqs/${createdRfqId}/quotes`,
+      'POST',
+      {
+        ma_nha_cung_cap: 2,
+        ma_vat_tu: 1,
+        so_luong_chao: 1000,
+        don_gia_chao: 64500,
+        thoi_gian_giao_hang_ngay: 7,
+        dieu_kien_thanh_toan: 'TTR 45 ngày',
+      },
+      tokenMuaHang
+    );
+    assert(quote2Res.status === 201, 'NCC 2 gửi báo giá thành công (HTTP 201)');
+
+    // So sánh & Lựa chọn NCC 1
+    const selectRes = await request(
+      `/api/v1/purchasing/rfqs/${createdRfqId}/select-vendor`,
+      'POST',
+      {
+        quote_id: quote1Id,
+        ly_do_chon: 'Giá rẻ hơn 2,500đ/mét và giao hàng nhanh hơn 2 ngày',
+      },
+      tokenMuaHang
+    );
+    assert(selectRes.status === 200, `Lựa chọn NCC thắng thầu trả về HTTP 200 OK (Nhận ${selectRes.status})`);
+    assert(selectRes.data?.data?.po?.id !== undefined, 'Hệ thống tự động phát hành đơn PO từ báo giá được chọn');
+    assert(selectRes.data?.data?.rfq?.trang_thai === 'da_chot', 'Trạng thái RFQ chuyển: da_chot');
+
+    // -------------------------------------------------------------------------
+    // TEST 15: Supplier Evaluation & Rating Calculation
+    // -------------------------------------------------------------------------
+    console.log('\n15. TEST 15: Đánh giá chất lượng nhà cung cấp định kỳ:');
+    const evalRes = await request(
+      '/api/v1/purchasing/suppliers/1/evaluations',
+      'POST',
+      {
+        ky_danh_gia: 'Q3-2026',
+        diem_chat_luong: 9.5,
+        diem_giao_hang: 9.0,
+        diem_gia_ca: 9.0,
+        nhan_xet: 'Chất lượng vải kate xuất sắc, giao đúng hạn hợp đồng',
+      },
+      tokenMuaHang
+    );
+    assert(evalRes.status === 201, `Tạo đánh giá NCC trả về HTTP 201 Created (Nhận ${evalRes.status})`);
+    assert(parseFloat(evalRes.data?.data?.diem_tong_hop) === 9.2, 'Điểm tổng hợp tính đúng trọng số (0.4/0.3/0.3) = 9.2');
+
+    // Tra cứu danh sách đánh giá
+    const listEvalRes = await request('/api/v1/purchasing/suppliers/1/evaluations', 'GET', null, tokenMuaHang);
+    assert(listEvalRes.status === 200, 'Tra cứu lịch sử đánh giá NCC trả về HTTP 200 OK');
+    assert(Array.isArray(listEvalRes.data?.data) && listEvalRes.data.data.length > 0, 'Có ít nhất 1 bản ghi đánh giá');
+
+    // -------------------------------------------------------------------------
+    // TEST 16: Quality Inspection on PO Receipt (Lỗi hỏng & kiểm định)
+    // -------------------------------------------------------------------------
+    console.log('\n16. TEST 16: Nhận hàng kèm kiểm nghiệm quy cách phẩm chất:');
+    const rfqPoId = selectRes.data?.data?.po?.id;
+    // Approve the RFQ-generated PO first so it can be received
+    await request(`/api/v1/purchasing/purchase-orders/${rfqPoId}/approve`, 'POST', {}, tokenMuaHang);
+
+    const inspectReceiveRes = await request(
+      '/api/v1/purchasing/receive-status-update',
+      'POST',
+      {
+        ma_don_mua_hang: rfqPoId,
+        chiTiet: [
+          {
+            ma_vat_tu: 1,
+            so_luong_nhap: 500,
+            so_luong_loi_hong: 5,
+            ghi_chu_kiem_dinh: '5m bị lỗi dệt mép, lập biên bản trừ tiền',
+          },
+        ],
+      },
+      tokenKho
+    );
+    assert(inspectReceiveRes.status === 200, `Kiểm nghiệm & nhận hàng trả về HTTP 200 OK (Nhận ${inspectReceiveRes.status})`);
+    assert(inspectReceiveRes.data?.data?.trang_thai === 'dang_giao', 'PO chuyển sang dang_giao khi nhận 500/1000m');
   } catch (err) {
     console.error('Lỗi ngoại lệ trong quá trình chạy kiểm thử:', err);
     failed++;
@@ -624,7 +854,7 @@ async function runAllPurchasingTests() {
   if (failed > 0) {
     process.exit(1);
   } else {
-    console.log('🎉 TẤT CẢ 12 TIÊU CHÍ KIỂM THỬ PH3 ĐÃ VƯỢT QUA 100%!\n');
+    console.log('🎉 TẤT CẢ 16 TIÊU CHÍ KIỂM THỬ PH3 ĐÃ VƯỢT QUA 100%!\n');
     process.exit(0);
   }
 }

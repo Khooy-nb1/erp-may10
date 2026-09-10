@@ -167,12 +167,17 @@ Phân hệ PH3 tuyệt đối không biến mọi lỗi nghiệp vụ thành HTT
   "ma_don_mua_hang": 1,
   "ghi_chu": "Nhập kho đợt 1",
   "chiTiet": [
-    { "ma_vat_tu": 1, "so_luong_nhap": 200 }
+    {
+      "ma_vat_tu": 1,
+      "so_luong_nhap": 200,
+      "so_luong_loi_hong": 2,
+      "ghi_chu_kiem_dinh": "2 đơn vị lỗi dệt mép"
+    }
   ]
 }
 ```
   - **Cơ chế tự động:**
-    - Cập nhật lũy kế `so_luong_da_nhap`.
+    - Cập nhật lũy kế `so_luong_da_nhap`, `so_luong_loi_hong`, `ghi_chu_kiem_dinh`.
     - Nếu tổng nhận < tổng đặt: PO chuyển sang `dang_giao`.
     - Nếu tổng nhận >= 100% tất cả mặt hàng: PO tự động chuyển sang `da_nhap_kho`.
 
@@ -183,3 +188,112 @@ Phân hệ PH3 tuyệt đối không biến mọi lỗi nghiệp vụ thành HTT
   - **Quyền:** `mua_hang`, `admin`
   - **Query params:** `tu_ngay`, `den_ngay`, `ma_nha_cung_cap`
   - **Phản hồi:** Cơ cấu chi tiêu theo nhà cung cấp, theo chủng loại vật tư và xu hướng chi tiêu theo tháng.
+
+---
+
+### 2.8. Quản lý Yêu cầu mua hàng (Purchase Requisitions - PR)
+- **`GET /api/v1/purchasing/requisitions`**
+  - **Quyền:** `mua_hang`, `admin`, `kho`
+  - **Query params:** `page`, `limit`, `search`, `trang_thai`
+  - **Phản hồi:** Danh sách PR kèm thông tin người yêu cầu, người duyệt, số mặt hàng, tổng số lượng.
+
+- **`GET /api/v1/purchasing/requisitions/:id`**
+  - **Quyền:** `mua_hang`, `admin`, `kho`
+  - **Phản hồi:** Chi tiết 1 yêu cầu mua sắm và mảng `chiTiet` các mặt hàng yêu cầu.
+
+- **`POST /api/v1/purchasing/requisitions`**
+  - **Quyền:** `mua_hang`, `admin`
+  - **Body:**
+```json
+{
+  "nguon_yeu_cau": "san_xuat",
+  "ghi_chu": "Vải kate cho đơn sơ mi xuất khẩu",
+  "chiTiet": [
+    {
+      "ma_vat_tu": 1,
+      "so_luong_yeu_cau": 500,
+      "don_gia_du_kien": 65000,
+      "ngay_can_giao": "2026-09-25T00:00:00Z",
+      "ma_kho_nhap": 1
+    }
+  ]
+}
+```
+  - **Phản hồi:** `201 Created`
+
+- **`POST /api/v1/purchasing/requisitions/:id/approve`**
+  - **Quyền:** `mua_hang`, `admin`
+  - **Chức năng:** Phê duyệt PR (`cho_duyet` -> `da_duyet`).
+
+- **`POST /api/v1/purchasing/requisitions/:id/reject`**
+  - **Quyền:** `mua_hang`, `admin`
+  - **Body:** `{ "ly_do_tu_choi": "Tồn kho an toàn còn đủ" }`
+  - **Chức năng:** Từ chối PR (`cho_duyet` -> `tu_choi`).
+
+- **`POST /api/v1/purchasing/requisitions/:id/create-po`**
+  - **Quyền:** `mua_hang`, `admin`
+  - **Chức năng:** Chuyển yêu cầu mua sắm đã duyệt thành Đơn mua hàng (PO). Tự động gán `trang_thai = 'da_tao_don'`.
+
+---
+
+### 2.9. Yêu cầu báo giá (RFQ) & So sánh lựa chọn Nhà cung cấp
+- **`GET /api/v1/purchasing/rfqs`**
+  - **Quyền:** `mua_hang`, `admin`, `kho`
+  - **Phản hồi:** Danh sách các đợt RFQ kèm số báo giá nhận được từ các NCC.
+
+- **`GET /api/v1/purchasing/rfqs/:id`**
+  - **Quyền:** `mua_hang`, `admin`, `kho`
+  - **Phản hồi:** Chi tiết đợt RFQ, danh sách báo giá của các NCC, ma trận đối sánh giá / lead time / điểm chất lượng.
+
+- **`POST /api/v1/purchasing/rfqs`**
+  - **Quyền:** `mua_hang`, `admin`
+  - **Body:**
+```json
+{
+  "tieu_de": "RFQ Bông sợi và Vải kate lụa quý 3",
+  "han_bao_gia": "2026-09-20T17:00:00Z",
+  "dieu_khoan_thuong_mai": "Giao tại kho May 10, CIF Hà Nội"
+}
+```
+  - **Phản hồi:** `201 Created`
+
+- **`POST /api/v1/purchasing/rfqs/:id/quotes`**
+  - **Quyền:** `mua_hang`, `admin`
+  - **Body:** Tiếp nhận đơn giá chào từ NCC:
+```json
+{
+  "ma_nha_cung_cap": 1,
+  "ma_vat_tu": 1,
+  "so_luong_chao": 1000,
+  "don_gia_chao": 62000,
+  "thoi_gian_giao_hang_ngay": 5,
+  "dieu_kien_thanh_toan": "TTR 30 ngày"
+}
+```
+  - **Phản hồi:** `201 Created`
+
+- **`POST /api/v1/purchasing/rfqs/:id/select-vendor`**
+  - **Quyền:** `mua_hang`, `admin`
+  - **Body:** `{ "quote_id": 1, "ly_do_chon": "Giá tốt nhất và giao hàng nhanh 5 ngày", "auto_create_po": true }`
+  - **Chức năng:** Quyết định trúng thầu, lưu lý do lựa chọn và tự động phát hành đơn PO.
+
+---
+
+### 2.10. Đánh giá chất lượng Nhà cung cấp (Supplier Evaluations)
+- **`GET /api/v1/purchasing/suppliers/:id/evaluations`**
+  - **Quyền:** `mua_hang`, `admin`
+  - **Phản hồi:** Lịch sử đánh giá định kỳ của NCC (điểm chất lượng, tiến độ, giá cả, điểm tổng hợp, nhận xét).
+
+- **`POST /api/v1/purchasing/suppliers/:id/evaluations`**
+  - **Quyền:** `mua_hang`, `admin`
+  - **Body:**
+```json
+{
+  "ky_danh_gia": "Q3-2026",
+  "diem_chat_luong": 9.5,
+  "diem_giao_hang": 9.0,
+  "diem_gia_ca": 9.0,
+  "nhan_xet": "Chất lượng vải tốt, giao đúng hẹn"
+}
+```
+  - **Cơ chế tự động:** Tính điểm tổng hợp theo trọng số chuẩn (0.4 * CL + 0.3 * GH + 0.3 * GC) và tự động cập nhật điểm trung bình `diem_danh_gia` trên bảng `nha_cung_cap`.

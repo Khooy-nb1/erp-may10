@@ -140,7 +140,152 @@ function isValidStatusTransition(currentStatus, nextStatus) {
 }
 
 /**
- * Validate receiving update input
+ * Allowed State Transitions for Purchase Requisitions (PR State Machine)
+ */
+const VALID_PR_TRANSITIONS = {
+  cho_duyet: ['da_duyet', 'tu_choi', 'huy'],
+  da_duyet: ['da_tao_don', 'huy'],
+  da_tao_don: [],
+  tu_choi: [],
+  huy: [],
+};
+
+function isValidPrTransition(currentStatus, nextStatus) {
+  if (!VALID_PR_TRANSITIONS[currentStatus]) return false;
+  return VALID_PR_TRANSITIONS[currentStatus].includes(nextStatus);
+}
+
+/**
+ * Validate Purchase Requisition (yeu_cau_mua_hang)
+ */
+function validatePurchaseRequisitionInput(body) {
+  const errors = [];
+  const { nguon_yeu_cau, chiTiet } = body;
+
+  if (!nguon_yeu_cau || typeof nguon_yeu_cau !== 'string' || !nguon_yeu_cau.trim()) {
+    errors.push('Nguồn yêu cầu (nguon_yeu_cau: san_xuat, kho, noi_bo) là bắt buộc.');
+  }
+
+  if (!chiTiet || !Array.isArray(chiTiet) || chiTiet.length === 0) {
+    errors.push('Yêu cầu mua sắm phải chứa ít nhất 1 vật tư (chiTiet).');
+  } else {
+    chiTiet.forEach((item, index) => {
+      const idx = index + 1;
+      if (!item.ma_vat_tu) {
+        errors.push(`Dòng ${idx}: Mã vật tư (ma_vat_tu) là bắt buộc.`);
+      }
+      const sl = parseFloat(item.so_luong_yeu_cau);
+      if (isNaN(sl) || sl <= 0) {
+        errors.push(`Dòng ${idx}: Số lượng yêu cầu (so_luong_yeu_cau) phải là số dương lớn hơn 0.`);
+      }
+      if (item.don_gia_du_kien !== undefined && item.don_gia_du_kien !== null) {
+        const dg = parseFloat(item.don_gia_du_kien);
+        if (isNaN(dg) || dg < 0) {
+          errors.push(`Dòng ${idx}: Đơn giá dự kiến phải >= 0.`);
+        }
+      }
+      if (!item.ngay_can_giao) {
+        errors.push(`Dòng ${idx}: Ngày cần giao hàng (ngay_can_giao) là bắt buộc.`);
+      }
+    });
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validate Request for Quotation (yeu_cau_bao_gia - RFQ)
+ */
+function validateRfqInput(body) {
+  const errors = [];
+  const { tieu_de, han_bao_gia, vatTu } = body;
+
+  if (!tieu_de || typeof tieu_de !== 'string' || !tieu_de.trim()) {
+    errors.push('Tiêu đề đợt yêu cầu báo giá (tieu_de) là bắt buộc.');
+  }
+
+  if (!han_bao_gia) {
+    errors.push('Hạn chót nộp báo giá (han_bao_gia) là bắt buộc.');
+  } else {
+    const d = new Date(han_bao_gia);
+    if (isNaN(d.getTime())) {
+      errors.push('Hạn báo giá không phải là định dạng ngày giờ hợp lệ.');
+    }
+  }
+
+  if (vatTu !== undefined && (!Array.isArray(vatTu) || vatTu.length === 0)) {
+    errors.push('Đợt yêu cầu báo giá phải liệt kê ít nhất 1 vật tư cần chào giá nếu có cung cấp.');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validate Supplier Quote Submission (chi_tiet_bao_gia_ncc)
+ */
+function validateQuoteInput(body) {
+  const errors = [];
+  const { ma_nha_cung_cap, ma_vat_tu, so_luong_chao, don_gia_chao, thoi_gian_giao_hang_ngay } = body;
+
+  if (!ma_nha_cung_cap) errors.push('Mã nhà cung cấp (ma_nha_cung_cap) là bắt buộc.');
+  if (!ma_vat_tu) errors.push('Mã vật tư (ma_vat_tu) là bắt buộc.');
+
+  const sl = parseFloat(so_luong_chao);
+  if (isNaN(sl) || sl <= 0) {
+    errors.push('Số lượng chào giá (so_luong_chao) phải lớn hơn 0.');
+  }
+
+  const dg = parseFloat(don_gia_chao);
+  if (isNaN(dg) || dg < 0) {
+    errors.push('Đơn giá chào (don_gia_chao) phải là số >= 0.');
+  }
+
+  if (thoi_gian_giao_hang_ngay !== undefined) {
+    const lt = parseInt(thoi_gian_giao_hang_ngay, 10);
+    if (isNaN(lt) || lt < 0) {
+      errors.push('Thời gian giao hàng cam kết (lead time tính theo ngày) phải >= 0.');
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validate Supplier Evaluation (danh_gia_ncc)
+ */
+function validateEvaluationInput(body) {
+  const errors = [];
+  const { ma_nha_cung_cap, ky_danh_gia, diem_chat_luong, diem_giao_hang, diem_tien_do, diem_gia_ca } = body;
+
+  if (!ma_nha_cung_cap) errors.push('Mã nhà cung cấp là bắt buộc.');
+
+  const cl = parseFloat(diem_chat_luong);
+  if (isNaN(cl) || cl < 0 || cl > 10) errors.push('Điểm chất lượng phải từ 0 đến 10.');
+
+  const deliveryScore = diem_giao_hang !== undefined ? diem_giao_hang : diem_tien_do;
+  const gh = parseFloat(deliveryScore);
+  if (isNaN(gh) || gh < 0 || gh > 10) errors.push('Điểm giao hàng/tiến độ phải từ 0 đến 10.');
+
+  const gc = parseFloat(diem_gia_ca);
+  if (isNaN(gc) || gc < 0 || gc > 10) errors.push('Điểm giá cả/cạnh tranh phải từ 0 đến 10.');
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validate receiving update input with quality inspection
  */
 function validateReceiveStatusInput(body) {
   const errors = [];
@@ -162,6 +307,12 @@ function validateReceiveStatusInput(body) {
       if (isNaN(sl) || sl <= 0) {
         errors.push(`Dòng ${idx}: Số lượng nhận (so_luong_nhap) phải lớn hơn 0.`);
       }
+      if (item.so_luong_loi_hong !== undefined) {
+        const lh = parseFloat(item.so_luong_loi_hong);
+        if (isNaN(lh) || lh < 0) {
+          errors.push(`Dòng ${idx}: Số lượng lỗi/hỏng phải >= 0.`);
+        }
+      }
     });
   }
 
@@ -176,5 +327,11 @@ module.exports = {
   validatePurchaseOrderInput,
   isValidStatusTransition,
   validateReceiveStatusInput,
+  validatePurchaseRequisitionInput,
+  validateRfqInput,
+  validateQuoteInput,
+  validateEvaluationInput,
+  isValidPrTransition,
   VALID_TRANSITIONS,
+  VALID_PR_TRANSITIONS,
 };
