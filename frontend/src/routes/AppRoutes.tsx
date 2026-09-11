@@ -9,6 +9,15 @@ import { CustomerListPage } from '../pages/customers/CustomerListPage.js';
 import { CustomerCreatePage } from '../pages/customers/CustomerCreatePage.js';
 import { CustomerDetailPage } from '../pages/customers/CustomerDetailPage.js';
 import { ProductListPage } from '../pages/products/ProductListPage.js';
+import { SalesOrderListPage } from '../pages/orders/SalesOrderListPage.js';
+import { SalesOrderCreatePage } from '../pages/orders/SalesOrderCreatePage.js';
+import { SalesOrderDetailPage } from '../pages/orders/SalesOrderDetailPage.js';
+import { DeliveryListPage } from '../pages/deliveries/DeliveryListPage.js';
+import { DeliveryCreatePage } from '../pages/deliveries/DeliveryCreatePage.js';
+import { DeliveryDetailPage } from '../pages/deliveries/DeliveryDetailPage.js';
+import { InvoiceListPage } from '../pages/invoices/InvoiceListPage.js';
+import { InvoiceCreatePage } from '../pages/invoices/InvoiceCreatePage.js';
+import { InvoiceDetailPage } from '../pages/invoices/InvoiceDetailPage.js';
 
 const ScreenPlaceholder: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
   <div>
@@ -49,33 +58,22 @@ export const AppRoutes: React.FC = () => {
         <Route path="customers/new" element={<CustomerCreatePage />} />
         <Route path="customers/:id" element={<CustomerDetailPage />} />
         <Route path="products" element={<ProductListPage />} />
+        <Route path="sales-orders" element={<SalesOrderListPage />} />
+        <Route path="sales-orders/new" element={<SalesOrderCreatePage />} />
+        <Route path="sales-orders/:id" element={<SalesOrderDetailPage />} />
+        <Route path="deliveries" element={<DeliveryListPage />} />
+        <Route path="deliveries/new" element={<DeliveryCreatePage />} />
+        <Route path="deliveries/:id" element={<DeliveryDetailPage />} />
+        <Route path="invoices" element={<InvoiceListPage />} />
         <Route
-          path="sales-orders"
+          path="invoices/new"
           element={
-            <ScreenPlaceholder
-              title="Đơn bán hàng"
-              subtitle="Tạo, xác nhận và theo dõi tiến độ đơn hàng bán"
-            />
+            <ProtectedRoute allowedRoles={['ke_toan']}>
+              <InvoiceCreatePage />
+            </ProtectedRoute>
           }
         />
-        <Route
-          path="deliveries"
-          element={
-            <ScreenPlaceholder
-              title="Quản lý giao hàng"
-              subtitle="Điều phối xuất giao hàng và cập nhật trạng thái vận chuyển"
-            />
-          }
-        />
-        <Route
-          path="invoices"
-          element={
-            <ScreenPlaceholder
-              title="Hóa đơn bán hàng"
-              subtitle="Lập và theo dõi hóa đơn bán hàng theo đơn hàng"
-            />
-          }
-        />
+        <Route path="invoices/:id" element={<InvoiceDetailPage />} />
         <Route
           path="receivables"
           element={

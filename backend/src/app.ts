@@ -10,6 +10,8 @@ import { authRoutes } from './routes/auth.routes.js';
 import { customerRoutes } from './routes/customer.routes.js';
 import { productRoutes } from './routes/product.routes.js';
 import { orderRoutes } from './routes/order.routes.js';
+import { deliveryRoutes } from './routes/delivery.routes.js';
+import { invoiceRoutes } from './routes/invoice.routes.js';
 export function createApp(): Express {
   const app = express();
 
@@ -75,8 +77,14 @@ export function createApp(): Express {
   // Sales Order Management routes
   app.use('/api/v1/sales-orders', orderRoutes);
 
-  app.use(errorMiddleware);
+  // Delivery Management routes
+  app.use('/api/v1/deliveries', deliveryRoutes);
 
+  // Invoice Management routes
+  app.use('/api/v1/invoices', invoiceRoutes);
+
+  // Global error handler
+  app.use(errorMiddleware);
   return app;
 }
 
