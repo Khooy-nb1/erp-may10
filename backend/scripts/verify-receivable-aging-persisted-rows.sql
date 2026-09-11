@@ -9,10 +9,17 @@
 --   rows at each boundary and asks the production predicate chain where each
 --   one landed.
 --
--- Safety
---   Everything runs inside one explicit transaction that ends in ROLLBACK, so
---   no row survives and no seed data is modified or deleted. Safe to run
---   against the dev database at any time, repeatedly.
+-- Side effects (measured, not assumed)
+--   * No row survives. The transaction ends in ROLLBACK and the seed row count
+--     is unchanged after a run (verified: `SELECT COUNT(*) FROM cong_no`).
+--   * `cong_no` has NO triggers and NO rewrite rules (checked in pg_trigger /
+--     pg_rules), so there is no audit or cascade path that could survive.
+--   * The ONE non-transactional effect is the `cong_no_id_seq` advance: the 14
+--     inserted rows consume 14 sequence values that ROLLBACK does NOT return
+--     (PostgreSQL sequences are intentionally non-transactional). Primary keys
+--     in `cong_no` therefore acquire gaps. This is harmless for a dev database
+--     and irrelevant to the assertions below, but it means this script is NOT
+--     strictly read-only, and it MUST NOT be run against production.
 --
 -- Determinism
 --   PostgreSQL's `NOW()` is the TRANSACTION start timestamp and is constant for
@@ -31,22 +38,23 @@ BEGIN;
 CREATE TEMP TABLE boundary_row (
   label           text PRIMARY KEY,
   expected_bucket text NOT NULL,
-  due_offset      interval NOT NULL
+  -- Signed: due date is `NOW() + due_at_offset`, so future dates are positive.
+  due_at_offset   interval NOT NULL
 ) ON COMMIT DROP;
 
-INSERT INTO boundary_row (label, expected_bucket, due_offset) VALUES
-  ('due_in_1_day',        'current',    INTERVAL '1 day'),
-  ('due_now_exactly',     'current',    INTERVAL '0'),
-  ('past_due_1_second',   'b1_1_30',    INTERVAL '1 second'),
-  ('past_due_12_hours',   'b1_1_30',    INTERVAL '12 hours'),
-  ('past_due_1_day',      'b1_1_30',    INTERVAL '1 day'),
-  ('past_due_30_days',    'b1_1_30',    INTERVAL '30 days'),
-  ('past_due_30d23h',     'b1_1_30',    INTERVAL '30 days 23 hours'),
-  ('past_due_31_days',    'b2_31_60',   INTERVAL '31 days'),
-  ('past_due_60_days',    'b2_31_60',   INTERVAL '60 days'),
-  ('past_due_61_days',    'b3_61_90',   INTERVAL '61 days'),
-  ('past_due_90_days',    'b3_61_90',   INTERVAL '90 days'),
-  ('past_due_91_days',    'b4_over_90', INTERVAL '91 days');
+INSERT INTO boundary_row (label, expected_bucket, due_at_offset) VALUES
+  ('due_in_1_day',        'current',    make_interval(days =>   1)),
+  ('due_now_exactly',     'current',    make_interval(secs =>   0)),
+  ('past_due_1_second',   'b1_1_30',    make_interval(secs =>  -1)),
+  ('past_due_12_hours',   'b1_1_30',    make_interval(hours => -12)),
+  ('past_due_1_day',      'b1_1_30',    make_interval(days =>  -1)),
+  ('past_due_30_days',    'b1_1_30',    make_interval(days => -30)),
+  ('past_due_30d23h',     'b1_1_30',    make_interval(days => -30, hours => -23)),
+  ('past_due_31_days',    'b2_31_60',   make_interval(days => -31)),
+  ('past_due_60_days',    'b2_31_60',   make_interval(days => -60)),
+  ('past_due_61_days',    'b3_61_90',   make_interval(days => -61)),
+  ('past_due_90_days',    'b3_61_90',   make_interval(days => -90)),
+  ('past_due_91_days',    'b4_over_90', make_interval(days => -91));
 
 -- id -> label, populated from RETURNING so each row is tracked exactly.
 CREATE TEMP TABLE inserted_row (
@@ -54,8 +62,8 @@ CREATE TEMP TABLE inserted_row (
   label text NOT NULL
 ) ON COMMIT DROP;
 
--- Persist one real cong_no row per boundary. `due_offset` is subtracted from
--- the transaction-constant NOW(), making "30d23h past due" exact.
+-- Persist one real cong_no row per boundary. Offsets are anchored to the
+-- transaction-constant NOW(), making "30d23h past due" exact.
 WITH inserted AS (
   INSERT INTO cong_no (
     loai_cong_no, ma_khach_hang, so_tien_phat_sinh, so_tien_da_thanh_toan,
@@ -67,7 +75,7 @@ WITH inserted AS (
     100.00,
     0.00,
     100.00,
-    NOW() - b.due_offset,
+    NOW() + b.due_at_offset,
     'chua_thanh_toan'
   FROM boundary_row b
   RETURNING id, ngay_dao_han
@@ -75,7 +83,7 @@ WITH inserted AS (
 INSERT INTO inserted_row (id, label)
 SELECT i.id, b.label
 FROM inserted i
-JOIN boundary_row b ON i.ngay_dao_han = NOW() - b.due_offset;
+JOIN boundary_row b ON i.ngay_dao_han = NOW() + b.due_at_offset;
 
 -- Control A: fully PAID row (con_lai = 0) overdue by 45 days. Nothing is
 -- outstanding, so nothing may be aged — it must appear in NO bucket.
@@ -179,10 +187,11 @@ WITH checks(ord, check_name, expected, actual) AS (
       (SELECT c.actual_bucket FROM classified_control c WHERE c.label = 'control_paid_row')
 
   -- Control B: the payable row carries real money at a 45-day age, so if the
-  -- loai_cong_no filter were ever dropped it WOULD land in b4_over_90. The
-  -- production scan filters it out before classification, so nothing is bucketed.
-  UNION ALL SELECT 202, 'persisted_payable_excluded_from_aging',
-      'b4_over_90',
+  -- loai_cong_no filter were ever dropped it WOULD be bucketed (45 days falls in
+  -- the 31-60 band). The production scan filters it out before classification,
+  -- so check 200 proves it contributes nothing to any receivables figure.
+  UNION ALL SELECT 202, 'persisted_payable_would_be_bucketed_if_unfiltered',
+      'b2_31_60',
       (SELECT c.actual_bucket FROM classified_control c WHERE c.label = 'control_payable_row')
 )
 SELECT check_name, expected, actual,

@@ -42,4 +42,52 @@ describe('Environment Configuration Validation', () => {
       /Environment configuration error: PORT:/
     );
   });
+
+  it('keeps the development JWT default outside production', () => {
+    delete process.env.JWT_SECRET;
+    process.env.NODE_ENV = 'development';
+
+    // Local work and the test suite must need no secret setup.
+    assert.equal(getEnv().JWT_SECRET.length > 0, true);
+  });
+
+  it('refuses to boot in production with the built-in development JWT secret', () => {
+    delete process.env.JWT_SECRET;
+    process.env.NODE_ENV = 'production';
+
+    // The default is published in the repository, so accepting it in production
+    // would let anyone forge a token for any role. Startup must fail instead.
+    assert.throws(() => getEnv(), /Environment configuration error: JWT_SECRET:/);
+  });
+
+  it('refuses a production JWT secret shorter than 32 characters', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'too-short';
+
+    assert.throws(() => getEnv(), /Environment configuration error: JWT_SECRET:/);
+  });
+
+  it('accepts an explicit production JWT secret', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'a'.repeat(48);
+
+    assert.equal(getEnv().JWT_SECRET, 'a'.repeat(48));
+  });
+
+  it('parses PGSSL=false as false rather than JavaScript truthiness', () => {
+    // A regression guard: `z.coerce.boolean()` would read the string "false" as
+    // true and enable TLS against a server that does not support it, breaking
+    // every database connection.
+    process.env.PGSSL = 'false';
+    assert.equal(getEnv().PGSSL, false);
+
+    process.env.PGSSL = 'true';
+    resetEnvCache();
+    assert.equal(getEnv().PGSSL, true);
+  });
+
+  it('rejects an unrecognized PGSSL value instead of guessing', () => {
+    process.env.PGSSL = 'yes';
+    assert.throws(() => getEnv(), /Environment configuration error: PGSSL:/);
+  });
 });

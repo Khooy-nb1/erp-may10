@@ -92,21 +92,21 @@ export class DashboardRepository implements IDashboardRepository {
   async getSummary(window: DashboardWindow): Promise<DashboardSummary> {
     const params = windowParams(window);
 
-    const [orderTotals, statusCounts, invoiceCounts, receivables] = await Promise.all([
-      timeDashboardQuery('dashboard.summary.orders', () =>
-        query<{ order_count: number; total_order_value: string }>(
+    const [statusTotals, invoiceCounts, receivables] = await Promise.all([
+      // One statement, one snapshot: the status breakdown AND the sales value are
+      // derived together, so `SUM(statusCounts) == orderCount` is structural
+      // rather than a coincidence that a concurrent order write could break.
+      // (Two separate pooled queries would each get their own read-committed
+      // snapshot and could disagree mid-write.)
+      timeDashboardQuery('dashboard.summary.status-totals', () =>
+        query<{ status: string; count: number; order_value: string; total_order_value: string }>(
           `SELECT
-             COUNT(*)::int AS order_count,
-             COALESCE(SUM(CASE WHEN d.trang_thai <> 'huy' THEN d.tong_thanh_toan ELSE 0 END), 0)::numeric(18,2)::text AS total_order_value
-           FROM don_ban_hang d
-           JOIN khach_hang k ON k.id = d.ma_khach_hang
-           ${ORDER_WINDOW_PREDICATE}`,
-          params
-        )
-      ),
-      timeDashboardQuery('dashboard.summary.status-counts', () =>
-        query<{ status: string; count: number }>(
-          `SELECT d.trang_thai AS status, COUNT(*)::int AS count
+             d.trang_thai AS status,
+             COUNT(*)::int AS count,
+             COALESCE(SUM(CASE WHEN d.trang_thai <> 'huy' THEN d.tong_thanh_toan ELSE 0 END), 0)::numeric(18,2)::text AS order_value,
+             -- Window over the grouped rows: the grand total lands on every row in the
+             -- same snapshot, so the sum needs no second query and no JS decimal math.
+             COALESCE(SUM(SUM(CASE WHEN d.trang_thai <> 'huy' THEN d.tong_thanh_toan ELSE 0 END)) OVER (), 0)::numeric(18,2)::text AS total_order_value
            FROM don_ban_hang d
            JOIN khach_hang k ON k.id = d.ma_khach_hang
            ${ORDER_WINDOW_PREDICATE}
@@ -140,16 +140,16 @@ export class DashboardRepository implements IDashboardRepository {
       ),
     ]);
 
-    const totals = orderTotals.rows[0];
     const invoices = invoiceCounts.rows[0];
     const receivable = receivables.rows[0];
-    const breakdown = toStatusBreakdown(statusCounts.rows);
+    const breakdown = toStatusBreakdown(statusTotals.rows);
 
     return {
       // Population metric: cancelled orders stay in the count and in the status breakdown.
-      orderCount: Number(totals?.order_count ?? 0),
-      // Sales metric: cancelled orders are excluded from every money value.
-      totalOrderValue: String(totals?.total_order_value ?? '0.00'),
+      orderCount: breakdown.total,
+      // Sales metric: cancelled orders are excluded from every money value. The grand
+      // total rides along on each grouped row, so it shares the snapshot above.
+      totalOrderValue: String(statusTotals.rows[0]?.total_order_value ?? '0.00'),
       statusCounts: Object.fromEntries(breakdown.statuses.map((entry) => [entry.status, entry.count])),
       openReceivable: String(receivable?.open_receivable ?? '0.00'),
       overdueReceivable: String(receivable?.overdue_receivable ?? '0.00'),

@@ -157,6 +157,44 @@ const sqlRows: SqlRow[] = scriptOutput
     return { name, expected, actual, status };
   });
 
+// ---------------------------------------------------------------------------
+// Layer 1b — boundary proof over PERSISTED rows.
+//
+// Layer 1 classifies literal expressions (`NOW() - INTERVAL '12 hours'`); it
+// never reads a stored row, so it cannot show that a real cong_no row at a
+// boundary is reported in the right bucket. This layer inserts actual rows at
+// every boundary inside a transaction that always ROLLBACKs, then asks the
+// production predicate chain where each landed. The rollback is why the seed
+// row counts elsewhere in this harness are unaffected.
+// ---------------------------------------------------------------------------
+
+const PERSISTED_SQL_PATH = resolve(HERE, 'verify-receivable-aging-persisted-rows.sql');
+const persistedScriptText = readFileSync(PERSISTED_SQL_PATH, 'utf8');
+const persistedOutput = runSqlScript(persistedScriptText);
+
+const persistedRows: SqlRow[] = persistedOutput
+  .split(/\r?\n/)
+  .filter((line) => line.includes('|') && /^persisted_/.test(line))
+  .map((line) => {
+    const [name, expected, actual, status] = line.split('|');
+    return { name, expected, actual, status };
+  });
+
+if (persistedRows.length === 0) {
+  throw new Error(
+    `Persisted-row script ${PERSISTED_SQL_PATH} emitted no checks — it did not run as expected.`
+  );
+}
+
+const persistedActual = new Map(persistedRows.map((r) => [r.name, r.actual]));
+const gotPersisted = (name: string): string => {
+  const value = persistedActual.get(name);
+  if (value === undefined) {
+    throw new Error(`Persisted-row script did not emit check "${name}" — script and harness are out of sync.`);
+  }
+  return value;
+};
+
 const sqlActual = new Map(sqlRows.map((r) => [r.name, r.actual]));
 const got = (name: string): string => {
   const value = sqlActual.get(name);
@@ -284,6 +322,47 @@ const sqlFailures = sqlRows.filter((r) => r.status !== 'PASS');
 check('sql.script_check_count', '53', String(sqlRows.length));
 check('sql.script_checks_failing', '0', String(sqlFailures.length));
 check('sql.script_is_read_only_no_write_statements', 'clean', writeHits.length === 0 ? 'clean' : writeHits.join(','));
+
+// Layer 1b verdicts, replayed verbatim (each proved its own PASS in SQL, and the
+// harness re-asserts them so a FAIL in that script cannot pass unnoticed here).
+const persistedFailures = persistedRows.filter((r) => r.status !== 'PASS');
+check('persisted.script_check_count', '16', String(persistedRows.length));
+check('persisted.script_checks_failing', '0', String(persistedFailures.length));
+
+// The persisted-row script is NOT read-only: it inserts real rows inside a
+// transaction that ends in ROLLBACK. No row survives and `cong_no` has no
+// triggers or rules, but the `cong_no_id_seq` advance is non-transactional and
+// is not undone. Assert the mutation class explicitly rather than letting the
+// read-only check above imply both scripts are pure. See the script header.
+check(
+  'persisted.script_rollback_scoped',
+  'true',
+  /^ROLLBACK;/m.test(persistedScriptText) ? 'true' : 'false'
+);
+
+// `CREATE TEMP TABLE ... ON COMMIT DROP` is temp-table scoping, not destruction,
+// so it is stripped before scanning for genuinely destructive statements.
+const persistedBody = persistedScriptText.replace(/--[^\n]*/g, ' ').replace(/on commit drop/gi, ' ');
+const destructive = persistedBody.match(/\b(delete|truncate|alter|grant|revoke|update)\b/gi) ?? [];
+check('persisted.script_has_no_destructive_statements', '0', String(destructive.length));
+
+// A persisted probe must write ONLY the table under test. INSERT targets are
+// collected and the two temp scratch tables are discounted; anything else would
+// be an unannounced write to seed data.
+const insertTargets = [...persistedBody.matchAll(/\binsert\s+into\s+([a-z_][a-z0-9_]*)/gi)].map((m) =>
+  m[1].toLowerCase()
+);
+const persistentTargets = [...new Set(insertTargets)].filter(
+  (table) => table !== 'boundary_row' && table !== 'inserted_row'
+);
+check('persisted.script_inserts_only_the_table_under_test', 'cong_no', persistentTargets.join(','));
+check('persisted.boundary_is_exhaustive_on_stored_rows', '12', gotPersisted('persisted_bucket_counts_are_exhaustive'));
+check('persisted.paid_row_is_unbucketed', 'UNBUCKETED', gotPersisted('persisted_paid_row_is_unbucketed'));
+check(
+  'persisted.payable_would_be_bucketed_if_unfiltered',
+  'b2_31_60',
+  gotPersisted('persisted_payable_would_be_bucketed_if_unfiltered')
+);
 
 // Layer 2 — summary recomputed in TypeScript vs the production formula in SQL.
 check('ts.summary_total_original', formatCents(ts.totalOriginal), got('summary_total_original'));

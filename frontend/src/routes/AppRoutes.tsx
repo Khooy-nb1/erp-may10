@@ -1,8 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from '../components/common/AppShell.js';
-import { PageHeader } from '../components/common/PageHeader.js';
-import { EmptyState } from '../components/common/EmptyState.js';
 import { LoginPage } from '../pages/auth/LoginPage.js';
 import { ProtectedRoute } from './ProtectedRoute.js';
 import { CustomerListPage } from '../pages/customers/CustomerListPage.js';
@@ -19,16 +17,7 @@ import { InvoiceListPage } from '../pages/invoices/InvoiceListPage.js';
 import { InvoiceCreatePage } from '../pages/invoices/InvoiceCreatePage.js';
 import { InvoiceDetailPage } from '../pages/invoices/InvoiceDetailPage.js';
 import { ReceivableListPage } from '../pages/receivables/ReceivableListPage.js';
-
-const ScreenPlaceholder: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
-  <div>
-    <PageHeader title={title} subtitle={subtitle} />
-    <EmptyState
-      title={`${title} - Chức năng đang hoàn thiện`}
-      description={`Phân hệ ${title} sẽ được triển khai theo kế hoạch phân kỳ.`}
-    />
-  </div>
-);
+import { DashboardPage } from '../pages/dashboard/DashboardPage.js';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -46,15 +35,7 @@ export const AppRoutes: React.FC = () => {
         }
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route
-          path="dashboard"
-          element={
-            <ScreenPlaceholder
-              title="Tổng quan kinh doanh"
-              subtitle="Số liệu doanh thu, tình trạng đơn hàng và công nợ bán hàng"
-            />
-          }
-        />
+        <Route path="dashboard" element={<DashboardPage />} />
         <Route path="customers" element={<CustomerListPage />} />
         <Route path="customers/new" element={<CustomerCreatePage />} />
         <Route path="customers/:id" element={<CustomerDetailPage />} />

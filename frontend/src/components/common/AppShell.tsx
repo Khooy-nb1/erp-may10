@@ -12,7 +12,7 @@ interface NavItem {
 // Strictly obey foundation rule: "Do not show navigation for screens that are not implemented."
 // Business modules are marked implemented as they are developed in P2-P9.
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Tổng quan', path: '/dashboard', icon: '📊', implemented: false },
+  { label: 'Tổng quan', path: '/dashboard', icon: '📊', implemented: true },
   { label: 'Khách hàng', path: '/customers', icon: '👥', implemented: true },
   { label: 'Sản phẩm', path: '/products', icon: '📦', implemented: true },
   { label: 'Đơn bán hàng', path: '/sales-orders', icon: '📋', implemented: true },
