@@ -8,7 +8,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres_dev_password
     ports:
-      - "5432:5432"
+      # Host port is overridable: on machines where 5432 is already taken (e.g. a native
+      # PostgreSQL service), run with POSTGRES_HOST_PORT=55432 and set PGPORT in backend/.env.
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

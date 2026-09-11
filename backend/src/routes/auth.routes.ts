@@ -1,12 +1,17 @@
 import { Router } from 'express';
 import { authService, loginSchema } from '../services/auth.service.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
+import { loginRateLimiter } from '../middlewares/rate-limit.middleware.js';
 import { sendSuccess } from '../utils/response.js';
 
-export function createAuthRoutes(service = authService, auth = authenticate): Router {
+export function createAuthRoutes(
+  service = authService,
+  auth = authenticate,
+  loginLimiter = loginRateLimiter
+): Router {
   const router = Router();
 
-  router.post('/login', async (req, res, next) => {
+  router.post('/login', loginLimiter, async (req, res, next) => {
     try {
       const validated = loginSchema.parse(req.body);
       const result = await service.login(validated);

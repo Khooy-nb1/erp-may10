@@ -12,6 +12,8 @@ import { productRoutes } from './routes/product.routes.js';
 import { orderRoutes } from './routes/order.routes.js';
 import { deliveryRoutes } from './routes/delivery.routes.js';
 import { invoiceRoutes } from './routes/invoice.routes.js';
+import { dashboardRoutes } from './routes/dashboard.routes.js';
+import { receivableRoutes } from './routes/receivable.routes.js';
 export function createApp(): Express {
   const app = express();
 
@@ -83,6 +85,11 @@ export function createApp(): Express {
   // Invoice Management routes
   app.use('/api/v1/invoices', invoiceRoutes);
 
+  // Dashboard aggregate metrics routes (P9)
+  app.use('/api/v1/dashboard', dashboardRoutes);
+
+  // Accounts Receivable routes
+  app.use('/api/v1/receivables', receivableRoutes);
   // Global error handler
   app.use(errorMiddleware);
   return app;

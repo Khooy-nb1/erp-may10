@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { customerService } from '../services/customer.service.js';
+import { receivableService } from '../services/receivable.service.js';
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js';
 import { sendSuccess, sendPaginated } from '../utils/response.js';
 
-export function createCustomerRoutes(service = customerService, auth = authenticate): Router {
+export function createCustomerRoutes(service = customerService, auth = authenticate, recService = receivableService): Router {
   const router = Router();
 
   // All customer routes require authentication
@@ -75,6 +76,26 @@ export function createCustomerRoutes(service = customerService, auth = authentic
     try {
       const summary = await service.getCustomerSummary(Number(req.params.id));
       sendSuccess(res, summary);
+    } catch (err) {
+      next(err);
+    }
+  });
+  // 7. Get customer specific receivables
+  router.get('/:id/receivables', requireRole('admin', 'ban_hang', 'ke_toan'), async (req, res, next) => {
+    try {
+      const result = await recService.getCustomerReceivables(Number(req.params.id), req.query);
+      sendPaginated(
+        res,
+        result.receivables,
+        {
+          page: result.page,
+          pageSize: result.pageSize,
+          total: result.total,
+          totalPages: result.totalPages,
+        },
+        null,
+        200
+      );
     } catch (err) {
       next(err);
     }

@@ -1,7 +1,7 @@
 # Roles & Permission Matrix — ERP Sales & Customer Management
 
 **Document Status:** Technical Baseline (P0 Contract)  
-**Verification State:** Static SQL schema analysis verified; live PostgreSQL runtime comparison and seed linkage execution are **BLOCKED** pending access to a reachable development database instance.  
+**Verification State:** Static SQL schema analysis verified; live PostgreSQL runtime comparison and seed linkage execution **COMPLETED 2026-09-11** against a disposable development database (see `docs/database/seed-checklist.md`, "P0 acceptance evidence").  
 **Scope:** Role-Based Access Control (RBAC) definitions and permission matrices governing `/api/v1/*` endpoints.
 
 ---
@@ -19,7 +19,7 @@ User accounts and roles are sourced from the existing `nguoi_dung` table.
   - `ban_hang`: Sales Representative / Sales Manager
   - `kho`: Warehouse Clerk / Fulfillment Staff
   - `ke_toan`: Accountant / Credit Controller
-- **Live Verification Status:** **BLOCKED** pending live database connectivity.
+- **Live Verification Status:** **COMPLETED 2026-09-11** against a disposable development PostgreSQL instance (see `docs/database/seed-checklist.md`).
 
 ---
 

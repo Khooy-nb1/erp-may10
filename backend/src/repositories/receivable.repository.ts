@@ -166,22 +166,31 @@ export class ReceivableRepository implements IReceivableRepository {
   }
 
   async getAgingReport(): Promise<AgingReport> {
+    // Buckets MUST be mutually exclusive AND exhaustive over every row with
+    // so_tien_con_lai > 0, so that (current + b1 + b2 + b3 + b4) always equals
+    // total_receivables and (b1 + b2 + b3 + b4) always equals the summary's
+    // total_overdue. Two rules make that hold:
+    //   1. "past due" starts at the first instant after ngay_dao_han, so a row
+    //      that is 12 hours overdue is already overdue — it must land in the
+    //      first overdue band, never fall through a whole-day gap.
+    //   2. Band edges use interval arithmetic (31/61/91 days), which is exact
+    //      at the 1/30/31/60/61/90/91-day boundary probes.
     const sql = `
       SELECT
         COALESCE(SUM(CASE WHEN ngay_dao_han >= NOW() AND so_tien_con_lai > 0 THEN so_tien_con_lai ELSE 0 END), 0) AS current_amount,
         COUNT(CASE WHEN ngay_dao_han >= NOW() AND so_tien_con_lai > 0 THEN 1 END) AS current_count,
 
-        COALESCE(SUM(CASE WHEN NOW() > ngay_dao_han AND EXTRACT(DAY FROM NOW() - ngay_dao_han) BETWEEN 1 AND 30 AND so_tien_con_lai > 0 THEN so_tien_con_lai ELSE 0 END), 0) AS b1_amount,
-        COUNT(CASE WHEN NOW() > ngay_dao_han AND EXTRACT(DAY FROM NOW() - ngay_dao_han) BETWEEN 1 AND 30 AND so_tien_con_lai > 0 THEN 1 END) AS b1_count,
+        COALESCE(SUM(CASE WHEN ngay_dao_han < NOW() AND NOW() - ngay_dao_han < INTERVAL '31 days' AND so_tien_con_lai > 0 THEN so_tien_con_lai ELSE 0 END), 0) AS b1_amount,
+        COUNT(CASE WHEN ngay_dao_han < NOW() AND NOW() - ngay_dao_han < INTERVAL '31 days' AND so_tien_con_lai > 0 THEN 1 END) AS b1_count,
 
-        COALESCE(SUM(CASE WHEN NOW() > ngay_dao_han AND EXTRACT(DAY FROM NOW() - ngay_dao_han) BETWEEN 31 AND 60 AND so_tien_con_lai > 0 THEN so_tien_con_lai ELSE 0 END), 0) AS b2_amount,
-        COUNT(CASE WHEN NOW() > ngay_dao_han AND EXTRACT(DAY FROM NOW() - ngay_dao_han) BETWEEN 31 AND 60 AND so_tien_con_lai > 0 THEN 1 END) AS b2_count,
+        COALESCE(SUM(CASE WHEN NOW() - ngay_dao_han >= INTERVAL '31 days' AND NOW() - ngay_dao_han < INTERVAL '61 days' AND so_tien_con_lai > 0 THEN so_tien_con_lai ELSE 0 END), 0) AS b2_amount,
+        COUNT(CASE WHEN NOW() - ngay_dao_han >= INTERVAL '31 days' AND NOW() - ngay_dao_han < INTERVAL '61 days' AND so_tien_con_lai > 0 THEN 1 END) AS b2_count,
 
-        COALESCE(SUM(CASE WHEN NOW() > ngay_dao_han AND EXTRACT(DAY FROM NOW() - ngay_dao_han) BETWEEN 61 AND 90 AND so_tien_con_lai > 0 THEN so_tien_con_lai ELSE 0 END), 0) AS b3_amount,
-        COUNT(CASE WHEN NOW() > ngay_dao_han AND EXTRACT(DAY FROM NOW() - ngay_dao_han) BETWEEN 61 AND 90 AND so_tien_con_lai > 0 THEN 1 END) AS b3_count,
+        COALESCE(SUM(CASE WHEN NOW() - ngay_dao_han >= INTERVAL '61 days' AND NOW() - ngay_dao_han < INTERVAL '91 days' AND so_tien_con_lai > 0 THEN so_tien_con_lai ELSE 0 END), 0) AS b3_amount,
+        COUNT(CASE WHEN NOW() - ngay_dao_han >= INTERVAL '61 days' AND NOW() - ngay_dao_han < INTERVAL '91 days' AND so_tien_con_lai > 0 THEN 1 END) AS b3_count,
 
-        COALESCE(SUM(CASE WHEN NOW() > ngay_dao_han AND EXTRACT(DAY FROM NOW() - ngay_dao_han) > 90 AND so_tien_con_lai > 0 THEN so_tien_con_lai ELSE 0 END), 0) AS b4_amount,
-        COUNT(CASE WHEN NOW() > ngay_dao_han AND EXTRACT(DAY FROM NOW() - ngay_dao_han) > 90 AND so_tien_con_lai > 0 THEN 1 END) AS b4_count,
+        COALESCE(SUM(CASE WHEN NOW() - ngay_dao_han >= INTERVAL '91 days' AND so_tien_con_lai > 0 THEN so_tien_con_lai ELSE 0 END), 0) AS b4_amount,
+        COUNT(CASE WHEN NOW() - ngay_dao_han >= INTERVAL '91 days' AND so_tien_con_lai > 0 THEN 1 END) AS b4_count,
 
         COALESCE(SUM(CASE WHEN so_tien_con_lai > 0 THEN so_tien_con_lai ELSE 0 END), 0) AS total_receivables
       FROM cong_no

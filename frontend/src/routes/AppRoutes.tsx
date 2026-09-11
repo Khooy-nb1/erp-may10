@@ -18,6 +18,7 @@ import { DeliveryDetailPage } from '../pages/deliveries/DeliveryDetailPage.js';
 import { InvoiceListPage } from '../pages/invoices/InvoiceListPage.js';
 import { InvoiceCreatePage } from '../pages/invoices/InvoiceCreatePage.js';
 import { InvoiceDetailPage } from '../pages/invoices/InvoiceDetailPage.js';
+import { ReceivableListPage } from '../pages/receivables/ReceivableListPage.js';
 
 const ScreenPlaceholder: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
   <div>
@@ -74,15 +75,7 @@ export const AppRoutes: React.FC = () => {
           }
         />
         <Route path="invoices/:id" element={<InvoiceDetailPage />} />
-        <Route
-          path="receivables"
-          element={
-            <ScreenPlaceholder
-              title="Quản lý công nợ"
-              subtitle="Theo dõi công nợ phải thu khách hàng và tuổi nợ"
-            />
-          }
-        />
+        <Route path="receivables" element={<ReceivableListPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

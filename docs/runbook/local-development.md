@@ -43,6 +43,21 @@ Kiểm tra trạng thái sẵn sàng:
 docker compose ps
 ```
 
+> **Lưu ý về cổng host:** `docker-compose.yml` publish cổng host qua biến `POSTGRES_HOST_PORT` với mặc định là
+> `5432`. Nếu máy đã có sẵn một dịch vụ PostgreSQL khác đang chiếm cổng 5432, hãy khởi động kèm biến override
+> để tránh xung đột, và đặt `PGPORT` trong `backend/.env` cho khớp với cổng đã chọn:
+>
+> ```bash
+> # Git Bash / macOS / Linux
+> POSTGRES_HOST_PORT=55432 docker compose up -d postgres
+>
+> # PowerShell
+> $env:POSTGRES_HOST_PORT=55432; docker compose up -d postgres
+> ```
+>
+> Khi dùng override, đặt `PGPORT=55432` trong `backend/.env`. Lệnh `psql` ở mục 5 cũng phải dùng
+> `-p 55432` tương ứng.
+
 ---
 
 ## 4. Khởi tạo Cấu hình Môi trường

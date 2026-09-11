@@ -1,7 +1,7 @@
 # Module Ownership Matrix & Cross-Module Architecture Boundaries
 
 > **P0 Baseline & Verification Notice:**  
-> Live database verification against a development PostgreSQL instance (including one `SELECT` query per scoped table and seed relational linkage execution) is currently **BLOCKED** pending a reachable development database environment.  
+> Live database verification against a development PostgreSQL instance (one `SELECT` query per scoped table and seed relational linkage execution) was **COMPLETED 2026-09-11** against a disposable development database; see `docs/database/seed-checklist.md`, "P0 acceptance evidence".  
 > The structural schemas, columns, constraints, and relationships documented herein are derived as **Confirmed Static Facts** from `backend/database/schema.sql` and `backend/database/seed_updated.sql`.  
 > Architectural policies and cross-module boundaries are documented as **Provisional Defaults** designed to unblock initial foundation, authentication, and RBAC development without claiming stakeholder sign-off.
 

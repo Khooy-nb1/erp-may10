@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Customer, CustomerSummary } from '../../types/customer.js';
+import { Receivable, ReceivableStatus, ReceivableSummary } from '../../types/receivable.js';
 import { getCustomerById, getCustomerSummary, updateCustomerStatus } from '../../services/customerService.js';
+import { getCustomerReceivables, getReceivableSummary } from '../../services/receivableService.js';
 import { useAuth } from '../../context/AuthContext.js';
 import { PageHeader } from '../../components/common/PageHeader.js';
 import { LoadingState } from '../../components/common/LoadingState.js';
 import { ErrorState } from '../../components/common/ErrorState.js';
 import { EmptyState } from '../../components/common/EmptyState.js';
+
+const RECEIVABLE_STATUS_CONFIG: Record<ReceivableStatus, { label: string; bg: string; color: string }> = {
+  chua_thanh_toan: { label: 'Chưa thanh toán', bg: '#fef9c3', color: '#854d0e' },
+  mot_phan: { label: 'Thanh toán một phần', bg: '#e0e7ff', color: '#3730a3' },
+  da_thanh_toan: { label: 'Đã thanh toán', bg: '#dcfce7', color: '#15803d' },
+  qua_han: { label: 'Quá hạn', bg: '#fee2e2', color: '#b91c1c' },
+};
 
 export const CustomerDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +29,15 @@ export const CustomerDetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'info' | 'orders' | 'invoices' | 'receivables'>('info');
 
   const [updatingStatus, setUpdatingStatus] = useState<boolean>(false);
+
+  // Receivables tab (lazy-loaded on first open)
+  const [receivables, setReceivables] = useState<Receivable[]>([]);
+  const [receivableSummary, setReceivableSummary] = useState<ReceivableSummary | null>(null);
+  const [receivablesLoading, setReceivablesLoading] = useState<boolean>(false);
+  const [receivablesError, setReceivablesError] = useState<string | null>(null);
+  const [receivablesLoadedFor, setReceivablesLoadedFor] = useState<number | null>(null);
+  const [receivablesTotal, setReceivablesTotal] = useState<number>(0);
+  const [receivablesReloadKey, setReceivablesReloadKey] = useState<number>(0);
 
   const fetchData = async () => {
     setLoading(true);
@@ -44,6 +62,36 @@ export const CustomerDetailPage: React.FC = () => {
     }
   }, [customerId]);
 
+  useEffect(() => {
+    if (activeTab !== 'receivables' || !customerId || receivablesLoadedFor === customerId) {
+      return;
+    }
+
+    let cancelled = false;
+    setReceivablesLoading(true);
+    setReceivablesError(null);
+
+    Promise.all([getCustomerReceivables(customerId, { pageSize: 100 }), getReceivableSummary(customerId)])
+      .then(([page, sum]) => {
+        if (cancelled) return;
+        setReceivables(page.receivables);
+        setReceivablesTotal(page.meta.total);
+        setReceivableSummary(sum);
+        setReceivablesLoadedFor(customerId);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setReceivablesError(err instanceof Error ? err.message : 'Không thể tải sổ công nợ');
+      })
+      .finally(() => {
+        if (!cancelled) setReceivablesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, customerId, receivablesLoadedFor, receivablesReloadKey]);
+
   const handleStatusChange = async (newStatus: string) => {
     if (!confirm(`Bạn có chắc chắn muốn chuyển trạng thái khách hàng sang "${newStatus}"?`)) {
       return;
@@ -61,6 +109,29 @@ export const CustomerDetailPage: React.FC = () => {
 
   const formatCurrency = (val: string | number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('vi-VN');
+  };
+
+  const renderReceivableStatus = (st: ReceivableStatus) => {
+    const c = RECEIVABLE_STATUS_CONFIG[st] || { bg: '#f1f5f9', color: '#475569', label: st };
+    return (
+      <span
+        style={{
+          padding: '0.2rem 0.55rem',
+          borderRadius: '9999px',
+          fontSize: '0.75rem',
+          fontWeight: 600,
+          backgroundColor: c.bg,
+          color: c.color,
+        }}
+      >
+        {c.label}
+      </span>
+    );
   };
 
   if (loading) {
@@ -323,10 +394,148 @@ export const CustomerDetailPage: React.FC = () => {
       )}
 
       {activeTab === 'receivables' && (
-        <EmptyState
-          title="Sổ chi tiết công nợ"
-          description="Lịch sử công nợ phải thu sẽ hiển thị khi phân hệ Công nợ (P8) được hoàn thiện."
-        />
+        <div>
+          <div
+            style={{
+              padding: '0.6rem 1rem',
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '6px',
+              color: '#1d4ed8',
+              fontSize: '0.85rem',
+              marginBottom: '1rem',
+            }}
+          >
+            Chỉ đọc — ghi nhận thanh toán thuộc Kế toán.
+          </div>
+
+          {receivablesError ? (
+            <ErrorState
+              message={receivablesError}
+              onRetry={() => setReceivablesReloadKey((k) => k + 1)}
+            />
+          ) : receivablesLoading || receivablesLoadedFor !== customerId ? (
+            <LoadingState message="Đang tải sổ công nợ..." />
+          ) : receivables.length === 0 ? (
+            <EmptyState
+              title="Không có công nợ phải thu"
+              description="Khách hàng này hiện không có khoản công nợ phải thu nào."
+            />
+          ) : (
+            <>
+              {receivableSummary && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: '0.75rem',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  <div style={{ backgroundColor: '#ffffff', padding: '0.9rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Phát sinh</span>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a', marginTop: '0.2rem' }}>
+                      {formatCurrency(receivableSummary.totalOriginal)}
+                    </div>
+                  </div>
+                  <div style={{ backgroundColor: '#ffffff', padding: '0.9rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Đã thu</span>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#15803d', marginTop: '0.2rem' }}>
+                      {formatCurrency(receivableSummary.totalPaid)}
+                    </div>
+                  </div>
+                  <div style={{ backgroundColor: '#ffffff', padding: '0.9rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Còn lại</span>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#d97706', marginTop: '0.2rem' }}>
+                      {formatCurrency(receivableSummary.totalOutstanding)}
+                    </div>
+                  </div>
+                  <div style={{ backgroundColor: '#ffffff', padding: '0.9rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Quá hạn</span>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#dc2626', marginTop: '0.2rem' }}>
+                      {formatCurrency(receivableSummary.totalOverdue)}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.15rem' }}>
+                      {receivableSummary.overdueCount} khoản quá hạn
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  overflow: 'hidden',
+                }}
+              >
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
+                      <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Mã hóa đơn</th>
+                      <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Phát sinh</th>
+                      <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Đã thanh toán</th>
+                      <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Còn lại</th>
+                      <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Ngày đáo hạn</th>
+                      <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'center' }}>Số ngày quá hạn</th>
+                      <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'center' }}>Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {receivables.map((r) => (
+                      <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 600, color: '#2563eb' }}>
+                          {r.ma_hoa_don ? (
+                            <Link to={`/invoices/${r.ma_hoa_don}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                              {r.ma_hoa_don_code || `#${r.ma_hoa_don}`}
+                            </Link>
+                          ) : (
+                            r.ma_hoa_don_code || '—'
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0f172a', textAlign: 'right' }}>
+                          {formatCurrency(r.so_tien_phat_sinh)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 500, color: '#15803d', textAlign: 'right' }}>
+                          {formatCurrency(r.so_tien_da_thanh_toan)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#d97706', textAlign: 'right' }}>
+                          {formatCurrency(r.so_tien_con_lai)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>{formatDate(r.ngay_dao_han)}</td>
+                        <td
+                          style={{
+                            padding: '0.75rem 1rem',
+                            textAlign: 'center',
+                            fontWeight: r.daysOverdue && r.daysOverdue > 0 ? 600 : 400,
+                            color: r.daysOverdue && r.daysOverdue > 0 ? '#dc2626' : '#94a3b8',
+                          }}
+                        >
+                          {r.daysOverdue && r.daysOverdue > 0 ? r.daysOverdue : '—'}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>{renderReceivableStatus(r.trang_thai)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div
+                  style={{
+                    padding: '0.75rem 1rem',
+                    borderTop: '1px solid #e2e8f0',
+                    backgroundColor: '#f8fafc',
+                    fontSize: '0.8rem',
+                    color: '#64748b',
+                  }}
+                >
+                  Hiển thị {receivables.length}/{receivablesTotal} khoản công nợ phải thu
+                  {receivablesTotal > receivables.length && ' — xem đầy đủ tại trang Sổ công nợ.'}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

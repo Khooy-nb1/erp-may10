@@ -18,7 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Đơn bán hàng', path: '/sales-orders', icon: '📋', implemented: true },
   { label: 'Giao hàng', path: '/deliveries', icon: '🚚', implemented: true },
   { label: 'Hóa đơn', path: '/invoices', icon: '🧾', implemented: true },
-  { label: 'Công nợ', path: '/receivables', icon: '💰', implemented: false },
+  { label: 'Công nợ', path: '/receivables', icon: '💰', implemented: true },
 ];
 
 export const AppShell: React.FC = () => {

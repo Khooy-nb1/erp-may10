@@ -1,7 +1,7 @@
 # Database Invariants & Business Rules — ERP Sales & Customer Management
 
 **Document Status:** Technical Baseline (P0 Contract)  
-**Verification State:** Static SQL schema analysis verified; live PostgreSQL runtime comparison and seed linkage execution are **BLOCKED** pending access to a reachable development database instance.  
+**Verification State:** Static SQL schema analysis verified; live PostgreSQL runtime comparison and seed linkage execution **COMPLETED 2026-09-11** against a disposable development database (see `docs/database/seed-checklist.md`, "P0 acceptance evidence").  
 **Scope:** Core database invariants, transactional boundaries, query restrictions, audit rules, and calculation policies across all in-scope tables.
 
 ---
@@ -11,7 +11,7 @@
 The database schema (`backend/database/schema.sql`) represents a shared enterprise PostgreSQL database supporting multiple modules (Sales, Production, Warehouse, Purchasing, Accounting).
 
 - **Static Evidence:** Scoped table structures, foreign keys, unique constraints, and check constraints have been verified statically against `backend/database/schema.sql` and `backend/database/seed_updated.sql`.
-- **Live Verification Status:** **BLOCKED**. Execution of `SELECT` checks against a live PostgreSQL development database and query-based seed linkage validation have not been performed due to lack of a reachable development database instance.
+- **Live Verification Status:** **COMPLETED 2026-09-11**. `SELECT` checks against a live PostgreSQL development database and query-based seed linkage validation were executed successfully; see `docs/database/seed-checklist.md`.
 - **Architectural Principle:** The Sales & CRM module must strictly adhere to the database constraints without altering existing schema definitions or adding unapproved migration scripts.
 
 ---

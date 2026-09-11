@@ -1,7 +1,7 @@
 # API Business Error Codes — ERP Sales & Customer Management
 
 **Document Status:** Technical Baseline (P0 Contract)  
-**Verification State:** Static SQL schema analysis verified; live PostgreSQL runtime comparison and seed linkage execution are **BLOCKED** pending access to a reachable development database instance.  
+**Verification State:** Static SQL schema analysis verified; live PostgreSQL runtime comparison and seed linkage execution **COMPLETED 2026-09-11** against a disposable development database (see `docs/database/seed-checklist.md`, "P0 acceptance evidence").  
 **Scope:** Authoritative business error definitions returned in the standard error envelope across `/api/v1/*`.
 
 ---
