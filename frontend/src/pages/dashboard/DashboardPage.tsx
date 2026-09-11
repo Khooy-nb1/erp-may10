@@ -15,10 +15,20 @@ import {
   getTopCustomers,
   getTopProducts,
 } from '../../services/dashboardService.js';
-import { PageHeader } from '../../components/common/PageHeader.js';
-import { LoadingState } from '../../components/common/LoadingState.js';
-import { EmptyState } from '../../components/common/EmptyState.js';
-import { ErrorState } from '../../components/common/ErrorState.js';
+import { VStack, HStack } from '@astryxdesign/core/Stack';
+import { Grid } from '@astryxdesign/core/Grid';
+import { Card } from '@astryxdesign/core/Card';
+import { Heading, Text } from '@astryxdesign/core/Text';
+import { Button } from '@astryxdesign/core/Button';
+import { Selector } from '@astryxdesign/core/Selector';
+import { DateInput } from '@astryxdesign/core/DateInput';
+import type { ISODateString } from '@astryxdesign/core/Calendar';
+import { ProgressBar } from '@astryxdesign/core/ProgressBar';
+import { Table, proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
+import { Banner } from '@astryxdesign/core/Banner';
+import { PageScaffold } from '../../components/common/PageScaffold.js';
+import { AsyncPanel } from '../../components/common/AsyncPanel.js';
+import { StatusBadge } from '../../components/common/StatusBadge.js';
 import { useAuth } from '../../context/AuthContext.js';
 
 /**
@@ -40,6 +50,29 @@ type Loadable<T> = {
   error: string | null;
   reload: () => void;
 };
+
+const PERIOD_VALUES: DashboardPeriod[] = ['month', 'quarter', 'year', 'custom'];
+
+function isDashboardPeriod(value: string): value is DashboardPeriod {
+  return (PERIOD_VALUES as string[]).includes(value);
+}
+
+/** Narrows the serialized widget params back to a typed query object. */
+function parseStoredParams(serialized: string): DashboardQueryParams {
+  const parsed: unknown = JSON.parse(serialized);
+  if (parsed && typeof parsed === 'object' && 'period' in parsed) {
+    const period = parsed.period;
+    if (typeof period === 'string' && isDashboardPeriod(period)) {
+      const stored = parsed as Partial<DashboardQueryParams>;
+      return {
+        period,
+        ...(period === 'custom' ? { fromDate: stored.fromDate, toDate: stored.toDate } : {}),
+        limit: stored.limit,
+      };
+    }
+  }
+  return { period: 'month', limit: 5 };
+}
 
 /** One independent widget request. Each call site gets its own state slot. */
 function useWidget<T>(
@@ -70,7 +103,9 @@ function useWidget<T>(
     setLoading(true);
     setError(null);
 
-    fetcher(JSON.parse(paramKey) as DashboardQueryParams)
+    const params = parseStoredParams(paramKey);
+
+    fetcher(params)
       .then((result) => {
         if (!cancelled) setData(result);
       })
@@ -98,59 +133,11 @@ const PERIOD_OPTIONS: Array<{ value: DashboardPeriod; label: string }> = [
   { value: 'custom', label: 'Tùy chọn' },
 ];
 
-/** Label per `don_ban_hang.trang_thai`; unknown values fall back to the raw code. */
-const STATUS_LABELS: Record<string, string> = {
-  cho_xac_nhan: 'Chờ xác nhận',
-  da_xac_nhan: 'Đã xác nhận',
-  dang_san_xuat: 'Đang sản xuất',
-  da_giao: 'Đã giao',
-  huy: 'Đã hủy',
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  cho_xac_nhan: '#f59e0b',
-  da_xac_nhan: '#3b82f6',
-  dang_san_xuat: '#8b5cf6',
-  da_giao: '#10b981',
-  huy: '#ef4444',
-};
-
 const formatCurrency = (value: string | number | undefined): string =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value ?? 0) || 0);
 
 const formatQuantity = (value: string | number | undefined): string =>
   new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 }).format(Number(value ?? 0) || 0);
-
-const cardStyle: React.CSSProperties = {
-  background: '#fff',
-  border: '1px solid #e2e8f0',
-  borderRadius: '0.5rem',
-  padding: '1rem 1.25rem',
-  minWidth: 0,
-};
-
-const cardTitleStyle: React.CSSProperties = {
-  margin: '0 0 0.75rem',
-  fontSize: '0.95rem',
-  fontWeight: 600,
-  color: '#0f172a',
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: 'left',
-  padding: '0.5rem 0.75rem',
-  fontSize: '0.75rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.03em',
-  color: '#64748b',
-  borderBottom: '1px solid #e2e8f0',
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: '0.5rem 0.75rem',
-  fontSize: '0.875rem',
-  borderBottom: '1px solid #f1f5f9',
-};
 
 /** Shared panel boundary: loading, error and empty are handled identically per widget. */
 const Widget: React.FC<{
@@ -162,48 +149,114 @@ const Widget: React.FC<{
   emptyMessage: string;
   children: React.ReactNode;
 }> = ({ title, loading, error, isEmpty, onRetry, emptyMessage, children }) => (
-  <section style={cardStyle}>
-    <h3 style={cardTitleStyle}>{title}</h3>
-    {loading ? (
-      <LoadingState />
-    ) : error ? (
-      <ErrorState message={error} onRetry={onRetry} />
-    ) : isEmpty ? (
-      <EmptyState title="Chưa có dữ liệu" description={emptyMessage} />
-    ) : (
-      children
-    )}
-  </section>
+  <Card>
+    <VStack gap={3}>
+      <Heading level={3}>{title}</Heading>
+      <AsyncPanel
+        isLoading={loading}
+        error={error}
+        isEmpty={isEmpty}
+        onRetry={onRetry}
+        emptyTitle="Chưa có dữ liệu"
+        emptyDescription={emptyMessage}
+      >
+        {children}
+      </AsyncPanel>
+    </VStack>
+  </Card>
 );
 
 /** Horizontal bar list shared by the revenue and status widgets. */
 const BarList: React.FC<{
-  rows: Array<{ key: string; label: string; value: number; display: string; color?: string }>;
+  rows: Array<{ key: string; label: string; value: number; display: string; variant?: 'accent' | 'success' | 'warning' | 'error' | 'neutral' }>;
 }> = ({ rows }) => {
   const max = Math.max(...rows.map((r) => r.value), 1);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <VStack gap={3}>
       {rows.map((row) => (
-        <div key={row.key}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#334155' }}>
-            <span>{row.label}</span>
-            <span style={{ fontWeight: 600 }}>{row.display}</span>
-          </div>
-          <div style={{ background: '#f1f5f9', borderRadius: '999px', height: '0.5rem', marginTop: '0.25rem' }}>
-            <div
-              style={{
-                width: `${Math.max((row.value / max) * 100, row.value > 0 ? 2 : 0)}%`,
-                background: row.color ?? '#2563eb',
-                height: '100%',
-                borderRadius: '999px',
-              }}
-            />
-          </div>
-        </div>
+        <VStack gap={1} key={row.key}>
+          <HStack gap={2} hAlign="between">
+            <Text type="supporting">{row.label}</Text>
+            <Text type="label">{row.display}</Text>
+          </HStack>
+          <ProgressBar
+            label={row.label}
+            value={row.value}
+            max={max}
+            isLabelHidden
+            variant={row.variant ?? 'accent'}
+          />
+        </VStack>
       ))}
-    </div>
+    </VStack>
   );
 };
+
+interface CustomerRankRow extends Record<string, unknown> {
+  maKhachHang: number;
+  maKhachHangCode: string;
+  tenKhachHang: string;
+  orderCount: number;
+  totalValue: string;
+}
+
+interface ProductRankRow extends Record<string, unknown> {
+  maSanPham: number;
+  maSanPhamCode: string;
+  tenSanPham: string;
+  quantity: string | number;
+  totalValue: string;
+}
+
+const customerColumns: TableColumn<CustomerRankRow>[] = [
+  {
+    key: 'tenKhachHang',
+    header: 'Khách hàng',
+    width: proportional(2),
+    renderCell: (item) => (
+      <VStack gap={0}>
+        <Text type="label">{item.tenKhachHang}</Text>
+        <Text type="supporting">{item.maKhachHangCode}</Text>
+      </VStack>
+    ),
+  },
+  { key: 'orderCount', header: 'Số đơn', width: pixel(80), align: 'end' },
+  {
+    key: 'totalValue',
+    header: 'Giá trị',
+    width: pixel(140),
+    align: 'end',
+    renderCell: (item) => <Text type="label" hasTabularNumbers>{formatCurrency(item.totalValue)}</Text>,
+  },
+];
+
+const productColumns: TableColumn<ProductRankRow>[] = [
+  {
+    key: 'tenSanPham',
+    header: 'Sản phẩm',
+    width: proportional(2),
+    renderCell: (item) => (
+      <VStack gap={0}>
+        <Text type="label">{item.tenSanPham}</Text>
+        <Text type="supporting">{item.maSanPhamCode}</Text>
+      </VStack>
+    ),
+  },
+  {
+    key: 'quantity',
+    header: 'Số lượng',
+    width: pixel(90),
+    align: 'end',
+    renderCell: (item) => <Text hasTabularNumbers>{formatQuantity(item.quantity)}</Text>,
+  },
+  {
+    key: 'totalValue',
+    header: 'Giá trị',
+    width: pixel(140),
+    align: 'end',
+    renderCell: (item) => <Text type="label" hasTabularNumbers>{formatCurrency(item.totalValue)}</Text>,
+  },
+];
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -215,8 +268,8 @@ export const DashboardPage: React.FC = () => {
   const canViewReceivables = role === 'admin' || role === 'ke_toan';
 
   const [period, setPeriod] = useState<DashboardPeriod>('month');
-  const [fromDate, setFromDate] = useState<string>('');
-  const [toDate, setToDate] = useState<string>('');
+  const [fromDate, setFromDate] = useState<ISODateString | undefined>(undefined);
+  const [toDate, setToDate] = useState<ISODateString | undefined>(undefined);
 
   const customRangeIncomplete = period === 'custom' && (!fromDate || !toDate);
 
@@ -251,80 +304,52 @@ export const DashboardPage: React.FC = () => {
   const revenueMaxTotal = revenue.data?.total;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <PageHeader
-        title="Tổng quan kinh doanh"
-        subtitle="Số liệu doanh thu, tình trạng đơn hàng và công nợ bán hàng"
-      />
-
+    <PageScaffold
+      title="Tổng quan kinh doanh"
+      subtitle="Số liệu doanh thu, tình trạng đơn hàng và công nợ bán hàng"
+    >
       {/* Shared date filter — one control drives every widget. */}
-      <section style={{ ...cardStyle, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '0.75rem' }}>
-        <div>
-          <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>
-            Khoảng thời gian
-          </label>
-          <select
+      <Card>
+        <HStack gap={3} vAlign="end" wrap="wrap">
+          <Selector
+            label="Khoảng thời gian"
+            options={PERIOD_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
             value={period}
-            onChange={(e) => setPeriod(e.target.value as DashboardPeriod)}
-            style={{ padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid #cbd5e1', minWidth: '10rem' }}
-          >
-            {PERIOD_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {period === 'custom' && (
-          <>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>
-                Từ ngày
-              </label>
-              <input
-                type="date"
+            onChange={(value) => {
+              if (value && isDashboardPeriod(value)) setPeriod(value);
+            }}
+            width={200}
+          />
+          {period === 'custom' && (
+            <>
+              <DateInput
+                label="Từ ngày"
                 value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                style={{ padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid #cbd5e1' }}
+                onChange={setFromDate}
               />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>
-                Đến ngày
-              </label>
-              <input
-                type="date"
+              <DateInput
+                label="Đến ngày"
                 value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                style={{ padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid #cbd5e1' }}
+                onChange={setToDate}
               />
-            </div>
-          </>
-        )}
+            </>
+          )}
+          <Button
+            label="Làm mới"
+            variant="primary"
+            isDisabled={customRangeIncomplete}
+            onClick={refreshAll}
+          />
+        </HStack>
+      </Card>
 
-        <button
-          type="button"
-          onClick={refreshAll}
-          disabled={customRangeIncomplete}
-          style={{
-            padding: '0.5rem 1rem',
-            borderRadius: '0.375rem',
-            border: '1px solid #2563eb',
-            background: customRangeIncomplete ? '#cbd5e1' : '#2563eb',
-            color: '#fff',
-            cursor: customRangeIncomplete ? 'not-allowed' : 'pointer',
-          }}
-        >
-          Làm mới
-        </button>
-
-        {customRangeIncomplete && (
-          <span style={{ fontSize: '0.8rem', color: '#b45309' }}>
-            Chọn đủ ngày bắt đầu và kết thúc để xem số liệu tùy chọn.
-          </span>
-        )}
-      </section>
+      {customRangeIncomplete && (
+        <Banner
+          status="warning"
+          title="Chọn đủ ngày bắt đầu và kết thúc để xem số liệu tùy chọn."
+          collapsible={false}
+        />
+      )}
 
       {/* KPI cards — role-scoped by the server; absent metrics are simply not rendered. */}
       <Widget
@@ -335,13 +360,7 @@ export const DashboardPage: React.FC = () => {
         onRetry={summary.reload}
         emptyMessage="Chưa có số liệu trong khoảng thời gian đã chọn."
       >
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(11rem, 1fr))',
-            gap: '0.75rem',
-          }}
-        >
+        <Grid columns={{ minWidth: 176, repeat: 'fit' }} gap={3}>
           {metrics?.orderCount !== undefined && (
             <Kpi label="Tổng số đơn" value={String(metrics.orderCount)} />
           )}
@@ -360,10 +379,10 @@ export const DashboardPage: React.FC = () => {
           {metrics?.overdueInvoiceCount !== undefined && (
             <Kpi label="Hóa đơn quá hạn" value={String(metrics.overdueInvoiceCount)} tone="danger" />
           )}
-        </div>
+        </Grid>
       </Widget>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(20rem, 1fr))', gap: '1.25rem' }}>
+      <Grid columns={{ minWidth: 320, repeat: 'fit' }} gap={5}>
         {canViewMoney && (
           <Widget
             title={revenue.data?.label ?? 'Doanh thu theo hóa đơn'}
@@ -374,10 +393,11 @@ export const DashboardPage: React.FC = () => {
             emptyMessage="Chưa có hóa đơn nào trong khoảng thời gian đã chọn."
           >
             {revenue.data && (
-              <>
-                <p style={{ margin: '0 0 0.5rem', fontSize: '0.75rem', color: '#64748b' }}>
-                  Nguồn dữ liệu: <code>{revenue.data.source}</code> — tổng {formatCurrency(revenueMaxTotal)}
-                </p>
+              <VStack gap={3}>
+                <Text type="supporting">
+                  Nguồn dữ liệu: <Text type="code">{revenue.data.source}</Text> — tổng{' '}
+                  {formatCurrency(revenueMaxTotal)}
+                </Text>
                 <BarList
                   rows={revenueRows.map((point) => ({
                     key: point.period,
@@ -386,7 +406,7 @@ export const DashboardPage: React.FC = () => {
                     display: formatCurrency(point.revenue),
                   }))}
                 />
-              </>
+              </VStack>
             )}
           </Widget>
         )}
@@ -399,26 +419,27 @@ export const DashboardPage: React.FC = () => {
           onRetry={status.reload}
           emptyMessage="Chưa có đơn hàng nào trong khoảng thời gian đã chọn."
         >
-          <BarList
-            rows={(status.data?.statuses ?? []).map((entry) => ({
-              key: entry.status,
-              label: STATUS_LABELS[entry.status] ?? entry.status,
-              value: entry.count,
-              display: String(entry.count),
-              color: STATUS_COLORS[entry.status] ?? '#94a3b8',
-            }))}
-          />
+          <VStack gap={3}>
+            {(status.data?.statuses ?? []).map((entry) => (
+              <HStack key={entry.status} gap={2} hAlign="between" vAlign="center">
+                <StatusBadge status={entry.status} />
+                <Text type="label" hasTabularNumbers>
+                  {entry.count}
+                </Text>
+              </HStack>
+            ))}
+          </VStack>
         </Widget>
-      </div>
+      </Grid>
 
       {/* Order value is aggregate-only; the breakdown chart covers all statuses. */}
       {statusRows.length > 0 && (
-        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
+        <Text type="supporting">
           Tổng số đơn theo trạng thái: {statusTotal} (bao gồm đơn đã hủy).
-        </p>
+        </Text>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(22rem, 1fr))', gap: '1.25rem' }}>
+      <Grid columns={{ minWidth: 352, repeat: 'fit' }} gap={5}>
         {canViewMoney && (
           <Widget
             title="Khách hàng mua nhiều nhất"
@@ -428,29 +449,18 @@ export const DashboardPage: React.FC = () => {
             onRetry={topCustomers.reload}
             emptyMessage="Chưa có đơn hàng nào để xếp hạng khách hàng."
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Khách hàng</th>
-                  <th style={thStyle}>Số đơn</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Giá trị</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(topCustomers.data?.items ?? []).map((item) => (
-                  <tr key={item.maKhachHang}>
-                    <td style={tdStyle}>
-                      <div style={{ fontWeight: 600 }}>{item.tenKhachHang}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{item.maKhachHangCode}</div>
-                    </td>
-                    <td style={tdStyle}>{item.orderCount}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>
-                      {formatCurrency(item.totalValue)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <Table<CustomerRankRow>
+              data={(topCustomers.data?.items ?? []).map((item) => ({
+                maKhachHang: item.maKhachHang,
+                maKhachHangCode: item.maKhachHangCode,
+                tenKhachHang: item.tenKhachHang,
+                orderCount: item.orderCount,
+                totalValue: item.totalValue,
+              }))}
+              columns={customerColumns}
+              idKey="maKhachHang"
+              density="compact"
+            />
           </Widget>
         )}
 
@@ -463,61 +473,38 @@ export const DashboardPage: React.FC = () => {
             onRetry={topProducts.reload}
             emptyMessage="Chưa có chi tiết đơn hàng nào để xếp hạng sản phẩm."
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Sản phẩm</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Số lượng</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Giá trị</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(topProducts.data?.items ?? []).map((item) => (
-                  <tr key={item.maSanPham}>
-                    <td style={tdStyle}>
-                      <div style={{ fontWeight: 600 }}>{item.tenSanPham}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{item.maSanPhamCode}</div>
-                    </td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatQuantity(item.quantity)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>
-                      {formatCurrency(item.totalValue)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <Table<ProductRankRow>
+              data={(topProducts.data?.items ?? []).map((item) => ({
+                maSanPham: item.maSanPham,
+                maSanPhamCode: item.maSanPhamCode,
+                tenSanPham: item.tenSanPham,
+                quantity: item.quantity,
+                totalValue: item.totalValue,
+              }))}
+              columns={productColumns}
+              idKey="maSanPham"
+              density="compact"
+            />
           </Widget>
         )}
-      </div>
+      </Grid>
 
       {!canViewReceivables && (
-        <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+        <Text type="supporting">
           Chỉ số công nợ chi tiết được giới hạn cho quản trị viên và kế toán.
-        </p>
+        </Text>
       )}
-    </div>
+    </PageScaffold>
   );
 };
 
 const Kpi: React.FC<{ label: string; value: string; tone?: 'info' | 'danger' }> = ({ label, value, tone }) => (
-  <div
-    style={{
-      border: '1px solid #e2e8f0',
-      borderRadius: '0.5rem',
-      padding: '0.75rem',
-      background: tone === 'danger' ? '#fef2f2' : tone === 'info' ? '#eff6ff' : '#f8fafc',
-    }}
-  >
-    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>{label}</div>
-    <div
-      style={{
-        fontSize: '1.05rem',
-        fontWeight: 700,
-        color: tone === 'danger' ? '#b91c1c' : '#0f172a',
-        overflowWrap: 'anywhere',
-      }}
-    >
-      {value}
-    </div>
-  </div>
+  <Card variant={tone === 'danger' ? 'red' : tone === 'info' ? 'blue' : 'muted'} padding={3}>
+    <VStack gap={1}>
+      <Text type="supporting">{label}</Text>
+      <Text type="label" hasTabularNumbers>
+        {value}
+      </Text>
+    </VStack>
+  </Card>
 );

@@ -1,29 +1,98 @@
 import React, { useState, useEffect } from 'react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
+import { Grid } from '@astryxdesign/core/Grid';
+import { HStack, VStack } from '@astryxdesign/core/Stack';
+import { Text, Heading } from '@astryxdesign/core/Text';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '@astryxdesign/core/Button';
+import { Card } from '@astryxdesign/core/Card';
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { Selector } from '@astryxdesign/core/Selector';
+import { proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
 import { Receivable, ReceivableStatus, ReceivableSummary, AgingReport, AgingBucket } from '../../types/receivable.js';
 import { getReceivables, getReceivableSummary, getAgingReport } from '../../services/receivableService.js';
-import { PageHeader } from '../../components/common/PageHeader.js';
-import { LoadingState } from '../../components/common/LoadingState.js';
-import { EmptyState } from '../../components/common/EmptyState.js';
-import { ErrorState } from '../../components/common/ErrorState.js';
+import { PageScaffold } from '../../components/common/PageScaffold.js';
+import { DataTableCard } from '../../components/common/DataTableCard.js';
+import { StatusBadge } from '../../components/common/StatusBadge.js';
 import { useAuth } from '../../context/AuthContext.js';
 
 type SortColumn = 'ngay_dao_han' | 'so_tien_con_lai';
 
-const STATUS_LABELS: Record<ReceivableStatus, string> = {
-  chua_thanh_toan: 'Chưa thanh toán',
-  mot_phan: 'Thanh toán một phần',
-  da_thanh_toan: 'Đã thanh toán',
-  qua_han: 'Quá hạn',
+/**
+ * Columns this screen reads off `Receivable`. Declared as an object type alias so
+ * the API payload can be handed to the table as-is, without re-mapping rows.
+ */
+type ReceivableRow = {
+  id: number;
+  ma_khach_hang: number;
+  ten_khach_hang?: string;
+  ma_khach_hang_code?: string;
+  ma_hoa_don_code?: string;
+  so_tien_phat_sinh: number | string;
+  so_tien_da_thanh_toan: number | string;
+  so_tien_con_lai: number | string;
+  ngay_dao_han: string;
+  daysOverdue?: number;
+  trang_thai: ReceivableStatus;
 };
 
-const STATUS_STYLES: Record<ReceivableStatus, { bg: string; color: string }> = {
-  chua_thanh_toan: { bg: '#fef9c3', color: '#854d0e' },
-  mot_phan: { bg: '#e0e7ff', color: '#3730a3' },
-  da_thanh_toan: { bg: '#dcfce7', color: '#15803d' },
-  qua_han: { bg: '#fee2e2', color: '#b91c1c' },
+/** One row of the aging report: a bucket, plus the report's total row. */
+type AgingRow = {
+  id: string;
+  label: string;
+  count: number;
+  totalAmount: string;
+  isTotal: boolean;
 };
 
-const STATUS_OPTIONS: ReceivableStatus[] = ['chua_thanh_toan', 'mot_phan', 'da_thanh_toan', 'qua_han'];
+const STATUS_OPTIONS = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'chua_thanh_toan', label: 'Chưa thanh toán' },
+  { value: 'mot_phan', label: 'Thanh toán một phần' },
+  { value: 'da_thanh_toan', label: 'Đã thanh toán' },
+  { value: 'qua_han', label: 'Quá hạn' },
+];
+
+const formatCurrency = (val: string | number) => {
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
+};
+
+const formatDate = (dateStr: string | null) => {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('vi-VN');
+};
+
+const agingColumns: TableColumn<AgingRow>[] = [
+  {
+    key: 'label',
+    header: 'Nhóm tuổi nợ',
+    width: proportional(2),
+    renderCell: (item) => <Text weight={item.isTotal ? 'bold' : 'normal'}>{item.label}</Text>,
+  },
+  {
+    key: 'count',
+    header: 'Số khoản',
+    width: pixel(120),
+    align: 'center',
+    renderCell: (item) => (
+      <Text weight={item.isTotal ? 'bold' : 'normal'} hasTabularNumbers>
+        {item.count}
+      </Text>
+    ),
+  },
+  {
+    key: 'totalAmount',
+    header: 'Tiền còn phải thu',
+    width: pixel(200),
+    align: 'end',
+    renderCell: (item) => (
+      <Text weight={item.isTotal ? 'bold' : 'semibold'} hasTabularNumbers>
+        {formatCurrency(item.totalAmount)}
+      </Text>
+    ),
+  },
+];
 
 export const ReceivableListPage: React.FC = () => {
   const { user } = useAuth();
@@ -116,449 +185,256 @@ export const ReceivableListPage: React.FC = () => {
     }
   };
 
-  const sortIndicator = (column: SortColumn) => {
-    if (sortBy !== column) return '';
-    return sortOrder === 'ASC' ? ' ▲' : ' ▼';
-  };
+  /**
+   * Sortable header: clicking it toggles the server-side sort exactly like the
+   * old header button did. The arrow icon shows the active direction and the
+   * accessible name carries it too, so the sort state is not colour-only.
+   */
+  const renderSortHeader = (column: SortColumn, label: string, tooltip: string) => (
+    <Button
+      label={sortBy === column ? `${label} (sắp xếp ${sortOrder === 'ASC' ? 'tăng dần' : 'giảm dần'})` : label}
+      variant="ghost"
+      size="sm"
+      icon={
+        sortBy === column ? sortOrder === 'ASC' ? <ArrowUp size={14} /> : <ArrowDown size={14} /> : undefined
+      }
+      tooltip={tooltip}
+      onClick={() => handleSort(column)}
+    >
+      {label}
+    </Button>
+  );
 
-  const formatCurrency = (val: string | number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('vi-VN');
-  };
-
-  const renderStatusBadge = (st: ReceivableStatus) => {
-    const config = STATUS_STYLES[st] || { bg: '#f1f5f9', color: '#475569' };
-    return (
-      <span
-        style={{
-          padding: '0.2rem 0.55rem',
-          borderRadius: '9999px',
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          whiteSpace: 'nowrap',
-          backgroundColor: config.bg,
-          color: config.color,
-        }}
-      >
-        {STATUS_LABELS[st] || st}
-      </span>
-    );
-  };
+  const columns: TableColumn<ReceivableRow>[] = [
+    {
+      key: 'khach_hang',
+      header: 'Khách hàng',
+      width: proportional(2),
+      renderCell: (item) => (
+        <VStack gap={0.5}>
+          <Text weight="medium">{item.ten_khach_hang || `Mã #${item.ma_khach_hang}`}</Text>
+          {item.ma_khach_hang_code ? (
+            <Text type="code" color="secondary">
+              {item.ma_khach_hang_code}
+            </Text>
+          ) : null}
+        </VStack>
+      ),
+    },
+    {
+      key: 'ma_hoa_don_code',
+      header: 'Hóa đơn',
+      width: proportional(1),
+      renderCell: (item) => (
+        <Text type="code" weight="semibold">
+          {item.ma_hoa_don_code || '—'}
+        </Text>
+      ),
+    },
+    {
+      key: 'so_tien_phat_sinh',
+      header: 'Phát sinh',
+      width: pixel(160),
+      align: 'end',
+      renderCell: (item) => <Text hasTabularNumbers>{formatCurrency(item.so_tien_phat_sinh)}</Text>,
+    },
+    {
+      key: 'so_tien_da_thanh_toan',
+      header: 'Đã thanh toán',
+      width: pixel(160),
+      align: 'end',
+      renderCell: (item) => <Text hasTabularNumbers>{formatCurrency(item.so_tien_da_thanh_toan)}</Text>,
+    },
+    {
+      key: 'so_tien_con_lai',
+      header: renderSortHeader('so_tien_con_lai', 'Còn lại', 'Sắp xếp theo số tiền còn lại'),
+      width: pixel(160),
+      align: 'end',
+      renderCell: (item) => (
+        <Text weight="bold" hasTabularNumbers>
+          {formatCurrency(item.so_tien_con_lai)}
+        </Text>
+      ),
+    },
+    {
+      key: 'ngay_dao_han',
+      header: renderSortHeader('ngay_dao_han', 'Ngày đáo hạn', 'Sắp xếp theo ngày đáo hạn'),
+      width: pixel(170),
+      renderCell: (item) => <Text type="supporting">{formatDate(item.ngay_dao_han)}</Text>,
+    },
+    {
+      key: 'days_overdue',
+      header: 'Số ngày quá hạn',
+      width: pixel(160),
+      renderCell: (item) => {
+        const daysOverdue = Number(item.daysOverdue) || 0;
+        return daysOverdue > 0 ? (
+          <Text weight="semibold">Quá hạn {daysOverdue} ngày</Text>
+        ) : (
+          <Text color="secondary">—</Text>
+        );
+      },
+    },
+    {
+      key: 'trang_thai',
+      header: 'Trạng thái',
+      width: pixel(150),
+      align: 'center',
+      renderCell: (item) => <StatusBadge status={item.trang_thai} />,
+    },
+  ];
 
   const agingBuckets: AgingBucket[] = aging
     ? [aging.current, aging.days1To30, aging.days31To60, aging.days61To90, aging.daysOver90]
     : [];
   const agingCountTotal = agingBuckets.reduce((sum, bucket) => sum + bucket.count, 0);
+  const agingRows: AgingRow[] = aging
+    ? [
+        ...agingBuckets.map((bucket) => ({
+          id: bucket.label,
+          label: bucket.label,
+          count: bucket.count,
+          totalAmount: bucket.totalAmount,
+          isTotal: false,
+        })),
+        {
+          id: 'tong-cong',
+          label: 'Tổng cộng',
+          count: agingCountTotal,
+          totalAmount: aging.totalReceivables,
+          isTotal: true,
+        },
+      ]
+    : [];
 
   return (
-    <div>
-      <PageHeader
-        title="Công nợ phải thu"
-        subtitle={`Công nợ phải thu khách hàng, chỉ đọc trong phân hệ Bán hàng (${total} khoản)`}
-      />
-
+    <PageScaffold
+      title="Công nợ phải thu"
+      subtitle={`Công nợ phải thu khách hàng, chỉ đọc trong phân hệ Bán hàng (${total} khoản)`}
+    >
       {/* Read-only Notice */}
-      <div
-        style={{
-          backgroundColor: '#eff6ff',
-          border: '1px solid #bfdbfe',
-          borderRadius: '8px',
-          padding: '0.75rem 1rem',
-          marginBottom: '1.5rem',
-          color: '#1e40af',
-          fontSize: '0.85rem',
-        }}
-      >
-        Phân hệ Bán hàng chỉ đọc dữ liệu công nợ. Ghi nhận thanh toán thuộc trách nhiệm Kế toán.
-      </div>
+      <Banner
+        status="info"
+        title="Phân hệ Bán hàng chỉ đọc dữ liệu công nợ. Ghi nhận thanh toán thuộc trách nhiệm Kế toán."
+      />
 
       {/* Overview Error */}
       {overviewError && (
-        <div
-          style={{
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: '8px',
-            padding: '0.75rem 1rem',
-            marginBottom: '1.5rem',
-            color: '#991b1b',
-            fontSize: '0.85rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem',
-          }}
-        >
-          <span>Không thể tải đầy đủ số liệu tổng quan: {overviewError}</span>
-          <button
-            onClick={fetchOverview}
-            style={{
-              padding: '0.35rem 0.7rem',
-              backgroundColor: '#ffffff',
-              color: '#991b1b',
-              border: '1px solid #fca5a5',
-              borderRadius: '6px',
-              fontSize: '0.8rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Thử lại
-          </button>
-        </div>
+        <Banner
+          status="error"
+          title={`Không thể tải đầy đủ số liệu tổng quan: ${overviewError}`}
+          endContent={<Button label="Thử lại" variant="secondary" size="sm" onClick={fetchOverview} />}
+        />
       )}
 
       {/* Summary KPI Cards */}
       {summary && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1rem',
-            marginBottom: '1.5rem',
-          }}
-        >
-          <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Tổng phát sinh</span>
-            <div style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a', marginTop: '0.25rem' }}>
-              {formatCurrency(summary.totalOriginal)}
-            </div>
-          </div>
-          <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Đã thu</span>
-            <div style={{ fontSize: '1.25rem', fontWeight: 600, color: '#16a34a', marginTop: '0.25rem' }}>
-              {formatCurrency(summary.totalPaid)}
-            </div>
-          </div>
-          <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Còn phải thu</span>
-            <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#2563eb', marginTop: '0.25rem' }}>
-              {formatCurrency(summary.totalOutstanding)}
-            </div>
-          </div>
-          <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Quá hạn</span>
-            <div style={{ fontSize: '1.25rem', fontWeight: 700, color: Number(summary.totalOverdue) > 0 ? '#dc2626' : '#0f172a', marginTop: '0.25rem' }}>
-              {formatCurrency(summary.totalOverdue)}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: '#b91c1c', marginTop: '0.25rem' }}>
-              {summary.overdueCount} khoản quá hạn
-            </div>
-          </div>
-        </div>
+        <Grid columns={{ minWidth: 200, repeat: 'fit' }} gap={4}>
+          <Card padding={4}>
+            <VStack gap={1}>
+              <Text type="supporting">Tổng phát sinh</Text>
+              <Text type="large" weight="semibold">
+                {formatCurrency(summary.totalOriginal)}
+              </Text>
+            </VStack>
+          </Card>
+          <Card padding={4}>
+            <VStack gap={1}>
+              <Text type="supporting">Đã thu</Text>
+              <Text type="large" weight="semibold">
+                {formatCurrency(summary.totalPaid)}
+              </Text>
+            </VStack>
+          </Card>
+          <Card padding={4}>
+            <VStack gap={1}>
+              <Text type="supporting">Còn phải thu</Text>
+              <Text type="large" weight="semibold">
+                {formatCurrency(summary.totalOutstanding)}
+              </Text>
+            </VStack>
+          </Card>
+          <Card padding={4}>
+            <VStack gap={1}>
+              <Text type="supporting">Quá hạn</Text>
+              <Text type="large" weight="semibold">
+                {formatCurrency(summary.totalOverdue)}
+              </Text>
+              <Text type="supporting">{summary.overdueCount} khoản quá hạn</Text>
+            </VStack>
+          </Card>
+        </Grid>
       )}
-
-      {/* Filter Bar */}
-      <div
-        style={{
-          backgroundColor: '#ffffff',
-          padding: '1rem',
-          borderRadius: '8px',
-          border: '1px solid #e2e8f0',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          gap: '1rem',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-        }}
-      >
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.5rem', flex: 1, minWidth: '280px' }}>
-          <input
-            type="text"
-            placeholder="Tìm theo mã hóa đơn hoặc tên khách hàng..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              flex: 1,
-              padding: '0.5rem 0.75rem',
-              border: '1px solid #cbd5e1',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              outline: 'none',
-            }}
-          />
-          <button
-            type="submit"
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: '#0f172a',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-            }}
-          >
-            Tìm kiếm
-          </button>
-        </form>
-
-        <select
-          value={trangThai}
-          onChange={(e) => {
-            setTrangThai(e.target.value as ReceivableStatus | '');
-            setPage(1);
-          }}
-          style={{
-            padding: '0.5rem 0.75rem',
-            border: '1px solid #cbd5e1',
-            borderRadius: '6px',
-            fontSize: '0.875rem',
-            outline: 'none',
-          }}
-        >
-          <option value="">Tất cả trạng thái</option>
-          {STATUS_OPTIONS.map((st) => (
-            <option key={st} value={st}>
-              {STATUS_LABELS[st]}
-            </option>
-          ))}
-        </select>
-
-        <label
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            fontSize: '0.875rem',
-            color: '#334155',
-            cursor: 'pointer',
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={overdueOnly}
-            onChange={(e) => {
-              setOverdueOnly(e.target.checked);
-              setPage(1);
-            }}
-          />
-          Chỉ công nợ quá hạn
-        </label>
-      </div>
 
       {/* Aging Report (admin and ke_toan only) */}
       {canViewAging && aging && (
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-            marginBottom: '1.5rem',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #e2e8f0' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a' }}>Báo cáo tuổi nợ</h3>
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-              Phân nhóm số tiền còn phải thu theo số ngày quá hạn so với ngày đáo hạn.
-            </p>
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Nhóm tuổi nợ</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'center' }}>Số khoản</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Tiền còn phải thu</th>
-              </tr>
-            </thead>
-            <tbody>
-              {agingBuckets.map((bucket) => (
-                <tr key={bucket.label} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '0.7rem 1rem', color: '#0f172a' }}>{bucket.label}</td>
-                  <td style={{ padding: '0.7rem 1rem', textAlign: 'center', color: '#475569' }}>{bucket.count}</td>
-                  <td style={{ padding: '0.7rem 1rem', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
-                    {formatCurrency(bucket.totalAmount)}
-                  </td>
-                </tr>
-              ))}
-              <tr style={{ backgroundColor: '#f8fafc' }}>
-                <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0f172a' }}>Tổng cộng</td>
-                <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, color: '#475569' }}>
-                  {agingCountTotal}
-                </td>
-                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#2563eb' }}>
-                  {formatCurrency(aging.totalReceivables)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTableCard<AgingRow>
+          label="Báo cáo tuổi nợ"
+          data={agingRows}
+          columns={agingColumns}
+          idKey="id"
+          toolbar={
+            <VStack gap={0.5}>
+              <Heading level={3}>Báo cáo tuổi nợ</Heading>
+              <Text type="supporting">
+                Phân nhóm số tiền còn phải thu theo số ngày quá hạn so với ngày đáo hạn.
+              </Text>
+            </VStack>
+          }
+        />
       )}
 
       {/* Content State */}
-      {loading ? (
-        <LoadingState message="Đang tải danh sách công nợ phải thu..." />
-      ) : error ? (
-        <ErrorState message={error} onRetry={fetchList} />
-      ) : receivables.length === 0 ? (
-        <EmptyState
-          title="Không tìm thấy khoản công nợ nào"
-          description="Thử thay đổi bộ lọc tìm kiếm hoặc bỏ điều kiện chỉ hiển thị công nợ quá hạn."
-        />
-      ) : (
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-            overflow: 'hidden',
-          }}
-        >
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Khách hàng</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Hóa đơn</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Phát sinh</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Đã thanh toán</th>
-                <th
-                  style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}
-                  aria-sort={sortBy === 'so_tien_con_lai' ? (sortOrder === 'ASC' ? 'ascending' : 'descending') : 'none'}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleSort('so_tien_con_lai')}
-                    title="Sắp xếp theo số tiền còn lại"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      font: 'inherit',
-                      fontWeight: 600,
-                      color: 'inherit',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Còn lại{sortIndicator('so_tien_con_lai')}
-                  </button>
-                </th>
-                <th
-                  style={{ padding: '0.75rem 1rem', fontWeight: 600 }}
-                  aria-sort={sortBy === 'ngay_dao_han' ? (sortOrder === 'ASC' ? 'ascending' : 'descending') : 'none'}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleSort('ngay_dao_han')}
-                    title="Sắp xếp theo ngày đáo hạn"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      font: 'inherit',
-                      fontWeight: 600,
-                      color: 'inherit',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Ngày đáo hạn{sortIndicator('ngay_dao_han')}
-                  </button>
-                </th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Số ngày quá hạn</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'center' }}>Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody>
-              {receivables.map((rec) => {
-                const daysOverdue = Number(rec.daysOverdue) || 0;
-                return (
-                  <tr key={rec.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s' }}>
-                    <td style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>
-                      <div style={{ fontWeight: 500 }}>{rec.ten_khach_hang || `Mã #${rec.ma_khach_hang}`}</div>
-                      {rec.ma_khach_hang_code && (
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
-                          {rec.ma_khach_hang_code}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 600, color: '#2563eb' }}>
-                      {rec.ma_hoa_don_code || '—'}
-                    </td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#0f172a', textAlign: 'right' }}>
-                      {formatCurrency(rec.so_tien_phat_sinh)}
-                    </td>
-                    <td style={{ padding: '0.75rem 1rem', fontWeight: 500, color: '#15803d', textAlign: 'right' }}>
-                      {formatCurrency(rec.so_tien_da_thanh_toan)}
-                    </td>
-                    <td
-                      style={{
-                        padding: '0.75rem 1rem',
-                        fontWeight: 700,
-                        textAlign: 'right',
-                        color: Number(rec.so_tien_con_lai) > 0 ? '#dc2626' : '#16a34a',
-                      }}
-                    >
-                      {formatCurrency(rec.so_tien_con_lai)}
-                    </td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>{formatDate(rec.ngay_dao_han)}</td>
-                    <td style={{ padding: '0.75rem 1rem' }}>
-                      {daysOverdue > 0 ? (
-                        <span style={{ color: '#b91c1c', fontWeight: 600 }}>Quá hạn {daysOverdue} ngày</span>
-                      ) : (
-                        <span style={{ color: '#94a3b8' }}>—</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>{renderStatusBadge(rec.trang_thai)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {/* Pagination Controls */}
-          <div
-            style={{
-              padding: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              borderTop: '1px solid #e2e8f0',
-              backgroundColor: '#f8fafc',
-            }}
-          >
-            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-              Trang {page} / {totalPages} (Tổng số {total} khoản công nợ)
-            </span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                style={{
-                  padding: '0.4rem 0.8rem',
-                  backgroundColor: page <= 1 ? '#e2e8f0' : '#ffffff',
-                  color: page <= 1 ? '#94a3b8' : '#334155',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '4px',
-                  fontSize: '0.85rem',
-                  cursor: page <= 1 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Trang trước
-              </button>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                style={{
-                  padding: '0.4rem 0.8rem',
-                  backgroundColor: page >= totalPages ? '#e2e8f0' : '#ffffff',
-                  color: page >= totalPages ? '#94a3b8' : '#334155',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '4px',
-                  fontSize: '0.85rem',
-                  cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Trang sau
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <DataTableCard<ReceivableRow>
+        label="Danh sách công nợ phải thu"
+        data={receivables}
+        columns={columns}
+        idKey="id"
+        isLoading={loading}
+        error={error}
+        onRetry={fetchList}
+        emptyTitle="Không tìm thấy khoản công nợ nào"
+        emptyDescription="Thử thay đổi bộ lọc tìm kiếm hoặc bỏ điều kiện chỉ hiển thị công nợ quá hạn."
+        pagination={{ page, totalPages, totalItems: total, pageSize, onChange: setPage }}
+        rowIndexStart={(page - 1) * pageSize + 1}
+        rowCount={total}
+        toolbar={
+          <form onSubmit={handleSearchSubmit}>
+            <HStack gap={2} vAlign="end" wrap="wrap">
+              <TextInput
+                label="Tìm kiếm công nợ"
+                placeholder="Tìm theo mã hóa đơn hoặc tên khách hàng..."
+                value={search}
+                onChange={setSearch}
+                width={320}
+              />
+              <Button type="submit" label="Tìm kiếm" variant="secondary" />
+            </HStack>
+          </form>
+        }
+        toolbarEnd={
+          <HStack gap={3} vAlign="end" wrap="wrap">
+            <Selector
+              label="Trạng thái"
+              options={STATUS_OPTIONS}
+              value={trangThai}
+              onChange={(value) => {
+                setTrangThai(value as ReceivableStatus | '');
+                setPage(1);
+              }}
+              width={190}
+            />
+            <CheckboxInput
+              label="Chỉ công nợ quá hạn"
+              value={overdueOnly}
+              onChange={(checked) => {
+                setOverdueOnly(checked);
+                setPage(1);
+              }}
+            />
+          </HStack>
+        }
+      />
+    </PageScaffold>
   );
 };

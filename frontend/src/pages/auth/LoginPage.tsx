@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { Card } from '@astryxdesign/core/Card';
+import { VStack } from '@astryxdesign/core/Stack';
+import { Heading, Text } from '@astryxdesign/core/Text';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { Button } from '@astryxdesign/core/Button';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Center } from '@astryxdesign/core/Center';
 import { useAuth, UserProfile } from '../../context/AuthContext.js';
 import { apiFetch, ApiError } from '../../services/api.js';
-import { ErrorState } from '../../components/common/ErrorState.js';
 
 const loginSchema = z.object({
   email: z.string().email('Email không đúng định dạng'),
@@ -19,6 +25,17 @@ interface LoginResponse {
   user: UserProfile;
 }
 
+/** Reads the `from` route that ProtectedRoute stores in navigation state. */
+function resolveRedirectTarget(state: unknown): string {
+  if (state && typeof state === 'object' && 'from' in state) {
+    const from = state.from;
+    if (from && typeof from === 'object' && 'pathname' in from && typeof from.pathname === 'string') {
+      return from.pathname;
+    }
+  }
+  return '/dashboard';
+}
+
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -27,7 +44,7 @@ export const LoginPage: React.FC = () => {
   const [errorCode, setErrorCode] = useState<string>('AUTH_ERROR');
 
   const {
-    register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
@@ -49,8 +66,7 @@ export const LoginPage: React.FC = () => {
       login(result.token, result.user);
 
       // Redirect to intended route or default to /dashboard
-      const from = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
+      navigate(resolveRedirectTarget(location.state), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         setErrorCode(err.code);
@@ -63,119 +79,85 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '80vh',
-      }}
-    >
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '400px',
-          backgroundColor: '#ffffff',
-          padding: '2.5rem',
-          borderRadius: '8px',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
-          border: '1px solid #e2e8f0',
-        }}
-      >
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>Đăng nhập Hệ thống</h1>
-          <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem', color: '#64748b' }}>
-            Phân hệ Quản lý Bán hàng &amp; Khách hàng
-          </p>
-        </div>
+    <Center height="100vh" padding={4}>
+      <Card width="100%" maxWidth={440} elevation="med">
+        <VStack gap={5}>
+          <VStack gap={1} align="center">
+            <Heading level={1}>Đăng nhập Hệ thống</Heading>
+            <Text type="supporting" as="p" justify="center">
+              Phân hệ Quản lý Bán hàng &amp; Khách hàng
+            </Text>
+          </VStack>
 
-        {errorMessage && (
-          <ErrorState
-            code={errorCode}
-            message={errorMessage}
-            onRetry={() => setErrorMessage(null)}
-          />
-        )}
-
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label
-              htmlFor="email"
-              style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#334155', marginBottom: '0.35rem' }}
-            >
-              Địa chỉ Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              {...register('email')}
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.75rem',
-                borderRadius: '6px',
-                border: `1px solid ${errors.email ? '#ef4444' : '#cbd5e1'}`,
-                fontSize: '0.9rem',
-                boxSizing: 'border-box',
-                outline: 'none',
-              }}
+          {errorMessage && (
+            <Banner
+              status="error"
+              title="Đã xảy ra lỗi"
+              description={`[${errorCode}] ${errorMessage}`}
+              collapsible={false}
+              endContent={
+                <Button
+                  label="Thử lại"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setErrorMessage(null)}
+                />
+              }
             />
-            {errors.email && (
-              <span style={{ display: 'block', fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
-                {errors.email.message}
-              </span>
-            )}
-          </div>
+          )}
 
-          <div style={{ marginBottom: '1.75rem' }}>
-            <label
-              htmlFor="password"
-              style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#334155', marginBottom: '0.35rem' }}
-            >
-              Mật khẩu
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              {...register('password')}
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.75rem',
-                borderRadius: '6px',
-                border: `1px solid ${errors.password ? '#ef4444' : '#cbd5e1'}`,
-                fontSize: '0.9rem',
-                boxSizing: 'border-box',
-                outline: 'none',
-              }}
-            />
-            {errors.password && (
-              <span style={{ display: 'block', fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
-                {errors.password.message}
-              </span>
-            )}
-          </div>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <VStack gap={4} width="100%">
+              <Controller
+                name="email"
+                control={control}
+                render={({ field }) => (
+                  <TextInput
+                    label="Địa chỉ Email"
+                    value={field.value}
+                    onChange={(value) => field.onChange(value)}
+                    type="email"
+                    autoComplete="email"
+                    isRequired
+                    status={
+                      errors.email ? { type: 'error', message: errors.email.message } : undefined
+                    }
+                  />
+                )}
+              />
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              backgroundColor: isSubmitting ? '#93c5fd' : '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.95rem',
-              fontWeight: 600,
-              cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              transition: 'background-color 0.2s',
-            }}
-          >
-            {isSubmitting ? 'Đang xác thực...' : 'Đăng nhập'}
-          </button>
-        </form>
-      </div>
-    </div>
+              <Controller
+                name="password"
+                control={control}
+                render={({ field }) => (
+                  <TextInput
+                    label="Mật khẩu"
+                    value={field.value}
+                    onChange={(value) => field.onChange(value)}
+                    type="password"
+                    autoComplete="current-password"
+                    isRequired
+                    status={
+                      errors.password
+                        ? { type: 'error', message: errors.password.message }
+                        : undefined
+                    }
+                  />
+                )}
+              />
+
+              <Button
+                type="submit"
+                label={isSubmitting ? 'Đang xác thực...' : 'Đăng nhập'}
+                variant="primary"
+                width="100%"
+                isLoading={isSubmitting}
+                isDisabled={isSubmitting}
+              />
+            </VStack>
+          </form>
+        </VStack>
+      </Card>
+    </Center>
   );
 };

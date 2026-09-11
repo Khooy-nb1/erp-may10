@@ -1,0 +1,18 @@
+/* Astryx layer cascade. Order is authoritative and must match the layer order
+   injected by @astryxdesign/build/vite: reset < astryx-base (library) <
+   astryx-theme (theme overrides) < product (app StyleX) < app (this file). */
+@layer reset, astryx-base, astryx-theme, product, app;
+
+@layer app {
+  /* Nothing in the Astryx stylesheets sets a document font: the theme styles
+     prose elements, each component styles itself, and Button is font:inherit. */
+  body {
+    font-family: var(--font-family-body);
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+}

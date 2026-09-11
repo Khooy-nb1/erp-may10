@@ -1,156 +1,104 @@
 import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
+import { AppShell as AstryxAppShell } from '@astryxdesign/core/AppShell';
+import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
+import { TopNav } from '@astryxdesign/core/TopNav';
+import { NavIcon } from '@astryxdesign/core/NavIcon';
+import { HStack, VStack } from '@astryxdesign/core/Stack';
+import { Text } from '@astryxdesign/core/Text';
+import { Button } from '@astryxdesign/core/Button';
+import {
+  BadgeDollarSign,
+  Boxes,
+  ClipboardList,
+  LayoutDashboard,
+  LogOut,
+  ReceiptText,
+  Truck,
+  Users,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.js';
 
 interface NavItem {
   label: string;
   path: string;
-  icon: string;
-  implemented: boolean;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }
 
-// Strictly obey foundation rule: "Do not show navigation for screens that are not implemented."
-// Business modules are marked implemented as they are developed in P2-P9.
+// Navigation mirrors AppRoutes: every entry here resolves to a real route.
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Tổng quan', path: '/dashboard', icon: '📊', implemented: true },
-  { label: 'Khách hàng', path: '/customers', icon: '👥', implemented: true },
-  { label: 'Sản phẩm', path: '/products', icon: '📦', implemented: true },
-  { label: 'Đơn bán hàng', path: '/sales-orders', icon: '📋', implemented: true },
-  { label: 'Giao hàng', path: '/deliveries', icon: '🚚', implemented: true },
-  { label: 'Hóa đơn', path: '/invoices', icon: '🧾', implemented: true },
-  { label: 'Công nợ', path: '/receivables', icon: '💰', implemented: true },
+  { label: 'Tổng quan', path: '/dashboard', icon: LayoutDashboard },
+  { label: 'Khách hàng', path: '/customers', icon: Users },
+  { label: 'Sản phẩm', path: '/products', icon: Boxes },
+  { label: 'Đơn bán hàng', path: '/sales-orders', icon: ClipboardList },
+  { label: 'Giao hàng', path: '/deliveries', icon: Truck },
+  { label: 'Hóa đơn', path: '/invoices', icon: ReceiptText },
+  { label: 'Công nợ', path: '/receivables', icon: BadgeDollarSign },
 ];
 
 export const AppShell: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
-  const visibleNavItems = NAV_ITEMS.filter((item) => item.implemented);
+  const { pathname } = useLocation();
+
+  const isSelected = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {/* Sidebar */}
-      <aside
-        style={{
-          width: '240px',
-          backgroundColor: '#0f172a',
-          color: '#f8fafc',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid #1e293b' }}>
-          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#38bdf8' }}>
-            ERP Sales &amp; CRM
-          </h2>
-          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Phân hệ Quản lý Bán hàng</span>
-        </div>
-
-        <nav style={{ flex: 1, padding: '1rem 0.5rem' }}>
-          {visibleNavItems.length > 0 ? (
-            visibleNavItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                style={({ isActive }) => ({
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.65rem 1rem',
-                  margin: '0.25rem 0',
-                  borderRadius: '6px',
-                  color: isActive ? '#ffffff' : '#cbd5e1',
-                  backgroundColor: isActive ? '#1e293b' : 'transparent',
-                  textDecoration: 'none',
-                  fontSize: '0.9rem',
-                  fontWeight: isActive ? 600 : 400,
-                })}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </NavLink>
-            ))
-          ) : (
-            <div
-              style={{
-                padding: '1rem',
-                fontSize: '0.85rem',
-                color: '#64748b',
-                lineHeight: 1.5,
-              }}
-            >
-              Nền tảng P1 sẵn sàng. Các phân hệ sẽ xuất hiện trên menu sau khi được triển khai ở các giai đoạn tiếp theo.
-            </div>
-          )}
-        </nav>
-
-        <div style={{ padding: '1rem', borderTop: '1px solid #1e293b', fontSize: '0.8rem', color: '#64748b' }}>
-          <span>Phiên bản MVP 1.0 (P1 Foundation)</span>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <header
-          style={{
-            height: '60px',
-            backgroundColor: '#ffffff',
-            borderBottom: '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0 2rem',
-          }}
-        >
-          <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Hệ thống quản lý thông tin bán hàng và khách hàng</div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {isAuthenticated && user ? (
-              <>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0f172a' }}>{user.ho_ten}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    {user.vai_tro} {user.phong_ban ? `• ${user.phong_ban}` : ''}
-                  </div>
-                </div>
-                <button
+    <AstryxAppShell
+      height="fill"
+      variant="elevated"
+      contentPadding={6}
+      topNav={
+        <TopNav
+          label="Điều hướng chính"
+          heading={
+            <HStack gap={2} vAlign="center">
+              <NavIcon icon={<ClipboardList size={16} aria-hidden />} />
+              <VStack gap={0}>
+                <Text type="label">ERP Sales &amp; CRM</Text>
+                <Text type="supporting">Phân hệ Quản lý Bán hàng</Text>
+              </VStack>
+            </HStack>
+          }
+          endContent={
+            isAuthenticated && user ? (
+              <HStack gap={3} vAlign="center">
+                <VStack gap={0} hAlign="end">
+                  <Text type="label">{user.ho_ten}</Text>
+                  <Text type="supporting">
+                    {user.vai_tro}
+                    {user.phong_ban ? ` • ${user.phong_ban}` : ''}
+                  </Text>
+                </VStack>
+                <Button
+                  label="Đăng xuất"
+                  variant="secondary"
+                  size="sm"
+                  icon={<LogOut size={16} aria-hidden />}
                   onClick={logout}
-                  style={{
-                    padding: '0.35rem 0.75rem',
-                    backgroundColor: '#f1f5f9',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    color: '#475569',
-                  }}
-                >
-                  Đăng xuất
-                </button>
-              </>
-            ) : (
-              <NavLink
-                to="/login"
-                style={{
-                  padding: '0.4rem 0.9rem',
-                  backgroundColor: '#2563eb',
-                  color: '#ffffff',
-                  borderRadius: '4px',
-                  textDecoration: 'none',
-                  fontSize: '0.85rem',
-                  fontWeight: 500,
-                }}
-              >
-                Đăng nhập
-              </NavLink>
-            )}
-          </div>
-        </header>
-
-        {/* Content */}
-        <main style={{ flex: 1, padding: '2rem', maxWidth: '1200px', width: '100%', boxSizing: 'border-box' }}>
-          <Outlet />
-        </main>
-      </div>
-    </div>
+                />
+              </HStack>
+            ) : undefined
+          }
+        />
+      }
+      sideNav={
+        <SideNav collapsible={{ hasButton: true, buttonLabel: 'Thu gọn điều hướng' }}>
+          <SideNavHeading heading="ERP Sales & CRM" subheading="Phiên bản MVP 1.0" />
+          <SideNavSection title="Phân hệ" isHeaderHidden>
+            {NAV_ITEMS.map((item) => (
+              <SideNavItem
+                key={item.path}
+                label={item.label}
+                icon={item.icon}
+                href={item.path}
+                isSelected={isSelected(item.path)}
+              />
+            ))}
+          </SideNavSection>
+        </SideNav>
+      }
+    >
+      <Outlet />
+    </AstryxAppShell>
   );
 };

@@ -1,28 +1,37 @@
 import React from 'react';
+import { HStack, VStack } from '@astryxdesign/core/Stack';
+import { Heading, Text } from '@astryxdesign/core/Text';
+import { Divider } from '@astryxdesign/core/Divider';
 
-interface PageHeaderProps {
+export interface PageHeaderProps {
   title: string;
   subtitle?: string;
   children?: React.ReactNode;
 }
 
+/**
+ * Page title block: heading, optional supporting line, optional end-aligned actions.
+ * Call sites pass page actions through `children`.
+ */
 export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, children }) => {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: '1.5rem',
-        paddingBottom: '1rem',
-        borderBottom: '1px solid #e2e8f0',
-      }}
-    >
-      <div>
-        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: '#0f172a' }}>{title}</h1>
-        {subtitle && <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#64748b' }}>{subtitle}</p>}
-      </div>
-      {children && <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>{children}</div>}
-    </div>
+    <VStack gap={3}>
+      <HStack gap={4} vAlign="start" hAlign="between" wrap="wrap">
+        <VStack gap={1}>
+          <Heading level={2}>{title}</Heading>
+          {subtitle ? (
+            <Text type="supporting" as="p">
+              {subtitle}
+            </Text>
+          ) : null}
+        </VStack>
+        {children ? (
+          <HStack gap={2} vAlign="center" wrap="wrap">
+            {children}
+          </HStack>
+        ) : null}
+      </HStack>
+      <Divider />
+    </VStack>
   );
 };

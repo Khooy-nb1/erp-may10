@@ -1,12 +1,130 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Plus } from 'lucide-react';
+import { HStack } from '@astryxdesign/core/Stack';
+import { Text } from '@astryxdesign/core/Text';
+import { Button } from '@astryxdesign/core/Button';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { Selector } from '@astryxdesign/core/Selector';
+import { Link } from '@astryxdesign/core/Link';
+import { proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
 import { Invoice, InvoiceStatus } from '../../types/invoice.js';
 import { getInvoices } from '../../services/invoiceService.js';
-import { PageHeader } from '../../components/common/PageHeader.js';
-import { LoadingState } from '../../components/common/LoadingState.js';
-import { EmptyState } from '../../components/common/EmptyState.js';
-import { ErrorState } from '../../components/common/ErrorState.js';
+import { PageScaffold } from '../../components/common/PageScaffold.js';
+import { DataTableCard } from '../../components/common/DataTableCard.js';
+import { StatusBadge } from '../../components/common/StatusBadge.js';
 import { useAuth } from '../../context/AuthContext.js';
+
+/**
+ * Columns this screen reads off `Invoice`. Declared as an object type alias so
+ * the API payload can be handed to the table as-is, without re-mapping rows.
+ */
+type InvoiceRow = {
+  id: number;
+  ma_hoa_don: string;
+  ma_don_ban_hang: number;
+  ma_don_ban?: string;
+  ma_khach_hang: number;
+  ten_khach_hang?: string;
+  ngay_xuat_hoa_don: string;
+  ngay_dao_han: string;
+  tong_tien_sau_thue: number | string;
+  so_tien_da_thu: number | string;
+  trang_thai: InvoiceStatus;
+};
+
+const TRANG_THAI_OPTIONS = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'chua_thanh_toan', label: 'Chưa thanh toán' },
+  { value: 'thanh_toan_mot_phan', label: 'Thanh toán một phần' },
+  { value: 'da_thanh_toan', label: 'Đã thanh toán' },
+  { value: 'qua_han', label: 'Quá hạn' },
+];
+
+const formatCurrency = (val: string | number) => {
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
+};
+
+const formatDate = (dateStr: string | null) => {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('vi-VN');
+};
+
+const columns: TableColumn<InvoiceRow>[] = [
+  {
+    key: 'ma_hoa_don',
+    header: 'Mã hóa đơn',
+    width: proportional(1),
+    renderCell: (item) => (
+      <Link href={`/invoices/${item.id}`} weight="semibold">
+        {item.ma_hoa_don}
+      </Link>
+    ),
+  },
+  {
+    key: 'ma_don_ban',
+    header: 'Đơn bán hàng',
+    width: proportional(1),
+    renderCell: (item) => (
+      <Link href={`/sales-orders/${item.ma_don_ban_hang}`}>
+        {item.ma_don_ban || `Đơn #${item.ma_don_ban_hang}`}
+      </Link>
+    ),
+  },
+  {
+    key: 'ten_khach_hang',
+    header: 'Khách hàng',
+    width: proportional(2),
+    renderCell: (item) => <Text>{item.ten_khach_hang || `Mã #${item.ma_khach_hang}`}</Text>,
+  },
+  {
+    key: 'ngay_xuat_hoa_don',
+    header: 'Ngày xuất',
+    width: pixel(120),
+    renderCell: (item) => <Text type="supporting">{formatDate(item.ngay_xuat_hoa_don)}</Text>,
+  },
+  {
+    key: 'ngay_dao_han',
+    header: 'Ngày đáo hạn',
+    width: pixel(130),
+    renderCell: (item) => <Text type="supporting">{formatDate(item.ngay_dao_han)}</Text>,
+  },
+  {
+    key: 'tong_tien_sau_thue',
+    header: 'Tổng thanh toán',
+    width: pixel(160),
+    align: 'end',
+    renderCell: (item) => (
+      <Text type="label" hasTabularNumbers>
+        {formatCurrency(item.tong_tien_sau_thue)}
+      </Text>
+    ),
+  },
+  {
+    key: 'so_tien_da_thu',
+    header: 'Đã thu',
+    width: pixel(150),
+    align: 'end',
+    renderCell: (item) => <Text hasTabularNumbers>{formatCurrency(item.so_tien_da_thu)}</Text>,
+  },
+  {
+    key: 'trang_thai',
+    header: 'Trạng thái',
+    width: pixel(150),
+    align: 'center',
+    renderCell: (item) => <StatusBadge status={item.trang_thai} />,
+  },
+  {
+    key: 'actions',
+    header: 'Thao tác',
+    width: pixel(110),
+    align: 'end',
+    renderCell: (item) => (
+      <Link href={`/invoices/${item.id}`} weight="medium">
+        Chi tiết
+      </Link>
+    ),
+  },
+];
 
 export const InvoiceListPage: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -53,264 +171,56 @@ export const InvoiceListPage: React.FC = () => {
     fetchList();
   };
 
-  const formatCurrency = (val: string | number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('vi-VN');
-  };
-
-  const renderStatusBadge = (st: InvoiceStatus) => {
-    const config: Record<InvoiceStatus, { bg: string; color: string; label: string }> = {
-      chua_thanh_toan: { bg: '#fef9c3', color: '#854d0e', label: 'Chưa thanh toán' },
-      thanh_toan_mot_phan: { bg: '#e0e7ff', color: '#3730a3', label: 'Thanh toán một phần' },
-      da_thanh_toan: { bg: '#dcfce7', color: '#15803d', label: 'Đã thanh toán' },
-      qua_han: { bg: '#fee2e2', color: '#b91c1c', label: 'Quá hạn' },
-    };
-    const c = config[st] || { bg: '#f1f5f9', color: '#475569', label: st };
-    return (
-      <span
-        style={{
-          padding: '0.2rem 0.55rem',
-          borderRadius: '9999px',
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          backgroundColor: c.bg,
-          color: c.color,
-        }}
-      >
-        {c.label}
-      </span>
-    );
-  };
-
   return (
-    <div>
-      <PageHeader
-        title="Quản lý hóa đơn bán hàng"
-        subtitle={`Theo dõi xuất hóa đơn và tình trạng thanh toán (${total} hóa đơn)`}
-      >
-        {canCreateInvoice && (
-          <Link
-            to="/invoices/new"
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: '#2563eb',
-              color: '#ffffff',
-              borderRadius: '6px',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-              fontWeight: 500,
+    <PageScaffold
+      title="Quản lý hóa đơn bán hàng"
+      subtitle={`Theo dõi xuất hóa đơn và tình trạng thanh toán (${total} hóa đơn)`}
+      actions={
+        canCreateInvoice ? (
+          <Button label="Xuất hóa đơn mới" variant="primary" icon={<Plus size={16} />} href="/invoices/new" />
+        ) : undefined
+      }
+    >
+      <DataTableCard<InvoiceRow>
+        label="Danh sách hóa đơn bán hàng"
+        data={invoices}
+        columns={columns}
+        idKey="id"
+        isLoading={loading}
+        error={error}
+        onRetry={fetchList}
+        emptyTitle="Không tìm thấy hóa đơn nào"
+        emptyDescription="Thử thay đổi bộ lọc tìm kiếm hoặc tạo mới hóa đơn từ đơn hàng đã xác nhận."
+        pagination={{ page, totalPages, totalItems: total, pageSize, onChange: setPage }}
+        rowIndexStart={(page - 1) * pageSize + 1}
+        rowCount={total}
+        toolbar={
+          <form onSubmit={handleSearchSubmit}>
+            <HStack gap={2} vAlign="end" wrap="wrap">
+              <TextInput
+                label="Tìm kiếm hóa đơn"
+                placeholder="Tìm theo mã hóa đơn hoặc tên khách hàng..."
+                value={search}
+                onChange={setSearch}
+                width={320}
+              />
+              <Button type="submit" label="Tìm kiếm" variant="secondary" />
+            </HStack>
+          </form>
+        }
+        toolbarEnd={
+          <Selector
+            label="Trạng thái"
+            options={TRANG_THAI_OPTIONS}
+            value={trangThai}
+            onChange={(value) => {
+              setTrangThai(value as InvoiceStatus | '');
+              setPage(1);
             }}
-          >
-            + Xuất hóa đơn mới
-          </Link>
-        )}
-      </PageHeader>
-
-      {/* Filter Bar */}
-      <div
-        style={{
-          backgroundColor: '#ffffff',
-          padding: '1rem',
-          borderRadius: '8px',
-          border: '1px solid #e2e8f0',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          gap: '1rem',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-        }}
-      >
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.5rem', flex: 1, minWidth: '280px' }}>
-          <input
-            type="text"
-            placeholder="Tìm theo mã hóa đơn hoặc tên khách hàng..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              flex: 1,
-              padding: '0.5rem 0.75rem',
-              border: '1px solid #cbd5e1',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              outline: 'none',
-            }}
+            width={190}
           />
-          <button
-            type="submit"
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: '#0f172a',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-            }}
-          >
-            Tìm kiếm
-          </button>
-        </form>
-
-        <select
-          value={trangThai}
-          onChange={(e) => {
-            setTrangThai(e.target.value as InvoiceStatus | '');
-            setPage(1);
-          }}
-          style={{
-            padding: '0.5rem 0.75rem',
-            border: '1px solid #cbd5e1',
-            borderRadius: '6px',
-            fontSize: '0.875rem',
-            outline: 'none',
-          }}
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="chua_thanh_toan">Chưa thanh toán</option>
-          <option value="thanh_toan_mot_phan">Thanh toán một phần</option>
-          <option value="da_thanh_toan">Đã thanh toán</option>
-          <option value="qua_han">Quá hạn</option>
-        </select>
-      </div>
-
-      {/* Content State */}
-      {loading ? (
-        <LoadingState message="Đang tải danh sách hóa đơn..." />
-      ) : error ? (
-        <ErrorState message={error} onRetry={fetchList} />
-      ) : invoices.length === 0 ? (
-        <EmptyState
-          title="Không tìm thấy hóa đơn nào"
-          description="Thử thay đổi bộ lọc tìm kiếm hoặc tạo mới hóa đơn từ đơn hàng đã xác nhận."
-        />
-      ) : (
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-            overflow: 'hidden',
-          }}
-        >
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Mã hóa đơn</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Đơn bán hàng</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Khách hàng</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Ngày xuất</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Ngày đáo hạn</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Tổng thanh toán</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Đã thu</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'center' }}>Trạng thái</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((inv) => (
-                <tr
-                  key={inv.id}
-                  style={{
-                    borderBottom: '1px solid #f1f5f9',
-                    transition: 'background-color 0.15s',
-                  }}
-                >
-                  <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 600, color: '#2563eb' }}>
-                    <Link to={`/invoices/${inv.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
-                      {inv.ma_hoa_don}
-                    </Link>
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', fontWeight: 500, color: '#0f172a' }}>
-                    <Link to={`/sales-orders/${inv.ma_don_ban_hang}`} style={{ color: '#2563eb', textDecoration: 'none' }}>
-                      {inv.ma_don_ban || `Đơn #${inv.ma_don_ban_hang}`}
-                    </Link>
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>
-                    {inv.ten_khach_hang || `Mã #${inv.ma_khach_hang}`}
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>{formatDate(inv.ngay_xuat_hoa_don)}</td>
-                  <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>{formatDate(inv.ngay_dao_han)}</td>
-                  <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#2563eb', textAlign: 'right' }}>
-                    {formatCurrency(inv.tong_tien_sau_thue)}
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', fontWeight: 500, color: '#15803d', textAlign: 'right' }}>
-                    {formatCurrency(inv.so_tien_da_thu)}
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>{renderStatusBadge(inv.trang_thai)}</td>
-                  <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                    <Link
-                      to={`/invoices/${inv.id}`}
-                      style={{
-                        padding: '0.3rem 0.6rem',
-                        backgroundColor: '#f1f5f9',
-                        color: '#334155',
-                        borderRadius: '4px',
-                        textDecoration: 'none',
-                        fontSize: '0.8rem',
-                        fontWeight: 500,
-                      }}
-                    >
-                      Chi tiết
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Pagination Controls */}
-          <div
-            style={{
-              padding: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              borderTop: '1px solid #e2e8f0',
-              backgroundColor: '#f8fafc',
-            }}
-          >
-            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-              Trang {page} / {totalPages} (Tổng số {total} hóa đơn)
-            </span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                style={{
-                  padding: '0.4rem 0.8rem',
-                  backgroundColor: page <= 1 ? '#e2e8f0' : '#ffffff',
-                  color: page <= 1 ? '#94a3b8' : '#334155',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '4px',
-                  fontSize: '0.85rem',
-                  cursor: page <= 1 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Trang trước
-              </button>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                style={{
-                  padding: '0.4rem 0.8rem',
-                  backgroundColor: page >= totalPages ? '#e2e8f0' : '#ffffff',
-                  color: page >= totalPages ? '#94a3b8' : '#334155',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '4px',
-                  fontSize: '0.85rem',
-                  cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Trang sau
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+        }
+      />
+    </PageScaffold>
   );
 };
