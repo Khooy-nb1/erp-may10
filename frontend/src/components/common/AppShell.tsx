@@ -13,8 +13,8 @@ interface NavItem {
 // Business modules are marked implemented as they are developed in P2-P9.
 const NAV_ITEMS: NavItem[] = [
   { label: 'Tổng quan', path: '/dashboard', icon: '📊', implemented: false },
-  { label: 'Khách hàng', path: '/customers', icon: '👥', implemented: false },
-  { label: 'Sản phẩm', path: '/products', icon: '📦', implemented: false },
+  { label: 'Khách hàng', path: '/customers', icon: '👥', implemented: true },
+  { label: 'Sản phẩm', path: '/products', icon: '📦', implemented: true },
   { label: 'Đơn bán hàng', path: '/sales-orders', icon: '📋', implemented: false },
   { label: 'Giao hàng', path: '/deliveries', icon: '🚚', implemented: false },
   { label: 'Hóa đơn', path: '/invoices', icon: '🧾', implemented: false },

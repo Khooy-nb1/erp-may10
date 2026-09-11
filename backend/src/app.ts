@@ -4,9 +4,12 @@ import helmet from 'helmet';
 import { env } from './config/env.js';
 import { requestIdMiddleware } from './middlewares/request-id.middleware.js';
 import { errorMiddleware } from './middlewares/error.middleware.js';
-import { sendSuccess } from './utils/response.js';
 import { checkDatabaseHealth } from './config/database.js';
-
+import { sendSuccess } from './utils/response.js';
+import { authRoutes } from './routes/auth.routes.js';
+import { customerRoutes } from './routes/customer.routes.js';
+import { productRoutes } from './routes/product.routes.js';
+import { orderRoutes } from './routes/order.routes.js';
 export function createApp(): Express {
   const app = express();
 
@@ -60,7 +63,18 @@ export function createApp(): Express {
     });
   });
 
-  // Global error handler
+  // Authentication & Profile routes
+  app.use('/api/v1/auth', authRoutes);
+
+  // Customer Management routes
+  app.use('/api/v1/customers', customerRoutes);
+
+  // Product Lookup routes
+  app.use('/api/v1/products', productRoutes);
+
+  // Sales Order Management routes
+  app.use('/api/v1/sales-orders', orderRoutes);
+
   app.use(errorMiddleware);
 
   return app;

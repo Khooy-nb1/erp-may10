@@ -1,0 +1,300 @@
+import { query } from '../config/database.js';
+import {
+  CustomerRecord,
+  CustomerSummary,
+  CustomerListFilters,
+  ALLOWED_CUSTOMER_SORT_COLUMNS,
+  CustomerSortColumn,
+  CustomerStatus,
+} from '../models/customer.model.js';
+
+export interface CustomerListResult {
+  customers: CustomerRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface ICustomerRepository {
+  list(filters: CustomerListFilters): Promise<CustomerListResult>;
+  findById(id: number): Promise<CustomerRecord | null>;
+  findByCode(code: string): Promise<CustomerRecord | null>;
+  create(data: Omit<CustomerRecord, 'id' | 'ngay_tao' | 'ngay_cap_nhat'>): Promise<CustomerRecord>;
+  update(
+    id: number,
+    data: Partial<Pick<CustomerRecord, 'ten_khach_hang' | 'loai_khach_hang' | 'ma_so_thue' | 'so_dien_thoai' | 'email' | 'dia_chi' | 'tinh_thanh_pho' | 'nguoi_lien_he' | 'han_muc_cong_no' | 'so_ngay_cong_no' | 'ghi_chu'>>,
+    updaterId: number
+  ): Promise<CustomerRecord | null>;
+  updateStatus(id: number, status: CustomerStatus, updaterId: number): Promise<CustomerRecord | null>;
+  getSummary(id: number): Promise<CustomerSummary>;
+}
+
+export class CustomerRepository implements ICustomerRepository {
+  async list(filters: CustomerListFilters): Promise<CustomerListResult> {
+    const page = Math.max(1, Number(filters.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize) || 20));
+    const offset = (page - 1) * pageSize;
+
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    // Search across code, name, phone, tax code
+    if (filters.search && filters.search.trim().length > 0) {
+      params.push(`%${filters.search.trim()}%`);
+      const pIdx = params.length;
+      conditions.push(
+        `(ma_khach_hang ILIKE $${pIdx} OR ten_khach_hang ILIKE $${pIdx} OR so_dien_thoai ILIKE $${pIdx} OR ma_so_thue ILIKE $${pIdx})`
+      );
+    }
+
+    if (filters.loai_khach_hang) {
+      params.push(filters.loai_khach_hang);
+      conditions.push(`loai_khach_hang = $${params.length}`);
+    }
+
+    if (filters.tinh_thanh_pho && filters.tinh_thanh_pho.trim().length > 0) {
+      params.push(filters.tinh_thanh_pho.trim());
+      conditions.push(`tinh_thanh_pho = $${params.length}`);
+    }
+
+    if (filters.trang_thai) {
+      params.push(filters.trang_thai);
+      conditions.push(`trang_thai = $${params.length}`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Whitelist sorting
+    let sortColumn: CustomerSortColumn = 'ngay_tao';
+    if (filters.sortBy && ALLOWED_CUSTOMER_SORT_COLUMNS.includes(filters.sortBy as CustomerSortColumn)) {
+      sortColumn = filters.sortBy as CustomerSortColumn;
+    }
+
+    const sortOrder = filters.sortOrder === 'ASC' ? 'ASC' : 'DESC';
+
+    // Query Total Count
+    const countSql = `SELECT COUNT(*) AS total FROM khach_hang ${whereClause}`;
+    const countResult = await query<{ total: string | number }>(countSql, params);
+    const total = Number(countResult.rows[0]?.total || 0);
+    const totalPages = Math.ceil(total / pageSize) || 1;
+
+    // Query Paginated Items
+    params.push(pageSize);
+    const limitIdx = params.length;
+    params.push(offset);
+    const offsetIdx = params.length;
+
+    const dataSql = `
+      SELECT id, ma_khach_hang, ten_khach_hang, loai_khach_hang, ma_so_thue,
+             so_dien_thoai, email, dia_chi, tinh_thanh_pho, nguoi_lien_he,
+             han_muc_cong_no, so_ngay_cong_no, ghi_chu, trang_thai,
+             ngay_tao, ngay_cap_nhat, nguoi_tao, nguoi_cap_nhat
+      FROM khach_hang
+      ${whereClause}
+      ORDER BY ${sortColumn} ${sortOrder}, id DESC
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
+    `;
+
+    const dataResult = await query<CustomerRecord>(dataSql, params);
+
+    return {
+      customers: dataResult.rows,
+      total,
+      page,
+      pageSize,
+      totalPages,
+    };
+  }
+
+  async findById(id: number): Promise<CustomerRecord | null> {
+    const sql = `
+      SELECT id, ma_khach_hang, ten_khach_hang, loai_khach_hang, ma_so_thue,
+             so_dien_thoai, email, dia_chi, tinh_thanh_pho, nguoi_lien_he,
+             han_muc_cong_no, so_ngay_cong_no, ghi_chu, trang_thai,
+             ngay_tao, ngay_cap_nhat, nguoi_tao, nguoi_cap_nhat
+      FROM khach_hang
+      WHERE id = $1
+      LIMIT 1
+    `;
+    const result = await query<CustomerRecord>(sql, [id]);
+    return result.rows[0] || null;
+  }
+
+  async findByCode(code: string): Promise<CustomerRecord | null> {
+    const sql = `
+      SELECT id, ma_khach_hang, ten_khach_hang, loai_khach_hang, ma_so_thue,
+             so_dien_thoai, email, dia_chi, tinh_thanh_pho, nguoi_lien_he,
+             han_muc_cong_no, so_ngay_cong_no, ghi_chu, trang_thai,
+             ngay_tao, ngay_cap_nhat, nguoi_tao, nguoi_cap_nhat
+      FROM khach_hang
+      WHERE UPPER(ma_khach_hang) = UPPER($1)
+      LIMIT 1
+    `;
+    const result = await query<CustomerRecord>(sql, [code.trim()]);
+    return result.rows[0] || null;
+  }
+
+  async create(data: Omit<CustomerRecord, 'id' | 'ngay_tao' | 'ngay_cap_nhat'>): Promise<CustomerRecord> {
+    const sql = `
+      INSERT INTO khach_hang (
+        ma_khach_hang, ten_khach_hang, loai_khach_hang, ma_so_thue,
+        so_dien_thoai, email, dia_chi, tinh_thanh_pho, nguoi_lien_he,
+        han_muc_cong_no, so_ngay_cong_no, ghi_chu, trang_thai,
+        nguoi_tao, nguoi_cap_nhat
+      ) VALUES (
+        $1, $2, $3, $4,
+        $5, $6, $7, $8, $9,
+        $10, $11, $12, $13,
+        $14, $14
+      )
+      RETURNING *
+    `;
+    const params = [
+      data.ma_khach_hang,
+      data.ten_khach_hang,
+      data.loai_khach_hang,
+      data.ma_so_thue || null,
+      data.so_dien_thoai,
+      data.email || null,
+      data.dia_chi,
+      data.tinh_thanh_pho,
+      data.nguoi_lien_he || null,
+      data.han_muc_cong_no || 0,
+      data.so_ngay_cong_no || 0,
+      data.ghi_chu || null,
+      data.trang_thai || 'hoat_dong',
+      data.nguoi_tao || null,
+    ];
+    const result = await query<CustomerRecord>(sql, params);
+    return result.rows[0];
+  }
+
+  async update(
+    id: number,
+    data: Partial<Pick<CustomerRecord, 'ten_khach_hang' | 'loai_khach_hang' | 'ma_so_thue' | 'so_dien_thoai' | 'email' | 'dia_chi' | 'tinh_thanh_pho' | 'nguoi_lien_he' | 'han_muc_cong_no' | 'so_ngay_cong_no' | 'ghi_chu'>>,
+    updaterId: number
+  ): Promise<CustomerRecord | null> {
+    const fields: string[] = [];
+    const params: unknown[] = [id];
+
+    if (data.ten_khach_hang !== undefined) {
+      params.push(data.ten_khach_hang);
+      fields.push(`ten_khach_hang = $${params.length}`);
+    }
+    if (data.loai_khach_hang !== undefined) {
+      params.push(data.loai_khach_hang);
+      fields.push(`loai_khach_hang = $${params.length}`);
+    }
+    if (data.ma_so_thue !== undefined) {
+      params.push(data.ma_so_thue);
+      fields.push(`ma_so_thue = $${params.length}`);
+    }
+    if (data.so_dien_thoai !== undefined) {
+      params.push(data.so_dien_thoai);
+      fields.push(`so_dien_thoai = $${params.length}`);
+    }
+    if (data.email !== undefined) {
+      params.push(data.email);
+      fields.push(`email = $${params.length}`);
+    }
+    if (data.dia_chi !== undefined) {
+      params.push(data.dia_chi);
+      fields.push(`dia_chi = $${params.length}`);
+    }
+    if (data.tinh_thanh_pho !== undefined) {
+      params.push(data.tinh_thanh_pho);
+      fields.push(`tinh_thanh_pho = $${params.length}`);
+    }
+    if (data.nguoi_lien_he !== undefined) {
+      params.push(data.nguoi_lien_he);
+      fields.push(`nguoi_lien_he = $${params.length}`);
+    }
+    if (data.han_muc_cong_no !== undefined) {
+      params.push(data.han_muc_cong_no);
+      fields.push(`han_muc_cong_no = $${params.length}`);
+    }
+    if (data.so_ngay_cong_no !== undefined) {
+      params.push(data.so_ngay_cong_no);
+      fields.push(`so_ngay_cong_no = $${params.length}`);
+    }
+    if (data.ghi_chu !== undefined) {
+      params.push(data.ghi_chu);
+      fields.push(`ghi_chu = $${params.length}`);
+    }
+
+    if (fields.length === 0) {
+      return this.findById(id);
+    }
+
+    params.push(updaterId);
+    fields.push(`nguoi_cap_nhat = $${params.length}`);
+    fields.push('ngay_cap_nhat = NOW()');
+
+    const sql = `
+      UPDATE khach_hang
+      SET ${fields.join(', ')}
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    const result = await query<CustomerRecord>(sql, params);
+    return result.rows[0] || null;
+  }
+
+  async updateStatus(id: number, status: CustomerStatus, updaterId: number): Promise<CustomerRecord | null> {
+    const sql = `
+      UPDATE khach_hang
+      SET trang_thai = $2,
+          nguoi_cap_nhat = $3,
+          ngay_cap_nhat = NOW()
+      WHERE id = $1
+      RETURNING *
+    `;
+    const result = await query<CustomerRecord>(sql, [id, status, updaterId]);
+    return result.rows[0] || null;
+  }
+
+  async getSummary(id: number): Promise<CustomerSummary> {
+    // 1. Order aggregation (excluding cancelled orders)
+    const orderSql = `
+      SELECT COUNT(*) AS total_orders,
+             COALESCE(SUM(tong_thanh_toan), 0) AS total_value
+      FROM don_ban_hang
+      WHERE ma_khach_hang = $1 AND trang_thai != 'huy'
+    `;
+    const orderRes = await query<{ total_orders: string | number; total_value: string | number }>(orderSql, [id]);
+    const totalOrders = Number(orderRes.rows[0]?.total_orders || 0);
+    const totalOrderValue = String(orderRes.rows[0]?.total_value || '0.00');
+
+    // 2. Unpaid invoices count
+    const invoiceSql = `
+      SELECT COUNT(*) AS unpaid_count
+      FROM hoa_don_ban_hang
+      WHERE ma_khach_hang = $1 AND trang_thai IN ('chua_thanh_toan', 'thanh_toan_mot_phan', 'qua_han')
+    `;
+    const invoiceRes = await query<{ unpaid_count: string | number }>(invoiceSql, [id]);
+    const unpaidInvoicesCount = Number(invoiceRes.rows[0]?.unpaid_count || 0);
+
+    // 3. Receivables strictly filtered to loai_cong_no = 'phai_thu'
+    const arSql = `
+      SELECT COALESCE(SUM(so_tien_con_lai), 0) AS outstanding,
+             COALESCE(SUM(CASE WHEN ngay_dao_han < NOW() AND so_tien_con_lai > 0 THEN so_tien_con_lai ELSE 0 END), 0) AS overdue
+      FROM cong_no
+      WHERE ma_khach_hang = $1 AND loai_cong_no = 'phai_thu'
+    `;
+    const arRes = await query<{ outstanding: string | number; overdue: string | number }>(arSql, [id]);
+    const outstandingReceivable = String(arRes.rows[0]?.outstanding || '0.00');
+    const overdueReceivable = String(arRes.rows[0]?.overdue || '0.00');
+
+    return {
+      totalOrders,
+      totalOrderValue,
+      unpaidInvoicesCount,
+      outstandingReceivable,
+      overdueReceivable,
+    };
+  }
+}
+
+export const customerRepository = new CustomerRepository();

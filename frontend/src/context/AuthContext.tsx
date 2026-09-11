@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiFetch, ApiError } from '../services/api.js';
 
 export interface UserProfile {
   id: number;
@@ -12,6 +13,7 @@ export interface AuthContextType {
   user: UserProfile | null;
   token: string | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (token: string, user: UserProfile) => void;
   logout: () => void;
 }
@@ -31,6 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     return null;
   });
+  const [isLoading, setIsLoading] = useState<boolean>(() => !!localStorage.getItem('auth_token'));
 
   const login = (newToken: string, newUser: UserProfile) => {
     localStorage.setItem('auth_token', newToken);
@@ -46,12 +49,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  // Verify and hydrate current user profile on initial startup if token exists
   useEffect(() => {
-    const handleStorage = () => {
-      setToken(localStorage.getItem('auth_token'));
+    const verifySession = async () => {
+      const storedToken = localStorage.getItem('auth_token');
+      if (!storedToken) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const profile = await apiFetch<UserProfile>('/auth/me');
+        setUser(profile);
+        localStorage.setItem('auth_user', JSON.stringify(profile));
+      } catch (err) {
+        if (err instanceof ApiError && err.statusCode === 401) {
+          logout();
+        }
+      } finally {
+        setIsLoading(false);
+      }
     };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+
+    verifySession();
   }, []);
 
   return (
@@ -59,7 +79,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         token,
-        isAuthenticated: !!token,
+        isAuthenticated: !!token && !!user,
+        isLoading,
         login,
         logout,
       }}

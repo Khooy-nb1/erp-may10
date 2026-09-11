@@ -3,14 +3,19 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from '../components/common/AppShell.js';
 import { PageHeader } from '../components/common/PageHeader.js';
 import { EmptyState } from '../components/common/EmptyState.js';
+import { LoginPage } from '../pages/auth/LoginPage.js';
+import { ProtectedRoute } from './ProtectedRoute.js';
+import { CustomerListPage } from '../pages/customers/CustomerListPage.js';
+import { CustomerCreatePage } from '../pages/customers/CustomerCreatePage.js';
+import { CustomerDetailPage } from '../pages/customers/CustomerDetailPage.js';
+import { ProductListPage } from '../pages/products/ProductListPage.js';
 
-// Placeholder screen component for modular development
 const ScreenPlaceholder: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
   <div>
     <PageHeader title={title} subtitle={subtitle} />
     <EmptyState
       title={`${title} - Chức năng đang hoàn thiện`}
-      description={`Mô-đun ${title} sẽ được triển khai theo kế hoạch phân kỳ.`}
+      description={`Phân hệ ${title} sẽ được triển khai theo kế hoạch phân kỳ.`}
     />
   </div>
 );
@@ -18,7 +23,18 @@ const ScreenPlaceholder: React.FC<{ title: string; subtitle: string }> = ({ titl
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
-      <Route path="/" element={<AppShell />}>
+      {/* Public Authentication Route */}
+      <Route path="/login" element={<LoginPage />} />
+
+      {/* Protected App Shell Routes */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <AppShell />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route
           path="dashboard"
@@ -29,24 +45,10 @@ export const AppRoutes: React.FC = () => {
             />
           }
         />
-        <Route
-          path="customers"
-          element={
-            <ScreenPlaceholder
-              title="Quản lý khách hàng"
-              subtitle="Danh sách khách hàng, thông tin hạn mức tín dụng và lịch sử giao dịch"
-            />
-          }
-        />
-        <Route
-          path="products"
-          element={
-            <ScreenPlaceholder
-              title="Tra cứu sản phẩm"
-              subtitle="Danh mục sản phẩm may mặc sẵn sàng bán và giá niêm yết"
-            />
-          }
-        />
+        <Route path="customers" element={<CustomerListPage />} />
+        <Route path="customers/new" element={<CustomerCreatePage />} />
+        <Route path="customers/:id" element={<CustomerDetailPage />} />
+        <Route path="products" element={<ProductListPage />} />
         <Route
           path="sales-orders"
           element={
@@ -80,15 +82,6 @@ export const AppRoutes: React.FC = () => {
             <ScreenPlaceholder
               title="Quản lý công nợ"
               subtitle="Theo dõi công nợ phải thu khách hàng và tuổi nợ"
-            />
-          }
-        />
-        <Route
-          path="login"
-          element={
-            <ScreenPlaceholder
-              title="Đăng nhập hệ thống"
-              subtitle="Nhập thông tin xác thực để truy cập các chức năng bán hàng"
             />
           }
         />

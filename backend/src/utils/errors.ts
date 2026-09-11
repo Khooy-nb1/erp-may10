@@ -53,3 +53,16 @@ export class ValidationError extends AppError {
     super(422, 'VALIDATION_ERROR', message, details);
   }
 }
+
+
+export class InvalidCredentialsError extends AppError {
+  constructor(message = 'Invalid email or password.') {
+    super(401, 'AUTH_INVALID_CREDENTIALS', message);
+  }
+}
+
+export class AccountInactiveError extends AppError {
+  constructor(message = 'Your account has been deactivated or locked. Please contact an administrator.') {
+    super(403, 'AUTH_ACCOUNT_INACTIVE', message);
+  }
+}
