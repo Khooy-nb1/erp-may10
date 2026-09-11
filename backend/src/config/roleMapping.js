@@ -3,7 +3,7 @@
  * Synchronized across Backend, Frontend, and Database (nguoi_dung)
  */
 
-// 1. CANONICAL ROLES (Chuẩn hóa 6 vai trò chính thức tiếng Việt theo RBAC Contract)
+// 1. CANONICAL ROLES (Chuáº©n hÃ³a 6 vai trÃ² chÃ­nh thá»©c tiáº¿ng Viá»‡t theo RBAC Contract)
 const CANONICAL_ROLES = {
   ADMIN: 'admin',
   KHO: 'kho',
@@ -12,7 +12,7 @@ const CANONICAL_ROLES = {
   MUA_HANG: 'mua_hang',
   KE_TOAN: 'ke_toan',
 
-  // Adapter tương thích nội bộ (Internal Security Adapter Compatibility)
+  // Adapter tÆ°Æ¡ng thÃ­ch ná»™i bá»™ (Internal Security Adapter Compatibility)
   WAREHOUSE: 'kho',
   SALES: 'ban_hang',
   PRODUCTION: 'san_xuat',
@@ -20,13 +20,13 @@ const CANONICAL_ROLES = {
   ACCOUNTING: 'ke_toan',
 };
 
-// 2. DICTIONARY MAPPING (Hỗ trợ chuẩn hóa mọi định dạng về 6 vai trò tiếng Việt)
+// 2. DICTIONARY MAPPING (Há»— trá»£ chuáº©n hÃ³a má»i Ä‘á»‹nh dáº¡ng vá» 6 vai trÃ² tiáº¿ng Viá»‡t)
 const ROLE_MAPPING = {
   // Admin
   'admin': 'admin',
   'ADMIN': 'admin',
 
-  // Phân hệ PH4: Kho & Quản lý vật tư
+  // PhÃ¢n há»‡ PH4: Kho & Quáº£n lÃ½ váº­t tÆ°
   'kho': 'kho',
   'KHO': 'kho',
   'warehouse': 'kho',
@@ -35,33 +35,35 @@ const ROLE_MAPPING = {
   'WAREHOUSE_MANAGER': 'kho',
   'quan_ly_kho': 'kho',
 
-  // Phân hệ PH1: Bán hàng
+  // PhÃ¢n há»‡ PH1: BÃ¡n hÃ ng
   'ban_hang': 'ban_hang',
   'BAN_HANG': 'ban_hang',
   'sales': 'ban_hang',
   'SALES': 'ban_hang',
 
-  // Phân hệ PH2: Sản xuất & Nhu cầu NPL
+  // PhÃ¢n há»‡ PH2: Sáº£n xuáº¥t & Nhu cáº§u NPL
   'san_xuat': 'san_xuat',
   'SAN_XUAT': 'san_xuat',
   'production': 'san_xuat',
   'PRODUCTION': 'san_xuat',
 
-  // Phân hệ PH3: Mua hàng & NCC
+  // PhÃ¢n há»‡ PH3: Mua hÃ ng & NCC
   'mua_hang': 'mua_hang',
   'MUA_HANG': 'mua_hang',
   'purchasing': 'mua_hang',
   'PURCHASING': 'mua_hang',
 
-  // Phân hệ PH5: Tài chính - Kế toán
+  // PhÃ¢n há»‡ PH5: TÃ i chÃ­nh - Káº¿ toÃ¡n
   'ke_toan': 'ke_toan',
   'KE_TOAN': 'ke_toan',
   'accounting': 'ke_toan',
   'ACCOUNTING': 'ke_toan',
+  'ke_toan_truong': 'ke_toan',
+  'KE_TOAN_TRUONG': 'ke_toan',
 };
 
 /**
- * Chuẩn hóa bất kỳ mã vai trò đầu vào về CANONICAL VIETNAMESE ROLE
+ * Chuáº©n hÃ³a báº¥t ká»³ mÃ£ vai trÃ² Ä‘áº§u vÃ o vá» CANONICAL VIETNAMESE ROLE
  * @param {string} rawRole
  * @returns {string}
  */
@@ -71,7 +73,7 @@ function normalizeRole(rawRole) {
   return ROLE_MAPPING[cleaned] || ROLE_MAPPING[rawRole.trim()] || 'kho';
 }
 
-// 3. MA TRẬN PHÂN QUYỀN CHUẨN (ROLE_PERMISSIONS) CHO TỪNG VAI TRÒ
+// 3. MA TRáº¬N PHÃ‚N QUYá»€N CHUáº¨N (ROLE_PERMISSIONS) CHO Tá»ªNG VAI TRÃ’
 const KHO_PERMISSIONS = [
   'dashboard.view',
   // Canonical Vietnamese permissions
