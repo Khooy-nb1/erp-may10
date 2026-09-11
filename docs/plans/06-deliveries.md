@@ -8,13 +8,13 @@ Track delivery headers and their state workflow without mutating order-line quan
 
 The schema has giao_hang but no chi_tiet_giao_hang. Therefore, it cannot persist the exact product/quantity content of each delivery.
 
-Before implementing partial delivery, choose one option:
+Until Q11 is resolved, the following are candidate strategies; none is selected:
 
-1. MVP whole-order delivery: complete the entire order in one operation.
-2. Accept deliveredLines in the request and update cumulative quantities in chi_tiet_don_ban_hang without persistent detail history.
-3. Add chi_tiet_giao_hang through an approved migration.
+1. **Q11-conditional; unselected:** whole-order delivery, completing the entire order in one operation.
+2. **Q11-conditional; unselected:** accept `deliveredLines` and update cumulative quantities in `chi_tiet_don_ban_hang` without persistent detail history.
+3. **Q11-conditional; unselected:** add `chi_tiet_giao_hang` through an approved migration.
 
-Do not choose option 2 or 3 silently. If undecided, build only list/detail/header workflow and keep quantity updates closed.
+While Q11 is unresolved, build only the header list/detail/workflow and keep quantity updates closed.
 
 ## P6.1 — Endpoints
 

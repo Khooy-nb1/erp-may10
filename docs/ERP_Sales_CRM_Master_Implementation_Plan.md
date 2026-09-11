@@ -3919,6 +3919,8 @@ A realistic complete MVP should include:
 | Delivery list | Yes |
 | Sales invoice | Yes |
 | Customer receivable view | Yes |
+| Receivable aging | Recommended |
+| Payment transaction history | No — schema does not support it |
 | Delivery workflow | Yes — header-only interim scope |
 | Cumulative delivery progress | Q11-conditional — skipped while the interim header-only strategy is active |
 | Exact delivery-line history | No — schema does not support it |
