@@ -118,7 +118,6 @@ export const LoginPage: React.FC = () => {
                     onChange={(value) => field.onChange(value)}
                     type="email"
                     autoComplete="email"
-                    isRequired
                     status={
                       errors.email ? { type: 'error', message: errors.email.message } : undefined
                     }
@@ -136,7 +135,6 @@ export const LoginPage: React.FC = () => {
                     onChange={(value) => field.onChange(value)}
                     type="password"
                     autoComplete="current-password"
-                    isRequired
                     status={
                       errors.password
                         ? { type: 'error', message: errors.password.message }

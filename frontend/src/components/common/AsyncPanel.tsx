@@ -1,6 +1,7 @@
 import React from 'react';
 import { VStack } from '@astryxdesign/core/Stack';
 import { Skeleton } from '@astryxdesign/core/Skeleton';
+import { VisuallyHidden } from '@astryxdesign/core/VisuallyHidden';
 import { ErrorState } from './ErrorState.js';
 import { EmptyState } from './EmptyState.js';
 
@@ -45,18 +46,7 @@ export const AsyncPanel: React.FC<AsyncPanelProps> = ({
   if (isLoading) {
     return (
       <VStack gap={2} aria-live="polite" aria-busy="true">
-        <span
-          style={{
-            position: 'absolute',
-            width: 1,
-            height: 1,
-            overflow: 'hidden',
-            clip: 'rect(0 0 0 0)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {loadingMessage}
-        </span>
+        <VisuallyHidden>{loadingMessage}</VisuallyHidden>
         {Array.from({ length: skeletonRows }, (_, index) => (
           <Skeleton key={index} index={index} height={20} radius={2} />
         ))}

@@ -1,21 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { ArrowLeft, Check, Truck, X } from 'lucide-react';
+import { AlertDialog } from '@astryxdesign/core/AlertDialog';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '@astryxdesign/core/Button';
+import { Card } from '@astryxdesign/core/Card';
+import { Dialog } from '@astryxdesign/core/Dialog';
+import { Link } from '@astryxdesign/core/Link';
+import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList';
+import { HStack, VStack } from '@astryxdesign/core/Stack';
+import { Text } from '@astryxdesign/core/Text';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { useToast } from '@astryxdesign/core/Toast';
 import { Delivery, DeliveryStatus } from '../../types/delivery.js';
 import { getDeliveryById, startDelivery, completeDelivery, failDelivery } from '../../services/deliveryService.js';
 import { useAuth } from '../../context/AuthContext.js';
-import { PageHeader } from '../../components/common/PageHeader.js';
-import { LoadingState } from '../../components/common/LoadingState.js';
-import { ErrorState } from '../../components/common/ErrorState.js';
+import { PageScaffold } from '../../components/common/PageScaffold.js';
+import { AsyncPanel } from '../../components/common/AsyncPanel.js';
+import { StatusBadge } from '../../components/common/StatusBadge.js';
+
+/** `da_giao` reads "Đã giao thành công" on this screen; the shared badge labels it "Đã giao". */
+const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
+  cho_giao: 'Chờ giao hàng',
+  dang_giao: 'Đang vận chuyển',
+  da_giao: 'Đã giao thành công',
+  that_bai: 'Giao thất bại',
+};
 
 export const DeliveryDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const deliveryId = Number(id);
   const { user } = useAuth();
+  const toast = useToast();
 
   const [delivery, setDelivery] = useState<Delivery | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [confirmCompleteOpen, setConfirmCompleteOpen] = useState<boolean>(false);
+  const [failDialogOpen, setFailDialogOpen] = useState<boolean>(false);
+  const [failReason, setFailReason] = useState<string>('');
 
   const fetchDelivery = async () => {
     setLoading(true);
@@ -42,40 +66,48 @@ export const DeliveryDetailPage: React.FC = () => {
       const updated = await startDelivery(deliveryId);
       setDelivery(updated);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Không thể bắt đầu vận chuyển');
+      toast({
+        body: err instanceof Error ? err.message : 'Không thể bắt đầu vận chuyển',
+        type: 'error',
+      });
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleComplete = async () => {
-    if (!confirm('Xác nhận hoàn thành đợt giao hàng này? (Quy trình đầu phiếu, không trừ tồn kho vật tư).')) {
-      return;
-    }
     setActionLoading(true);
     try {
       const updated = await completeDelivery(deliveryId);
       setDelivery(updated);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Không thể xác nhận hoàn thành');
+      toast({
+        body: err instanceof Error ? err.message : 'Không thể xác nhận hoàn thành',
+        type: 'error',
+      });
     } finally {
       setActionLoading(false);
+      setConfirmCompleteOpen(false);
     }
   };
 
   const handleFail = async () => {
-    const reason = prompt('Nhập lý do giao hàng thất bại:');
-    if (!reason || !reason.trim()) {
+    const reason = failReason.trim();
+    if (!reason) {
       return;
     }
     setActionLoading(true);
     try {
-      const updated = await failDelivery(deliveryId, reason.trim());
+      const updated = await failDelivery(deliveryId, reason);
       setDelivery(updated);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Không thể cập nhật thất bại');
+      toast({
+        body: err instanceof Error ? err.message : 'Không thể cập nhật thất bại',
+        type: 'error',
+      });
     } finally {
       setActionLoading(false);
+      setFailDialogOpen(false);
     }
   };
 
@@ -84,36 +116,17 @@ export const DeliveryDetailPage: React.FC = () => {
     return new Date(dateStr).toLocaleDateString('vi-VN');
   };
 
-  const renderStatusBadge = (st: DeliveryStatus) => {
-    const config: Record<DeliveryStatus, { bg: string; color: string; label: string }> = {
-      cho_giao: { bg: '#fef9c3', color: '#854d0e', label: 'Chờ giao hàng' },
-      dang_giao: { bg: '#e0e7ff', color: '#3730a3', label: 'Đang vận chuyển' },
-      da_giao: { bg: '#dcfce7', color: '#15803d', label: 'Đã giao thành công' },
-      that_bai: { bg: '#fee2e2', color: '#b91c1c', label: 'Giao thất bại' },
-    };
-    const c = config[st] || { bg: '#f1f5f9', color: '#475569', label: st };
+  if (loading || error || !delivery) {
     return (
-      <span
-        style={{
-          padding: '0.2rem 0.55rem',
-          borderRadius: '9999px',
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          backgroundColor: c.bg,
-          color: c.color,
-        }}
+      <AsyncPanel
+        isLoading={loading}
+        error={error ?? (!delivery ? 'Không tìm thấy phiếu giao hàng' : null)}
+        loadingMessage="Đang tải phiếu giao hàng..."
+        onRetry={fetchDelivery}
       >
-        {c.label}
-      </span>
+        {null}
+      </AsyncPanel>
     );
-  };
-
-  if (loading) {
-    return <LoadingState message="Đang tải phiếu giao hàng..." />;
-  }
-
-  if (error || !delivery) {
-    return <ErrorState message={error || 'Không tìm thấy phiếu giao hàng'} onRetry={fetchDelivery} />;
   }
 
   const isWarehouseOrAdmin = user?.vai_tro === 'kho' || user?.vai_tro === 'admin';
@@ -121,146 +134,134 @@ export const DeliveryDetailPage: React.FC = () => {
   const isInTransit = delivery.trang_thai === 'dang_giao';
 
   return (
-    <div>
-      <PageHeader
-        title={`Phiếu giao hàng: ${delivery.ma_giao_hang}`}
-        subtitle={`Ngày giao: ${formatDate(delivery.ngay_giao)} • Trạng thái: ${delivery.trang_thai}`}
-      >
-        <Link
-          to="/deliveries"
-          style={{
-            padding: '0.45rem 0.9rem',
-            backgroundColor: '#ffffff',
-            color: '#334155',
-            border: '1px solid #cbd5e1',
-            borderRadius: '6px',
-            textDecoration: 'none',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-          }}
-        >
-          ← Danh sách giao hàng
-        </Link>
+    <PageScaffold
+      title={`Phiếu giao hàng: ${delivery.ma_giao_hang}`}
+      subtitle={`Ngày giao: ${formatDate(delivery.ngay_giao)} • Trạng thái: ${delivery.trang_thai}`}
+      breadcrumbs={[
+        { label: 'Giao hàng', href: '/deliveries' },
+        { label: delivery.ma_giao_hang },
+      ]}
+      actions={
+        <HStack gap={2} wrap="wrap">
+          <Button
+            variant="secondary"
+            icon={<ArrowLeft size={16} />}
+            label="Danh sách giao hàng"
+            href="/deliveries"
+          />
+          {isWarehouseOrAdmin && isPending && (
+            <Button
+              variant="primary"
+              icon={<Truck size={16} />}
+              label="Bắt đầu vận chuyển"
+              isDisabled={actionLoading}
+              onClick={handleStart}
+            />
+          )}
+          {isWarehouseOrAdmin && isInTransit && (
+            <>
+              <Button
+                variant="primary"
+                icon={<Check size={16} />}
+                label="Xác nhận giao thành công"
+                isDisabled={actionLoading}
+                onClick={() => setConfirmCompleteOpen(true)}
+              />
+              <Button
+                variant="destructive"
+                icon={<X size={16} />}
+                label="Báo giao thất bại"
+                isDisabled={actionLoading}
+                onClick={() => {
+                  setFailReason('');
+                  setFailDialogOpen(true);
+                }}
+              />
+            </>
+          )}
+        </HStack>
+      }
+    >
+      <VStack gap={4}>
+        <Banner status="info" collapsible={false} title="Quy định kỹ thuật (P0 / Q11):">
+          <Text type="supporting">
+            Mô hình cơ sở dữ liệu hiện tại quản lý thực hiện giao hàng theo phiếu vận chuyển cấp đầu phiếu (`giao_hang`). Việc hoàn thành đợt giao không tự động trừ tồn kho (`ton_kho` quản lý nguyên phụ liệu ở phân hệ Kho) và không cập nhật chi tiết dòng sản phẩm.
+          </Text>
+        </Banner>
 
-        {isWarehouseOrAdmin && isPending && (
-          <button
-            disabled={actionLoading}
-            onClick={handleStart}
-            style={{
-              padding: '0.45rem 1rem',
-              backgroundColor: '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            🚚 Bắt đầu vận chuyển
-          </button>
-        )}
-
-        {isWarehouseOrAdmin && isInTransit && (
-          <>
-            <button
-              disabled={actionLoading}
-              onClick={handleComplete}
-              style={{
-                padding: '0.45rem 1rem',
-                backgroundColor: '#16a34a',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              ✓ Xác nhận giao thành công
-            </button>
-            <button
-              disabled={actionLoading}
-              onClick={handleFail}
-              style={{
-                padding: '0.45rem 0.9rem',
-                backgroundColor: '#fee2e2',
-                color: '#991b1b',
-                border: '1px solid #fca5a5',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              ✕ Báo giao thất bại
-            </button>
-          </>
-        )}
-      </PageHeader>
-
-      {/* Scope Disclaimer Card */}
-      <div
-        style={{
-          backgroundColor: '#eff6ff',
-          border: '1px solid #bfdbfe',
-          borderRadius: '8px',
-          padding: '1rem 1.25rem',
-          marginBottom: '1.5rem',
-          fontSize: '0.875rem',
-          color: '#1e40af',
-          lineHeight: 1.5,
-        }}
-      >
-        📌 <strong>Quy định kỹ thuật (P0 / Q11):</strong> Mô hình cơ sở dữ liệu hiện tại quản lý thực hiện giao hàng theo phiếu vận chuyển cấp đầu phiếu (`giao_hang`). Việc hoàn thành đợt giao không tự động trừ tồn kho (`ton_kho` quản lý nguyên phụ liệu ở phân hệ Kho) và không cập nhật chi tiết dòng sản phẩm.
-      </div>
-
-      {/* Delivery Details Overview */}
-      <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '1.5rem', marginBottom: '1.5rem' }}>
-        <h3 style={{ margin: '0 0 1.25rem 0', fontSize: '1.1rem', color: '#0f172a' }}>Thông tin phiếu giao hàng</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', fontSize: '0.875rem' }}>
-          <div>
-            <span style={{ color: '#64748b' }}>Đơn bán hàng liên kết:</span>
-            <div style={{ fontWeight: 600, marginTop: '0.2rem' }}>
-              <Link to={`/sales-orders/${delivery.ma_don_ban_hang}`} style={{ color: '#2563eb', textDecoration: 'none' }}>
+        <Card padding={4}>
+          <MetadataList title="Thông tin phiếu giao hàng" columns={2}>
+            <MetadataListItem label="Đơn bán hàng liên kết:">
+              <Link href={`/sales-orders/${delivery.ma_don_ban_hang}`}>
                 {delivery.ma_don_ban || `Đơn hàng #${delivery.ma_don_ban_hang}`}
               </Link>
-            </div>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Trạng thái vận chuyển:</span>
-            <div style={{ marginTop: '0.2rem' }}>{renderStatusBadge(delivery.trang_thai)}</div>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Kho hàng xuất:</span>
-            <div style={{ fontWeight: 500, marginTop: '0.2rem' }}>{delivery.ten_kho || `Kho #${delivery.ma_kho}`}</div>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Ngày giao hàng:</span>
-            <div style={{ fontWeight: 500, marginTop: '0.2rem' }}>{formatDate(delivery.ngay_giao)}</div>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Người nhận hàng:</span>
-            <div style={{ fontWeight: 500, marginTop: '0.2rem' }}>{delivery.ten_nguoi_nhan}</div>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Phương tiện vận chuyển:</span>
-            <div style={{ color: '#334155', marginTop: '0.2rem' }}>{delivery.phuong_tien_van_chuyen || 'Chưa xác định'}</div>
-          </div>
-          <div style={{ gridColumn: 'span 2' }}>
-            <span style={{ color: '#64748b' }}>Địa chỉ nhận hàng:</span>
-            <div style={{ fontWeight: 500, marginTop: '0.2rem' }}>{delivery.dia_chi_giao}</div>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Nhân viên giao nhận:</span>
-            <div style={{ color: '#334155', marginTop: '0.2rem' }}>{delivery.ten_nguoi_giao || '—'}</div>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Ghi chú điều phối:</span>
-            <div style={{ color: '#475569', marginTop: '0.2rem' }}>{delivery.ghi_chu || 'Không có ghi chú'}</div>
-          </div>
-        </div>
-      </div>
-    </div>
+            </MetadataListItem>
+            <MetadataListItem label="Trạng thái vận chuyển:">
+              <StatusBadge
+                status={delivery.trang_thai}
+                label={DELIVERY_STATUS_LABELS[delivery.trang_thai]}
+              />
+            </MetadataListItem>
+            <MetadataListItem label="Kho hàng xuất:">
+              {delivery.ten_kho || `Kho #${delivery.ma_kho}`}
+            </MetadataListItem>
+            <MetadataListItem label="Ngày giao hàng:">{formatDate(delivery.ngay_giao)}</MetadataListItem>
+            <MetadataListItem label="Người nhận hàng:">{delivery.ten_nguoi_nhan}</MetadataListItem>
+            <MetadataListItem label="Phương tiện vận chuyển:">
+              {delivery.phuong_tien_van_chuyen || 'Chưa xác định'}
+            </MetadataListItem>
+            <MetadataListItem label="Địa chỉ nhận hàng:">{delivery.dia_chi_giao}</MetadataListItem>
+            <MetadataListItem label="Nhân viên giao nhận:">{delivery.ten_nguoi_giao || '—'}</MetadataListItem>
+            <MetadataListItem label="Ghi chú điều phối:">{delivery.ghi_chu || 'Không có ghi chú'}</MetadataListItem>
+          </MetadataList>
+        </Card>
+      </VStack>
+
+      <AlertDialog
+        isOpen={confirmCompleteOpen}
+        onOpenChange={setConfirmCompleteOpen}
+        title="Xác nhận giao thành công"
+        description="Xác nhận hoàn thành đợt giao hàng này? (Quy trình đầu phiếu, không trừ tồn kho vật tư)."
+        actionLabel="Xác nhận giao thành công"
+        cancelLabel="Hủy"
+        actionVariant="primary"
+        isActionLoading={actionLoading}
+        onAction={handleComplete}
+      />
+
+      <Dialog
+        isOpen={failDialogOpen}
+        onOpenChange={setFailDialogOpen}
+        purpose="form"
+        width={440}
+      >
+        <VStack gap={4}>
+          <Text as="h2" type="large" weight="semibold">
+            Báo giao thất bại
+          </Text>
+          <TextInput
+            label="Nhập lý do giao hàng thất bại:"
+            value={failReason}
+            onChange={(value) => setFailReason(value)}
+            isDisabled={actionLoading}
+          />
+          <HStack gap={2} hAlign="end">
+            <Button
+              variant="secondary"
+              label="Hủy"
+              isDisabled={actionLoading}
+              onClick={() => setFailDialogOpen(false)}
+            />
+            <Button
+              variant="destructive"
+              label="Báo giao thất bại"
+              isDisabled={!failReason.trim() || actionLoading}
+              isLoading={actionLoading}
+              onClick={handleFail}
+            />
+          </HStack>
+        </VStack>
+      </Dialog>
+    </PageScaffold>
   );
 };

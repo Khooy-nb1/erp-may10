@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { createInvoice } from '../../services/invoiceService.js';
-import { PageHeader } from '../../components/common/PageHeader.js';
+import { VStack, HStack } from '@astryxdesign/core/Stack';
+import { Button } from '@astryxdesign/core/Button';
+import { NumberInput } from '@astryxdesign/core/NumberInput';
+import { TextArea } from '@astryxdesign/core/TextArea';
+import { DateInput } from '@astryxdesign/core/DateInput';
+import type { ISODateString } from '@astryxdesign/core/Calendar';
+import { PageScaffold } from '../../components/common/PageScaffold.js';
+import { FormSection } from '../../components/common/FormSection.js';
 import { ErrorState } from '../../components/common/ErrorState.js';
 
 export const InvoiceCreatePage: React.FC = () => {
   const navigate = useNavigate();
 
-  const [orderId, setOrderId] = useState<string>('');
+  const [orderId, setOrderId] = useState<number | null>(null);
   const [issueDate, setIssueDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [notes, setNotes] = useState<string>('');
@@ -17,7 +24,7 @@ export const InvoiceCreatePage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orderId || !Number(orderId)) {
+    if (orderId === null || !Number(orderId)) {
       setError('Vui lòng nhập ID đơn hàng hợp lệ.');
       return;
     }
@@ -42,156 +49,67 @@ export const InvoiceCreatePage: React.FC = () => {
   };
 
   return (
-    <div>
-      <PageHeader
-        title="Xuất hóa đơn bán hàng mới"
-        subtitle="Lập hóa đơn tài chính liên kết đơn hàng đã được xác nhận (Kế toán &amp; Admin)"
-      >
-        <Link
-          to="/invoices"
-          style={{
-            padding: '0.5rem 1rem',
-            backgroundColor: '#ffffff',
-            color: '#334155',
-            border: '1px solid #cbd5e1',
-            borderRadius: '6px',
-            textDecoration: 'none',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-          }}
-        >
-          Hủy bỏ
-        </Link>
-      </PageHeader>
-
+    <PageScaffold
+      title="Xuất hóa đơn bán hàng mới"
+      subtitle="Lập hóa đơn tài chính liên kết đơn hàng đã được xác nhận (Kế toán & Admin)"
+      breadcrumbs={[{ label: 'Hóa đơn', href: '/invoices' }, { label: 'Xuất hóa đơn bán hàng mới' }]}
+      actions={<Button label="Hủy bỏ" variant="secondary" href="/invoices" />}
+      maxWidth={650}
+    >
       {error && <ErrorState message={error} onRetry={() => setError(null)} />}
 
-      <div
-        style={{
-          backgroundColor: '#ffffff',
-          borderRadius: '8px',
-          border: '1px solid #e2e8f0',
-          padding: '2rem',
-          maxWidth: '650px',
-        }}
-      >
-        <form onSubmit={handleSubmit} noValidate>
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-              ID Đơn bán hàng *
-            </label>
-            <input
-              type="number"
-              placeholder="Nhập ID đơn hàng cần xuất hóa đơn (VD: 1)"
-              value={orderId}
-              onChange={(e) => setOrderId(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.75rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                boxSizing: 'border-box',
-              }}
-            />
-            <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem', display: 'block' }}>
-              Hóa đơn chỉ được tạo cho đơn hàng đã xác nhận và chưa từng được xuất hóa đơn trước đó.
-            </span>
-          </div>
+      <form onSubmit={handleSubmit} noValidate>
+        <VStack gap={5}>
+          <FormSection title="Thông tin hóa đơn">
+            <VStack gap={4}>
+              <NumberInput
+                label="ID Đơn bán hàng *"
+                placeholder="Nhập ID đơn hàng cần xuất hóa đơn (VD: 1)"
+                description="Hóa đơn chỉ được tạo cho đơn hàng đã xác nhận và chưa từng được xuất hóa đơn trước đó."
+                value={orderId}
+                onChange={(value) => setOrderId(value)}
+                hasClear
+                width="100%"
+              />
 
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-              Ngày xuất hóa đơn *
-            </label>
-            <input
-              type="date"
-              value={issueDate}
-              onChange={(e) => setIssueDate(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.75rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                boxSizing: 'border-box',
-              }}
-            />
-            <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem', display: 'block' }}>
-              Hạn thanh toán sẽ được hệ thống tính tự động dựa trên số ngày công nợ của khách hàng.
-            </span>
-          </div>
+              <DateInput
+                label="Ngày xuất hóa đơn *"
+                description="Hạn thanh toán sẽ được hệ thống tính tự động dựa trên số ngày công nợ của khách hàng."
+                value={issueDate ? (issueDate as ISODateString) : undefined}
+                onChange={(value) => setIssueDate(value ?? '')}
+                width="100%"
+              />
 
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-              Số tiền tạm ứng / đã thu ban đầu (VNĐ)
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={paidAmount}
-              onChange={(e) => setPaidAmount(Math.max(0, Number(e.target.value)))}
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.75rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
+              <NumberInput
+                label="Số tiền tạm ứng / đã thu ban đầu (VNĐ)"
+                min={0}
+                value={paidAmount}
+                onChange={(value) => setPaidAmount(Math.max(0, Number(value) || 0))}
+                width="100%"
+              />
 
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-              Ghi chú hóa đơn
-            </label>
-            <textarea
-              rows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.75rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                boxSizing: 'border-box',
-                fontFamily: 'inherit',
-              }}
-            />
-          </div>
+              <TextArea
+                label="Ghi chú hóa đơn"
+                rows={2}
+                value={notes}
+                onChange={(value) => setNotes(value)}
+                width="100%"
+              />
+            </VStack>
+          </FormSection>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-            <Link
-              to="/invoices"
-              style={{
-                padding: '0.6rem 1.25rem',
-                backgroundColor: '#f1f5f9',
-                color: '#475569',
-                border: '1px solid #cbd5e1',
-                borderRadius: '6px',
-                textDecoration: 'none',
-                fontSize: '0.9rem',
-                fontWeight: 500,
-              }}
-            >
-              Hủy
-            </Link>
-            <button
+          <HStack gap={2} hAlign="end">
+            <Button label="Hủy" variant="secondary" href="/invoices" />
+            <Button
               type="submit"
-              disabled={isSubmitting}
-              style={{
-                padding: '0.6rem 1.5rem',
-                backgroundColor: isSubmitting ? '#93c5fd' : '#2563eb',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.9rem',
-                fontWeight: 600,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {isSubmitting ? 'Đang xử lý...' : 'Xác nhận xuất hóa đơn'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+              label={isSubmitting ? 'Đang xử lý...' : 'Xác nhận xuất hóa đơn'}
+              variant="primary"
+              isLoading={isSubmitting}
+              isDisabled={isSubmitting}
+            />
+          </HStack>
+        </VStack>
+      </form>
+    </PageScaffold>
   );
 };

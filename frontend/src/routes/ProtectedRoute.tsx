@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
+import { VStack } from '@astryxdesign/core/Stack';
 import { useAuth } from '../context/AuthContext.js';
 import { LoadingState } from '../components/common/LoadingState.js';
 import { ErrorState } from '../components/common/ErrorState.js';
@@ -25,12 +26,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, ch
     const isAllowed = user.vai_tro === 'admin' || allowedRoles.includes(user.vai_tro);
     if (!isAllowed) {
       return (
-        <div style={{ padding: '2rem' }}>
+        <VStack padding={8}>
           <ErrorState
             code="AUTH_FORBIDDEN"
             message="Bạn không có quyền truy cập vào phân hệ hoặc chức năng này."
           />
-        </div>
+        </VStack>
       );
     }
   }

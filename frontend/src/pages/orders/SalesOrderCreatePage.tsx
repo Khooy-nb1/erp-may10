@@ -1,18 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Trash2 } from 'lucide-react';
+import { VStack, HStack } from '@astryxdesign/core/Stack';
+import { Grid } from '@astryxdesign/core/Grid';
+import { Text } from '@astryxdesign/core/Text';
+import { Card } from '@astryxdesign/core/Card';
+import { Button } from '@astryxdesign/core/Button';
+import { IconButton } from '@astryxdesign/core/IconButton';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Divider } from '@astryxdesign/core/Divider';
+import { Table, proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { NumberInput } from '@astryxdesign/core/NumberInput';
+import { TextArea } from '@astryxdesign/core/TextArea';
+import { Selector } from '@astryxdesign/core/Selector';
+import { DateInput } from '@astryxdesign/core/DateInput';
+import type { ISODateString } from '@astryxdesign/core/Calendar';
 import { Customer } from '../../types/customer.js';
 import { Product } from '../../types/product.js';
 import { getCustomers } from '../../services/customerService.js';
 import { createOrder } from '../../services/orderService.js';
 import { ProductSelector } from '../../components/products/ProductSelector.js';
-import { PageHeader } from '../../components/common/PageHeader.js';
-import { ErrorState } from '../../components/common/ErrorState.js';
+import { PageScaffold } from '../../components/common/PageScaffold.js';
+import { FormSection } from '../../components/common/FormSection.js';
 import { LoadingState } from '../../components/common/LoadingState.js';
 
 interface LineItemDraft {
   product: Product;
   quantity: number;
   discountRate: number;
+}
+
+interface LineItemRow extends Record<string, unknown> {
+  key: string;
+  index: number;
+  line: LineItemDraft;
 }
 
 export const SalesOrderCreatePage: React.FC = () => {
@@ -130,325 +152,228 @@ export const SalesOrderCreatePage: React.FC = () => {
     }
   };
 
+  const lineRows: LineItemRow[] = lines.map((line, index) => ({
+    key: String(line.product.id),
+    index,
+    line,
+  }));
+
+  const lineColumns: TableColumn<LineItemRow>[] = [
+    {
+      key: 'product',
+      header: 'Sản phẩm',
+      width: proportional(1),
+      renderCell: (row) => (
+        <VStack gap={0.5}>
+          <Text weight="semibold">{row.line.product.ten_san_pham}</Text>
+          <Text type="supporting">
+            {`${row.line.product.ma_san_pham} • ĐVT: ${row.line.product.ten_don_vi || 'Cái'}`}
+          </Text>
+        </VStack>
+      ),
+    },
+    {
+      key: 'quantity',
+      header: 'Số lượng',
+      width: pixel(120),
+      renderCell: (row) => (
+        <NumberInput
+          label="Số lượng"
+          isLabelHidden
+          value={row.line.quantity}
+          min={1}
+          onChange={(value) => handleUpdateLine(row.index, { quantity: Math.max(1, Number(value) || 1) })}
+        />
+      ),
+    },
+    {
+      key: 'unitPrice',
+      header: 'Đơn giá',
+      align: 'end',
+      renderCell: (row) => <Text weight="medium">{formatCurrency(Number(row.line.product.gia_ban))}</Text>,
+    },
+    {
+      key: 'discountRate',
+      header: 'Giảm (%)',
+      width: pixel(110),
+      renderCell: (row) => (
+        <NumberInput
+          label="Giảm (%)"
+          isLabelHidden
+          value={row.line.discountRate}
+          min={0}
+          max={100}
+          onChange={(value) =>
+            handleUpdateLine(row.index, { discountRate: Math.min(100, Math.max(0, Number(value) || 0)) })
+          }
+        />
+      ),
+    },
+    {
+      key: 'lineTotal',
+      header: 'Thành tiền',
+      align: 'end',
+      renderCell: (row) => {
+        const gross = row.line.quantity * Number(row.line.product.gia_ban);
+        const discount = (gross * row.line.discountRate) / 100;
+        return <Text weight="semibold">{formatCurrency(gross - discount)}</Text>;
+      },
+    },
+    {
+      key: 'actions',
+      header: '',
+      width: pixel(56),
+      align: 'center',
+      renderCell: (row) => (
+        <IconButton
+          icon={<Trash2 size={16} />}
+          label="Xóa dòng sản phẩm"
+          variant="ghost"
+          size="sm"
+          onClick={() => handleRemoveLine(row.index)}
+        />
+      ),
+    },
+  ];
+
   if (loadingCustomers) {
     return <LoadingState message="Đang nạp danh mục khách hàng..." />;
   }
 
   return (
-    <div>
-      <PageHeader
-        title="Tạo đơn bán hàng mới"
-        subtitle="Lập đơn hàng, thêm sản phẩm và tính toán giá niêm yết tự động"
-      >
-        <Link
-          to="/sales-orders"
-          style={{
-            padding: '0.5rem 1rem',
-            backgroundColor: '#ffffff',
-            color: '#334155',
-            border: '1px solid #cbd5e1',
-            borderRadius: '6px',
-            textDecoration: 'none',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-          }}
-        >
-          Hủy bỏ
-        </Link>
-      </PageHeader>
-
-      {error && <ErrorState message={error} onRetry={() => setError(null)} />}
-
+    <PageScaffold
+      title="Tạo đơn bán hàng mới"
+      subtitle="Lập đơn hàng, thêm sản phẩm và tính toán giá niêm yết tự động"
+      breadcrumbs={[
+        { label: 'Đơn bán hàng', href: '/sales-orders' },
+        { label: 'Tạo đơn bán hàng mới' },
+      ]}
+      actions={<Button variant="secondary" label="Hủy bỏ" href="/sales-orders" />}
+    >
       <form onSubmit={handleSubmit} noValidate>
-        {/* Header Information Card */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-            padding: '1.5rem',
-            marginBottom: '1.5rem',
-          }}
-        >
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', color: '#0f172a' }}>1. Thông tin chung đơn hàng</h3>
+        <VStack gap={5}>
+          {error ? (
+            <Banner
+              status="error"
+              title="Đã xảy ra lỗi"
+              description={`[ERROR] ${error}`}
+              collapsible={false}
+              endContent={
+                <Button label="Thử lại" variant="secondary" size="sm" onClick={() => setError(null)} />
+              }
+            />
+          ) : null}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-                Khách hàng *
-              </label>
-              <select
-                value={selectedCustomerId}
-                onChange={(e) => handleCustomerChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.6rem 0.75rem',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <option value="">-- Chọn khách hàng --</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.ten_khach_hang} ({c.ma_khach_hang}) - {c.tinh_thanh_pho}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <FormSection title="1. Thông tin chung đơn hàng">
+            <VStack gap={4}>
+              <Grid columns={{ minWidth: 260 }} gap={4}>
+                <Selector
+                  label="Khách hàng *"
+                  placeholder="-- Chọn khách hàng --"
+                  value={selectedCustomerId === '' ? undefined : String(selectedCustomerId)}
+                  onChange={(value) => handleCustomerChange(value ?? '')}
+                  options={customers.map((c) => ({
+                    value: String(c.id),
+                    label: `${c.ten_khach_hang} (${c.ma_khach_hang}) - ${c.tinh_thanh_pho}`,
+                  }))}
+                />
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-                Địa chỉ giao hàng *
-              </label>
-              <input
-                type="text"
-                value={deliveryAddress}
-                onChange={(e) => setDeliveryAddress(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.6rem 0.75rem',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
+                <TextInput
+                  label="Địa chỉ giao hàng *"
+                  value={deliveryAddress}
+                  onChange={(value) => setDeliveryAddress(value)}
+                />
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-                Ngày đặt hàng *
-              </label>
-              <input
-                type="date"
-                value={orderDate}
-                onChange={(e) => setOrderDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.6rem 0.75rem',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
+                <DateInput
+                  label="Ngày đặt hàng *"
+                  value={orderDate as ISODateString}
+                  onChange={(value) => setOrderDate(value ?? '')}
+                />
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-                Ngày giao hàng yêu cầu *
-              </label>
-              <input
-                type="date"
-                value={requestedDeliveryDate}
-                onChange={(e) => setRequestedDeliveryDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.6rem 0.75rem',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
+                <DateInput
+                  label="Ngày giao hàng yêu cầu *"
+                  value={requestedDeliveryDate as ISODateString}
+                  onChange={(value) => setRequestedDeliveryDate(value ?? '')}
+                />
+              </Grid>
 
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-                Ghi chú đơn hàng
-              </label>
-              <textarea
-                rows={2}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.6rem 0.75rem',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  boxSizing: 'border-box',
-                  fontFamily: 'inherit',
-                }}
-              />
-            </div>
-          </div>
-        </div>
+              <TextArea label="Ghi chú đơn hàng" rows={2} value={notes} onChange={(value) => setNotes(value)} />
+            </VStack>
+          </FormSection>
 
-        {/* Product Lines Selection Card */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-            padding: '1.5rem',
-            marginBottom: '1.5rem',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>2. Danh sách sản phẩm đặt mua</h3>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Giá niêm yết được áp dụng tự động từ máy chủ</span>
-          </div>
-
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-              Tra cứu &amp; thêm sản phẩm vào đơn:
-            </label>
-            <ProductSelector onSelect={handleAddProduct} />
-          </div>
-
-          {lines.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: '#f8fafc', borderRadius: '6px', color: '#64748b' }}>
-              Chưa có sản phẩm nào được chọn. Hãy tra cứu sản phẩm ở trên để thêm vào đơn hàng.
-            </div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                  <th style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>Sản phẩm</th>
-                  <th style={{ padding: '0.65rem 0.75rem', fontWeight: 600, width: '100px' }}>Số lượng</th>
-                  <th style={{ padding: '0.65rem 0.75rem', fontWeight: 600, textAlign: 'right' }}>Đơn giá</th>
-                  <th style={{ padding: '0.65rem 0.75rem', fontWeight: 600, width: '90px' }}>Giảm (%)</th>
-                  <th style={{ padding: '0.65rem 0.75rem', fontWeight: 600, textAlign: 'right' }}>Thành tiền</th>
-                  <th style={{ padding: '0.65rem 0.75rem', textAlign: 'center', width: '50px' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line, idx) => {
-                  const gross = line.quantity * Number(line.product.gia_ban);
-                  const discount = (gross * line.discountRate) / 100;
-                  const lineNet = gross - discount;
-
-                  return (
-                    <tr key={line.product.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.65rem 0.75rem' }}>
-                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{line.product.ten_san_pham}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                          {line.product.ma_san_pham} • ĐVT: {line.product.ten_don_vi || 'Cái'}
-                        </div>
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem' }}>
-                        <input
-                          type="number"
-                          min="1"
-                          value={line.quantity}
-                          onChange={(e) => handleUpdateLine(idx, { quantity: Math.max(1, Number(e.target.value)) })}
-                          style={{ width: '70px', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-                        />
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 500 }}>
-                        {formatCurrency(Number(line.product.gia_ban))}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem' }}>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={line.discountRate}
-                          onChange={(e) =>
-                            handleUpdateLine(idx, {
-                              discountRate: Math.min(100, Math.max(0, Number(e.target.value))),
-                            })
-                          }
-                          style={{ width: '60px', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-                        />
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 600, color: '#2563eb' }}>
-                        {formatCurrency(lineNet)}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveLine(idx)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#dc2626',
-                            cursor: 'pointer',
-                            fontSize: '1.1rem',
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-
-          {/* Financial Summary Preview */}
-          {lines.length > 0 && (
-            <div
-              style={{
-                marginTop: '1.5rem',
-                paddingTop: '1rem',
-                borderTop: '1px solid #e2e8f0',
-                display: 'flex',
-                justifyContent: 'flex-end',
-              }}
-            >
-              <div style={{ width: '300px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontSize: '0.875rem' }}>
-                  <span style={{ color: '#64748b' }}>Tổng tiền hàng:</span>
-                  <span style={{ fontWeight: 500 }}>{formatCurrency(grossTotal)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontSize: '0.875rem' }}>
-                  <span style={{ color: '#64748b' }}>Tiền giảm giá:</span>
-                  <span style={{ color: '#dc2626' }}>- {formatCurrency(discountTotal)}</span>
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    paddingTop: '0.5rem',
-                    borderTop: '2px solid #0f172a',
-                    fontWeight: 700,
-                    fontSize: '1.1rem',
-                    color: '#2563eb',
-                  }}
-                >
-                  <span>Tổng thanh toán:</span>
-                  <span>{formatCurrency(netTotal)}</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Submit Actions */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-          <Link
-            to="/sales-orders"
-            style={{
-              padding: '0.6rem 1.25rem',
-              backgroundColor: '#f1f5f9',
-              color: '#475569',
-              border: '1px solid #cbd5e1',
-              borderRadius: '6px',
-              textDecoration: 'none',
-              fontSize: '0.9rem',
-              fontWeight: 500,
-            }}
+          <FormSection
+            title="2. Danh sách sản phẩm đặt mua"
+            description="Giá niêm yết được áp dụng tự động từ máy chủ"
           >
-            Hủy
-          </Link>
-          <button
-            type="submit"
-            disabled={isSubmitting || lines.length === 0}
-            style={{
-              padding: '0.6rem 1.5rem',
-              backgroundColor: isSubmitting || lines.length === 0 ? '#93c5fd' : '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.9rem',
-              fontWeight: 600,
-              cursor: isSubmitting || lines.length === 0 ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isSubmitting ? 'Đang tạo đơn hàng...' : 'Lưu đơn bán hàng'}
-          </button>
-        </div>
+            <VStack gap={4}>
+              <VStack gap={2}>
+                <Text type="label" as="label">
+                  Tra cứu &amp; thêm sản phẩm vào đơn:
+                </Text>
+                <ProductSelector onSelect={handleAddProduct} />
+              </VStack>
+
+              {lines.length === 0 ? (
+                <Card variant="muted" padding={4}>
+                  <HStack hAlign="center" width="100%">
+                    <Text type="supporting" as="p">
+                      Chưa có sản phẩm nào được chọn. Hãy tra cứu sản phẩm ở trên để thêm vào đơn hàng.
+                    </Text>
+                  </HStack>
+                </Card>
+              ) : (
+                <VStack gap={4}>
+                  <Table data={lineRows} columns={lineColumns} idKey="key" density="compact" />
+
+                  <Divider />
+
+                  <HStack hAlign="end" width="100%">
+                    <VStack gap={2} width={340}>
+                      <HStack hAlign="between" width="100%">
+                        <Text type="supporting" as="span">
+                          Tổng tiền hàng:
+                        </Text>
+                        <Text weight="medium" as="span">
+                          {formatCurrency(grossTotal)}
+                        </Text>
+                      </HStack>
+
+                      <HStack hAlign="between" width="100%">
+                        <Text type="supporting" as="span">
+                          Tiền giảm giá:
+                        </Text>
+                        <Text as="span">{`- ${formatCurrency(discountTotal)}`}</Text>
+                      </HStack>
+
+                      <Divider />
+
+                      <HStack hAlign="between" width="100%">
+                        <Text weight="bold" as="span">
+                          Tổng thanh toán:
+                        </Text>
+                        <Text weight="bold" as="span">
+                          {formatCurrency(netTotal)}
+                        </Text>
+                      </HStack>
+                    </VStack>
+                  </HStack>
+                </VStack>
+              )}
+            </VStack>
+          </FormSection>
+
+          <HStack hAlign="end" gap={3}>
+            <Button variant="secondary" label="Hủy" href="/sales-orders" />
+            <Button
+              type="submit"
+              variant="primary"
+              label={isSubmitting ? 'Đang tạo đơn hàng...' : 'Lưu đơn bán hàng'}
+              isLoading={isSubmitting}
+              isDisabled={isSubmitting || lines.length === 0}
+            />
+          </HStack>
+        </VStack>
       </form>
-    </div>
+    </PageScaffold>
   );
 };

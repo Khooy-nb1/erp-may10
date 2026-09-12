@@ -4,9 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { createCustomer } from '../../services/customerService.js';
-import { Card } from '@astryxdesign/core/Card';
 import { VStack, HStack } from '@astryxdesign/core/Stack';
-import { Grid } from '@astryxdesign/core/Grid';
+import { Grid, GridSpan } from '@astryxdesign/core/Grid';
 import { Button } from '@astryxdesign/core/Button';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { NumberInput } from '@astryxdesign/core/NumberInput';
@@ -46,8 +45,6 @@ const CUSTOMER_TYPES: CustomerType[] = ['to_chuc', 'ca_nhan', 'dai_ly', 'xuat_kh
 function isCustomerType(value: string | null): value is CustomerType {
   return value !== null && (CUSTOMER_TYPES as string[]).includes(value);
 }
-
-const emptyToUndefined = (value: string): string | undefined => (value === '' ? undefined : value);
 
 export const CustomerCreatePage: React.FC = () => {
   const navigate = useNavigate();
@@ -114,10 +111,9 @@ export const CustomerCreatePage: React.FC = () => {
                   control={control}
                   render={({ field }) => (
                     <TextInput
-                      label="Tên khách hàng / Đơn vị"
+                      label="Tên khách hàng / Đơn vị *"
                       value={field.value}
                       onChange={field.onChange}
-                      isRequired
                       status={
                         errors.ten_khach_hang
                           ? { type: 'error', message: errors.ten_khach_hang.message }
@@ -133,7 +129,7 @@ export const CustomerCreatePage: React.FC = () => {
                 control={control}
                 render={({ field }) => (
                   <Selector
-                    label="Loại khách hàng"
+                    label="Loại khách hàng *"
                     options={LOAI_KHACH_HANG_OPTIONS.map((option) => ({
                       value: option.value,
                       label: option.label,
@@ -142,7 +138,6 @@ export const CustomerCreatePage: React.FC = () => {
                     onChange={(value) => {
                       if (isCustomerType(value)) field.onChange(value);
                     }}
-                    isRequired
                     width="100%"
                   />
                 )}
@@ -165,10 +160,9 @@ export const CustomerCreatePage: React.FC = () => {
                 control={control}
                 render={({ field }) => (
                   <TextInput
-                    label="Số điện thoại liên hệ"
+                    label="Số điện thoại liên hệ *"
                     value={field.value}
                     onChange={field.onChange}
-                    isRequired
                     status={
                       errors.so_dien_thoai
                         ? { type: 'error', message: errors.so_dien_thoai.message }
@@ -200,10 +194,9 @@ export const CustomerCreatePage: React.FC = () => {
                   control={control}
                   render={({ field }) => (
                     <TextInput
-                      label="Địa chỉ trụ sở / nhận hàng"
+                      label="Địa chỉ trụ sở / nhận hàng *"
                       value={field.value}
                       onChange={field.onChange}
-                      isRequired
                       status={
                         errors.dia_chi ? { type: 'error', message: errors.dia_chi.message } : undefined
                       }
@@ -217,10 +210,9 @@ export const CustomerCreatePage: React.FC = () => {
                 control={control}
                 render={({ field }) => (
                   <TextInput
-                    label="Tỉnh / Thành phố"
+                    label="Tỉnh / Thành phố *"
                     value={field.value}
                     onChange={field.onChange}
-                    isRequired
                     status={
                       errors.tinh_thanh_pho
                         ? { type: 'error', message: errors.tinh_thanh_pho.message }
@@ -254,6 +246,7 @@ export const CustomerCreatePage: React.FC = () => {
                     label="Hạn mức công nợ (VNĐ)"
                     value={field.value}
                     onChange={(value) => field.onChange(value)}
+                    hasClear
                     status={
                       errors.han_muc_cong_no
                         ? { type: 'error', message: errors.han_muc_cong_no.message }
@@ -271,6 +264,7 @@ export const CustomerCreatePage: React.FC = () => {
                     label="Số ngày được nợ (ngày)"
                     value={field.value}
                     onChange={(value) => field.onChange(value)}
+                    hasClear
                     status={
                       errors.so_ngay_cong_no
                         ? { type: 'error', message: errors.so_ngay_cong_no.message }
@@ -288,7 +282,7 @@ export const CustomerCreatePage: React.FC = () => {
                     <TextArea
                       label="Ghi chú"
                       value={field.value ?? ''}
-                      onChange={(value) => field.onChange(emptyToUndefined(value) ?? '')}
+                      onChange={field.onChange}
                     />
                   )}
                 />

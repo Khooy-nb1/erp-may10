@@ -15,6 +15,11 @@ import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { AsyncPanel } from '../../components/common/AsyncPanel.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
 
+/** `qua_han` reads "Quá hạn thanh toán" on this screen; the shared badge labels it "Quá hạn". */
+const STATUS_LABELS: Partial<Record<Invoice['trang_thai'], string>> = {
+  qua_han: 'Quá hạn thanh toán',
+};
+
 export const InvoiceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const invoiceId = Number(id);
@@ -157,7 +162,10 @@ export const InvoiceDetailPage: React.FC = () => {
                     </Link>
                   </MetadataListItem>
                   <MetadataListItem label="Trạng thái thanh toán">
-                    <StatusBadge status={invoice.trang_thai} />
+                    <StatusBadge
+                      status={invoice.trang_thai}
+                      label={STATUS_LABELS[invoice.trang_thai]}
+                    />
                   </MetadataListItem>
                   <MetadataListItem label="Ngày xuất hóa đơn">
                     {formatDate(invoice.ngay_xuat_hoa_don)}
