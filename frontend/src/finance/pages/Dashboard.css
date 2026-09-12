@@ -1,0 +1,44 @@
+.dashboard-kpis { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.dashboard-heading { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:20px; }
+.dashboard-period { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.dashboard-period-modes { display:flex; border:1px solid #d7e1ea; border-radius:12px; padding:3px; background:#eef5fb; }
+.dashboard-period-modes button { min-width:58px; height:36px; border-radius:9px; padding:0 11px; font-size:13px; font-weight:600; color:#526980; transition:background-color 180ms,color 180ms,box-shadow 180ms; }
+.dashboard-period-modes button:hover { color:#1f5e9d; }
+.dashboard-period-modes button.active { color:white; background:#1f5e9d; box-shadow:0 2px 6px rgb(31 94 157 / 18%); }
+.dashboard-period-value { display:flex; min-height:44px; align-items:center; gap:7px; border:1px solid #d7e1ea; border-radius:12px; padding:0 11px; background:white; color:#718499; }
+.dashboard-period-value svg { width:17px; height:17px; flex:0 0 auto; }
+.dashboard-period-value input,.dashboard-period-value select { min-width:0; border:0; outline:0; background:transparent; font-size:13px; font-weight:600; color:#294863; }
+.dashboard-period-value span { color:#a0adba; }
+.dashboard-period-note { display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:12px; color:#64748b; }
+.dashboard-kpi { --accent: #2563eb; --soft: #eff6ff; border: 1px solid #e4eaf1; border-top: 3px solid var(--accent); border-radius: 10px; padding: 15px 17px; background: white; box-shadow: 0 1px 3px rgb(18 54 91 / 4%); }
+.dashboard-kpi-amber { --accent: #d97706; --soft: #fffbeb; }
+.dashboard-kpi-indigo { --accent: #6366f1; --soft: #eef2ff; }
+.dashboard-kpi-green { --accent: #059669; --soft: #ecfdf5; }
+.dashboard-kpi h2 { font-size: 11px; font-weight: 600; color: #64748b; }
+.dashboard-kpi-icon { display: inline-flex; border-radius: 8px; padding: 7px; color: var(--accent); background: var(--soft); }
+.dashboard-kpi-change { font-weight: 650; color: var(--accent); }
+.dashboard-analysis-grid { display: grid; gap: 14px; }
+.dashboard-analysis-grid > .panel { min-height: 310px; border-radius: 10px; border-color: #e4eaf1; box-shadow: 0 1px 3px rgb(18 54 91 / 4%); }
+.dashboard-cost-layout { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 22px; }
+.dashboard-cost-donut { position: relative; width: 178px; height: 178px; flex: 0 0 auto; }
+.dashboard-cost-donut svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.dashboard-cost-donut > div { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.dashboard-cost-donut span { font-size: 9px; color: #8290a3; }
+.dashboard-cost-donut strong { margin-top: 3px; font-size: 25px; line-height: 1; color: #173455; }
+.dashboard-cost-donut small { margin-top: 4px; font-size: 9px; color: #64748b; }
+.dashboard-cost-layout ul { min-width: 185px; flex: 1; }
+.dashboard-cost-layout li { display: grid; grid-template-columns: 7px minmax(0, 1fr) auto 32px; align-items: center; gap: 7px; border-bottom: 1px solid #f0f3f6; padding: 8px 0; font-size: 10px; }
+
+.dashboard-kpi { border-radius: 16px; padding: 18px; }
+.dashboard-kpi h2 { font-size: 13px; }
+.dashboard-cost-donut span, .dashboard-cost-donut small { font-size: 12px; }
+.dashboard-cost-layout li { min-height: 44px; font-size: 13px; }
+.dashboard-cost-layout li:last-child { border-bottom: 0; }
+.dashboard-cost-layout li i { width: 7px; height: 7px; border-radius: 2px; }
+.dashboard-cost-layout li span { color: #52677e; }
+.dashboard-cost-layout li strong { color: #173455; }
+.dashboard-cost-layout li small { text-align: right; color: #94a3b8; }
+@media (min-width: 640px) { .dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .dashboard-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .dashboard-analysis-grid { grid-template-columns: minmax(0, 42fr) minmax(0, 58fr); } }
+@media (max-width: 767px) { .dashboard-period { width:100%; }.dashboard-period-modes { width:100%; }.dashboard-period-modes button { min-width:0; flex:1; }.dashboard-period-value { width:100%; }.dashboard-period-value input { flex:1; }.dashboard-period-value select { flex:1; } }

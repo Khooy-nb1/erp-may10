@@ -14,6 +14,7 @@ import Forbidden from '../pages/Forbidden';
 import NotFound from '../pages/NotFound';
 import WarehouseModule from '../pages/WarehouseModule';
 import PlaceholderModule from '../pages/PlaceholderModule';
+import FinanceRoutes from '../finance/FinanceRoutes';
 
 // Admin Pages
 import Users from '../pages/admin/Users';
@@ -97,14 +98,14 @@ export default function AppRoutes() {
 
         {/* PH5: Kế toán */}
         <Route
-          path="accounting"
+          path="accounting/*"
           element={
             <PermissionGuard
               permission="accounting.view"
               redirect={true}
               fallback={<Forbidden />}
             >
-              <PlaceholderModule />
+              <FinanceRoutes />
             </PermissionGuard>
           }
         />

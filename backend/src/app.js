@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 
-const { authMiddleware } = require('./middlewares/auth');
+const { authMiddleware, requireRoles } = require('./middlewares/auth');
 const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler');
 
 const masterDataRoutes = require('./routes/masterDataRoutes');
@@ -14,6 +14,7 @@ const phieuXuatRoutes = require('./routes/phieuXuatRoutes');
 const phieuChuyenRoutes = require('./routes/phieuChuyenRoutes');
 const phieuKiemKeRoutes = require('./routes/phieuKiemKeRoutes');
 const portalRoutes = require('./routes/portalRoutes');
+const financeRoutes = require('./routes/financeRoutes');
 
 const app = express();
 
@@ -75,6 +76,7 @@ app.use('/api/v1/phieu-xuat', phieuXuatRoutes);
 app.use('/api/v1/phieu-chuyen', phieuChuyenRoutes);
 app.use('/api/v1/phieu-kiem-ke', phieuKiemKeRoutes);
 app.use('/api/v1', portalRoutes);
+app.use('/api', authMiddleware, requireRoles('ke_toan', 'ke_toan_truong'), financeRoutes);
 
 // Xử lý route không tồn tại và lỗi
 app.use(notFoundHandler);

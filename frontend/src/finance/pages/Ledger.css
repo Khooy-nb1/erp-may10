@@ -1,0 +1,270 @@
+.ledger-page { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
+.ledger-page + section { display: none; }
+.ledger-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+.ledger-header nav { margin-bottom: 5px; font-size: 10px; color: #8392a5; }
+.ledger-header nav span { margin: 0 6px; color: #c3ceda; }
+.ledger-header h1 { font-size: 22px; line-height: 1.15; font-weight: 650; color: #173455; }
+.ledger-header p { margin-top: 4px; font-size: 11px; color: #718096; }
+.ledger-page-icon { display: inline-flex; border: 1px solid #dbeafe; border-radius: 9px; padding: 8px; color: #1769c2; background: #eff6ff; }
+.ledger-export, .ledger-search-button, .ledger-reset { display: inline-flex; height: 32px; align-items: center; justify-content: center; gap: 6px; border-radius: 6px; padding: 0 12px; font-size: 11px; font-weight: 600; }
+.ledger-export, .ledger-reset { border: 1px solid #d5dee8; color: #52677e; background: white; }
+.ledger-export:disabled { cursor: default; opacity: .45; }
+.ledger-search-button { border: 1px solid #1d5fa7; color: white; background: #255b98; }
+.ledger-tabs { display: flex; gap: 24px; border-bottom: 1px solid #dfe6ee; }
+.ledger-tabs button { position: relative; display: flex; align-items: center; gap: 7px; padding: 9px 3px 10px; font-size: 12px; font-weight: 600; color: #718096; }
+.ledger-tabs button.active { color: #1769c2; }
+.ledger-tabs button.active::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; content: ''; background: #1769c2; }
+.ledger-journal, .ledger-book { display: flex; flex-direction: column; gap: 12px; }
+.journal-balance-overview { display: grid; gap: 12px; }
+.journal-total-card, .journal-comparison-card { border: 1px solid #e4eaf1; border-radius: 10px; background: white; box-shadow: 0 1px 3px rgb(18 54 91 / 4%); }
+.journal-status-card { border: 1px solid #e4eaf1; border-top: 3px solid #6366a8; border-radius: 10px; padding: 12px 13px; background: white; box-shadow: 0 1px 3px rgb(18 54 91 / 4%); }
+.journal-status-card > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.journal-status-card h2 { font-size: 10px; font-weight: 650; color: #173455; }
+.journal-status-card header p { margin-top: 2px; font-size: 8px; color: #94a3b8; }
+.status-ring { display: flex; width: 45px; height: 45px; flex-direction: column; align-items: center; justify-content: center; border: 5px solid #e0e7ff; border-top-color: #6366a8; border-radius: 999px; }
+.status-ring strong { font-size: 13px; line-height: 1; color: #173455; }
+.status-ring small { margin-top: 2px; font-size: 7px; color: #94a3b8; }
+.status-facts { margin-top: 10px; }
+.status-facts > div { display: grid; grid-template-columns: 6px 1fr auto; align-items: center; gap: 6px; border-top: 1px solid #f0f3f6; padding: 5px 0; font-size: 8px; color: #64748b; }
+.status-facts i { width: 6px; height: 6px; border-radius: 999px; background: #94a3b8; }
+.status-facts i.balanced, .status-facts i.posted { background: #059669; }
+.status-facts i.different { background: #dc2626; }
+.status-facts strong { color: #173455; }
+.journal-total-card { display: flex; min-height: 132px; align-items: center; gap: 12px; border-top: 3px solid #2563eb; padding: 16px; }
+.journal-total-card > span { display: inline-flex; border-radius: 9px; padding: 9px; color: #2563eb; background: #eff6ff; }
+.journal-total-card svg { width: 18px; height: 18px; }
+.journal-total-card small { display: block; font-size: 9px; font-weight: 600; color: #64748b; }
+.journal-total-card strong { display: block; margin-top: 7px; font-size: 25px; line-height: 1; color: #173455; }
+.journal-total-card p { margin-top: 7px; font-size: 8px; color: #94a3b8; }
+.journal-comparison-card { overflow: hidden; }
+.journal-comparison-card > header { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #edf1f5; padding: 9px 14px; }
+.journal-comparison-card h2 { font-size: 11px; font-weight: 650; color: #173455; }
+.journal-comparison-card header p { margin-top: 2px; font-size: 8px; color: #94a3b8; }
+.balance-badge { flex: 0 0 auto; border-radius: 999px; padding: 5px 9px; font-size: 9px; font-weight: 650; }
+.balance-badge.balanced { color: #047857; background: #ecfdf5; }
+.balance-badge.different { color: #be123c; background: #fff1f2; }
+.balance-badge.neutral { color: #64748b; background: #f1f5f9; }
+.journal-comparison-body { display: grid; gap: 14px; align-items: center; padding: 14px; }
+.comparison-value { display: flex; min-width: 0; align-items: center; gap: 9px; }
+.comparison-value.credit { text-align: right; }
+.comparison-value.credit > div { order: -1; margin-left: auto; }
+.comparison-icon { display: inline-flex; flex: 0 0 auto; border-radius: 8px; padding: 7px; }
+.comparison-icon svg { width: 15px; height: 15px; }
+.comparison-value.debit .comparison-icon { color: #07816c; background: #ecfdf5; transform: rotate(90deg); }
+.comparison-value.credit .comparison-icon { color: #bf7410; background: #fffbeb; transform: rotate(-90deg); }
+.comparison-value small { display: block; font-size: 8px; font-weight: 700; letter-spacing: .04em; }
+.comparison-value.debit small, .comparison-value.debit strong { color: #07816c; }
+.comparison-value.credit small, .comparison-value.credit strong { color: #bf7410; }
+.comparison-value strong { display: block; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; font-size: 17px; line-height: 1; font-variant-numeric: tabular-nums; }
+.comparison-value p { margin-top: 5px; font-size: 8px; color: #94a3b8; }
+.comparison-visual { min-width: 0; }
+.comparison-labels { display: flex; justify-content: space-between; font-size: 8px; font-weight: 650; }
+.comparison-labels span:first-child { color: #07816c; }
+.comparison-labels span:last-child { color: #bf7410; }
+.balance-track { display: grid; height: 7px; grid-template-columns: 1fr 1fr; gap: 2px; margin-top: 5px; overflow: hidden; border-radius: 999px; background: #edf1f5; }
+.balance-track i { display: block; }
+.balance-track .debit-half { border-radius: 999px 2px 2px 999px; background: #36a88f; }
+.balance-track .credit-half { border-radius: 2px 999px 999px 2px; background: #dfa349; }
+.comparison-visual > p { margin-top: 7px; text-align: center; font-size: 8px; color: #8290a3; }
+.comparison-visual > p strong { color: #173455; }
+.journal-mini-analytics { display: grid; gap: 12px; }
+.mini-card-heading { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #edf1f5; padding: 10px 13px; }
+.mini-card-heading h2 { font-size: 10px; font-weight: 650; color: #173455; }
+.mini-card-heading p { margin-top: 2px; font-size: 8px; color: #94a3b8; }
+.mini-card-heading > svg { width: 15px; height: 15px; color: #6884a3; }
+.account-ranking > div:last-child { padding: 8px 13px; }
+.account-rank-row { display: grid; grid-template-columns: minmax(100px, 1.2fr) minmax(80px, 1fr) 20px; align-items: center; gap: 9px; padding: 5px 0; }
+.account-rank-row span strong { display: block; font-size: 9px; color: #173455; }
+.account-rank-row span small { display: block; max-width: 155px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 7px; color: #94a3b8; }
+.account-rank-row > div { height: 5px; overflow: hidden; border-radius: 999px; background: #edf1f5; }
+.account-rank-row > div i { display: block; height: 100%; border-radius: 999px; background: #4c86bd; }
+.account-rank-row b { text-align: right; font-size: 9px; color: #52677e; }
+.latest-journal-body { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 15px 13px; }
+.latest-icon { display: inline-flex; border-radius: 8px; padding: 7px; color: #2563a6; background: #eff6ff; }
+.latest-icon svg { width: 15px; height: 15px; }
+.latest-journal-body button { font-size: 10px; font-weight: 650; color: #1769c2; }
+.latest-journal-body p, .latest-journal-body small { display: block; margin-top: 3px; font-size: 8px; color: #8492a4; }
+.latest-journal-body > strong { font-size: 11px; color: #173455; }
+.mini-empty { padding: 22px; text-align: center; font-size: 9px; color: #94a3b8; }
+.journal-table-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 18px; border-top: 1px solid #dfe7ef; padding: 9px 13px; background: #fafcfe; }
+.journal-table-summary > div { display: flex; align-items: baseline; gap: 7px; }
+.journal-table-summary span { font-size: 8px; color: #8190a3; }
+.journal-table-summary strong { font-size: 10px; color: #173455; }
+.journal-table-summary strong.debit { color: #07816c; }
+.journal-table-summary strong.credit { color: #bf7410; }
+.journal-summary { display: grid; overflow: hidden; border: 1px solid #e4eaf1; border-radius: 10px; background: white; box-shadow: 0 1px 3px rgb(18 54 91 / 4%); }
+.journal-summary article { --accent: #2563eb; --soft: #eff6ff; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #edf1f5; padding: 12px 14px; }
+.journal-summary article.green { --accent: #059669; --soft: #ecfdf5; }
+.journal-summary article.amber { --accent: #d97706; --soft: #fffbeb; }
+.journal-summary article > span { display: inline-flex; border-radius: 8px; padding: 7px; color: var(--accent); background: var(--soft); }
+.journal-summary article svg { width: 15px; height: 15px; }
+.journal-summary article small { display: block; font-size: 9px; color: #7a8ca2; }
+.journal-summary article strong { display: block; margin-top: 4px; font-size: 18px; color: #173455; }
+.journal-balance-summary { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 11px; }
+.journal-balance-summary span { border-radius: 999px; padding: 5px 9px; font-size: 10px; font-weight: 650; }
+.journal-balance-summary .balanced { color: #047857; background: #ecfdf5; }
+.journal-balance-summary .neutral { color: #64748b; background: #f1f5f9; }
+.journal-balance-summary small { margin-top: 6px; font-size: 8px; color: #94a3b8; }
+.ledger-filter { display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; gap: 9px; padding: 12px; }
+.ledger-filter label, .account-picker label { min-width: 0; font-size: 9px; font-weight: 600; color: #64748b; }
+.ledger-control:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgb(59 130 246 / 12%); }
+.ledger-page .panel { border-radius: 10px; border-color: #e4eaf1; box-shadow: 0 1px 3px rgb(18 54 91 / 4%); }
+.ledger-page .panel-heading { min-height: 44px; padding: 9px 14px; }
+.ledger-count { border-radius: 999px; padding: 4px 8px; background: #eff6ff; font-size: 9px; font-weight: 600; color: #2563eb; }
+.ledger-table th { background: #f3f7fb !important; color: #52677e !important; font-size: 9px !important; }
+.ledger-table td { height: 48px; padding: 7px 10px !important; font-size: 10px; }
+.ledger-table tbody tr:hover { background: #f5f9ff; }
+.ledger-code { font-weight: 650; color: #1769c2; }
+.ledger-document { font-weight: 550; color: #4f7fae; }
+.ledger-account strong { display: block; font-size: 10px; color: #173455; }
+.ledger-account strong.debit { color: #07816c; }
+.ledger-account strong.credit { color: #bf7410; }
+.ledger-account small { display: block; max-width: 145px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; color: #8b98a9; }
+.ledger-debit-amount, .ledger-credit-amount { text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
+.ledger-debit-amount { color: #07816c; }
+.ledger-credit-amount { color: #bf7410; }
+.ledger-state { padding: 42px; text-align: center; font-size: 11px; color: #718096; }
+.ledger-state.error, .ledger-error { color: #be123c; }
+.ledger-error { border: 1px solid #fecdd3; border-radius: 7px; padding: 9px 11px; background: #fff1f2; font-size: 10px; }
+.account-picker { display: grid; align-items: end; gap: 12px; padding: 14px; }
+.account-picker > div { display: flex; align-items: center; gap: 10px; }
+.account-picker-icon { display: inline-flex; border-radius: 8px; padding: 7px; color: #4f46a5; background: #eef2ff; }
+.account-picker-icon svg { width: 16px; height: 16px; }
+.account-picker h2 { font-size: 11px; font-weight: 650; color: #173455; }
+.account-picker p { margin-top: 2px; font-size: 9px; color: #94a3b8; }
+.ledger-select-empty { display: flex; min-height: 190px; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed #ccd7e4; border-radius: 10px; color: #94a3b8; background: rgb(255 255 255 / 55%); }
+.ledger-select-empty h2 { margin-top: 12px; font-size: 13px; font-weight: 600; color: #52677e; }
+.ledger-select-empty p { margin-top: 5px; font-size: 10px; }
+.account-summary { overflow: hidden; border: 1px solid #e4eaf1; border-radius: 10px; background: white; box-shadow: 0 1px 3px rgb(18 54 91 / 4%); }
+.ledger-detail-navigation { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+.ledger-detail-navigation button { display:inline-flex; min-height:42px; align-items:center; gap:8px; border:1px solid #cbddeb; border-radius:11px; padding:0 14px; background:white; font-size:13px; font-weight:650; color:#1f5e9d; transition:border-color 180ms,background-color 180ms,color 180ms; }
+.ledger-detail-navigation button:hover { border-color:#91b9dc; color:#174f84; background:#eef5fb; }
+.ledger-detail-navigation button svg { width:16px; height:16px; transform:rotate(180deg); }
+.ledger-detail-navigation nav { display:flex; min-width:0; align-items:center; gap:7px; font-size:12px; color:#718499; }
+.ledger-detail-navigation nav i { font-style:normal; color:#a9b7c5; }
+.ledger-detail-navigation nav strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#294863; }
+.account-title { border-bottom: 1px solid #edf1f5; padding: 13px 15px; background: #f8faff; }
+.account-title small { font-size: 8px; font-weight: 700; letter-spacing: .1em; color: #6366a8; }
+.account-title h2 { margin-top: 4px; font-size: 18px; font-weight: 700; color: #173455; }
+.account-title h2 span { margin-left: 8px; font-size: 11px; font-weight: 500; color: #64748b; }
+.ledger-no-entries { display: flex; min-height: 105px; align-items: center; justify-content: center; gap: 11px; padding: 20px; }
+.ledger-no-entries > span { display: inline-flex; border-radius: 9px; padding: 9px; color: #7189a3; background: #f1f5f9; }
+.ledger-no-entries svg { width: 18px; height: 18px; }
+.ledger-no-entries h3 { font-size: 11px; font-weight: 650; color: #52677e; }
+.ledger-no-entries p { margin-top: 4px; font-size: 9px; color: #94a3b8; }
+.account-metrics { display: grid; }
+.account-metrics article { --accent: #2563eb; border-bottom: 2px solid var(--accent); padding: 11px 14px; }
+.account-metrics article.green { --accent: #059669; }
+.account-metrics article.amber { --accent: #d97706; }
+.account-metrics article.indigo { --accent: #6366f1; }
+.account-metrics small, .account-metrics span { display: block; font-size: 8px; color: #8190a3; }
+.account-metrics strong { display: block; margin: 5px 0 2px; font-size: 17px; color: #173455; }
+.ledger-overview { display: flex; flex-direction: column; gap: 12px; }
+.ledger-overview-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #dfe7ef; border-radius: 10px; padding: 11px 13px; background: #f8faff; }
+.ledger-overview-heading > div { display: flex; align-items: center; gap: 9px; }
+.ledger-overview-heading > div > span { display: inline-flex; border-radius: 8px; padding: 7px; color: #4f46a5; background: #eef2ff; }
+.ledger-overview-heading svg { width: 16px; height: 16px; }
+.ledger-overview-heading h2 { font-size: 11px; font-weight: 650; color: #173455; }
+.ledger-overview-heading p, .ledger-overview-heading > small { margin-top: 2px; font-size: 8px; color: #8290a3; }
+.ledger-overview-grid { display: grid; gap: 12px; }
+.ledger-card-heading { display: flex; min-height: 43px; align-items: center; justify-content: space-between; border-bottom: 1px solid #edf1f5; padding: 9px 13px; }
+.ledger-card-heading h3 { font-size: 10px; font-weight: 650; color: #173455; }
+.ledger-card-heading p { margin-top: 2px; font-size: 8px; color: #94a3b8; }
+.ledger-card-heading > svg { width: 15px; height: 15px; color: #6884a3; }
+.account-directory-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.account-directory-list button { display: grid; min-width: 0; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 7px; border-right: 1px solid #edf1f5; border-bottom: 1px solid #edf1f5; padding: 9px 11px; text-align: left; }
+.account-directory-list button:hover, .active-account-list button:hover { background: #f5f9ff; }
+.account-directory-list strong, .active-account-list span strong { display: block; font-size: 10px; color: #1769c2; }
+.account-directory-list small, .active-account-list span small { display: block; max-width: 150px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; color: #7f8da0; }
+.account-directory-list button > span:nth-child(2) { white-space: nowrap; font-size: 7px; color: #94a3b8; }
+.account-directory-list svg { width: 11px; height: 11px; color: #94a3b8; }
+.active-account-list { padding: 5px 12px; }
+.active-account-list button { display: grid; width: 100%; grid-template-columns: 18px minmax(95px,.9fr) minmax(60px,1fr) 35px auto; align-items: center; gap: 7px; border-bottom: 1px solid #edf1f5; padding: 8px 2px; text-align: left; }
+.active-account-list button:last-child { border-bottom: 0; }
+.active-account-list button > b { display: flex; width: 17px; height: 17px; align-items: center; justify-content: center; border-radius: 5px; font-size: 8px; color: #64748b; background: #f1f5f9; }
+.active-account-list button > div { height: 5px; overflow: hidden; border-radius: 99px; background: #edf1f5; }
+.active-account-list button > div i { display: block; height: 100%; border-radius: 99px; background: #596bc0; }
+.active-account-list em { font-size: 7px; font-style: normal; color: #94a3b8; }
+.active-account-list button > strong { white-space: nowrap; font-size: 9px; color: #173455; }
+.ledger-card-state { padding: 28px; text-align: center; font-size: 9px; color: #94a3b8; }
+.quick-account-access { border: 1px solid #e4eaf1; border-radius: 10px; padding: 12px 13px; background: white; box-shadow: 0 1px 3px rgb(18 54 91 / 4%); }
+.quick-account-access > div:first-child h3 { font-size: 10px; font-weight: 650; color: #173455; }
+.quick-account-access > div:first-child p { margin-top: 2px; font-size: 8px; color: #94a3b8; }
+.quick-account-access > div:last-child { display: grid; gap: 8px; margin-top: 10px; }
+.quick-account-access button { display: grid; min-width: 0; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 8px; border: 1px solid #e5eaf0; border-radius: 8px; padding: 8px 10px; text-align: left; }
+.quick-account-access button:hover { border-color: #bfdbfe; background: #f8fbff; }
+.quick-account-access button strong { font-size: 10px; color: #1769c2; }
+.quick-account-access button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; color: #64748b; }
+.quick-account-access button small { font-size: 7px; color: #4f7fae; }
+.ledger-detail-grid { display: grid; align-items: start; gap: 12px; }
+.account-analysis-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; padding: 14px; }
+.account-analysis-donut { display: flex; width: 105px; height: 105px; flex: 0 0 auto; flex-direction: column; align-items: center; justify-content: center; border-radius: 99px; background: radial-gradient(circle,white 54%,transparent 56%),conic-gradient(#dce5ee 0 100%); }
+.account-analysis-donut strong { font-size: 20px; color: #173455; }
+.account-analysis-donut span { margin-top: 2px; font-size: 8px; color: #94a3b8; }
+.account-analysis dl { min-width: 145px; flex: 1; }
+.account-analysis dl > div { border-bottom: 1px solid #edf1f5; padding: 7px 0; }
+.account-analysis dt, .account-analysis dl small { font-size: 8px; color: #8290a3; }
+.account-analysis dd { margin-top: 3px; font-size: 11px; font-weight: 650; color: #173455; }
+.account-analysis dd.debit { color: #07816c; }.account-analysis dd.credit { color: #bf7410; }
+.account-analysis-note { border-top: 1px solid #edf1f5; padding: 9px 12px; font-size: 8px; color: #94a3b8; }
+.no-account-entries { padding: 14px; }
+.no-account-entries > div:first-child { display: flex; align-items: center; gap: 10px; }
+.no-account-entries > div:first-child > span { display: inline-flex; border-radius: 8px; padding: 8px; color: #7189a3; background: #f1f5f9; }
+.no-account-entries svg { width: 16px; height: 16px; }
+.no-account-entries h3 { font-size: 11px; font-weight: 650; color: #52677e; }
+.no-account-entries p { margin-top: 3px; font-size: 8px; color: #94a3b8; }
+.suggested-accounts { margin-top: 13px; border-top: 1px solid #edf1f5; padding-top: 10px; }
+.suggested-accounts > small { font-size: 8px; font-weight: 600; color: #64748b; }
+.suggested-accounts > div { display: grid; gap: 7px; margin-top: 7px; }
+.suggested-accounts button { display: grid; grid-template-columns: 35px minmax(0,1fr) auto; align-items: center; gap: 8px; border: 1px solid #e5eaf0; border-radius: 7px; padding: 7px 9px; text-align: left; }
+.suggested-accounts button:hover { background: #f5f9ff; }
+.suggested-accounts button strong { font-size: 9px; color: #1769c2; }
+.suggested-accounts button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; color: #64748b; }
+.suggested-accounts button svg { width: 11px; height: 11px; color: #94a3b8; }
+@media (min-width: 640px) {
+  .quick-account-access > div:last-child { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .journal-balance-overview { grid-template-columns: minmax(145px, .65fr) minmax(380px, 2fr); }
+  .journal-status-card { grid-column: 1 / -1; }
+  .journal-comparison-body { grid-template-columns: minmax(135px, 1fr) minmax(150px, 1.35fr) minmax(135px, 1fr); }
+  .journal-mini-analytics { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .journal-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .journal-summary article { border-right: 1px solid #edf1f5; }
+  .ledger-filter { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .account-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .account-metrics article { border-right: 1px solid #edf1f5; }
+}
+
+/* Final enterprise typography pass. */
+.ledger-table th { font-size: 13px !important; }
+.ledger-table td { height: 52px; font-size: 14px; }
+.ledger-account strong { font-size: 14px; }
+.ledger-account small { max-width: 180px; font-size: 12px; }
+.ledger-count, .balance-badge { font-size: 12px; }
+.journal-total-card small, .comparison-value small, .comparison-labels, .journal-table-summary span { font-size: 12px; }
+.journal-total-card p, .journal-comparison-card header p, .comparison-value p, .comparison-visual > p { font-size: 11px; }
+.journal-comparison-card h2, .mini-card-heading h2 { font-size: 16px; }
+.ledger-filter label, .account-picker label { font-size: 13px; }
+.account-picker h2 { font-size: 17px; }
+.account-picker p { font-size: 13px; }
+.account-title small { font-size: 11px; }
+.account-title h2 span { font-size: 16px; }
+.ledger-overview-heading h2 { font-size: 18px; }
+.ledger-overview-heading p, .ledger-overview-heading > small { font-size: 13px; }
+.ledger-card-heading h3 { font-size: 16px; }
+.ledger-card-heading p { font-size: 12px; }
+.account-directory-list strong, .active-account-list span strong { font-size: 14px; }
+.account-directory-list small, .active-account-list span small { max-width: 230px; font-size: 12px; }
+.ledger-card-state, .mini-empty { font-size: 13px; }
+.account-analysis dt, .account-analysis dl small, .account-analysis-note { font-size: 12px; }
+.account-analysis dd { font-size: 16px; }
+@media (min-width: 1024px) {
+  .ledger-overview-grid { grid-template-columns: minmax(0,60fr) minmax(320px,40fr); }
+  .quick-account-access > div:last-child { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .ledger-detail-grid { grid-template-columns: minmax(0,69fr) minmax(280px,31fr); }
+  .journal-balance-overview { grid-template-columns: minmax(145px, .62fr) minmax(390px, 2.6fr) minmax(150px, .78fr); }
+  .journal-status-card { grid-column: auto; }
+  .journal-summary { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(125px, .65fr); }
+  .journal-summary article { border-bottom: 0; }
+  .ledger-filter { grid-template-columns: minmax(190px, 1.7fr) minmax(160px, 1.35fr) minmax(118px, .85fr) minmax(118px, .85fr) auto auto; }
+  .account-picker { grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.3fr) auto; }
+}
