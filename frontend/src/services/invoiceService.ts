@@ -29,7 +29,7 @@ export async function getInvoices(
   const json = (await res.json()) as PaginatedEnvelope<Invoice>;
 
   if (!res.ok) {
-    throw new Error('Failed to fetch invoices');
+    throw new Error('Không thể tải danh sách hóa đơn');
   }
 
   return {

@@ -27,7 +27,7 @@ export async function getDeliveries(
   const json = (await res.json()) as PaginatedEnvelope<Delivery>;
 
   if (!res.ok) {
-    throw new Error('Failed to fetch deliveries');
+    throw new Error('Không thể tải danh sách đợt giao hàng');
   }
 
   return {

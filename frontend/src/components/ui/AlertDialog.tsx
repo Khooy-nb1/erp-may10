@@ -1,6 +1,7 @@
 import React from 'react';
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import { Button } from './Button.js';
+import { useReturnFocus } from '../../lib/useReturnFocus.js';
 
 export interface AlertDialogProps {
   isOpen: boolean;
@@ -30,11 +31,16 @@ export const AlertDialog: React.FC<AlertDialogProps> = ({
   isActionLoading = false,
   actionVariant = 'primary',
 }) => {
+  const { onCloseAutoFocus } = useReturnFocus(isOpen);
+
   return (
     <AlertDialogPrimitive.Root open={isOpen} onOpenChange={onOpenChange}>
       <AlertDialogPrimitive.Portal>
         <AlertDialogPrimitive.Overlay className="fixed inset-0 z-40 bg-foreground/40" />
-        <AlertDialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border border-border bg-surface p-5 shadow-raised">
+        <AlertDialogPrimitive.Content
+          onCloseAutoFocus={onCloseAutoFocus}
+          className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border border-border bg-surface p-5 shadow-raised"
+        >
           <AlertDialogPrimitive.Title className="text-lg font-semibold text-foreground">
             {title}
           </AlertDialogPrimitive.Title>

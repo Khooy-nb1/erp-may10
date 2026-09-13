@@ -27,7 +27,7 @@ export async function getProducts(
   const json = (await res.json()) as PaginatedEnvelope<Product>;
 
   if (!res.ok) {
-    throw new Error('Failed to fetch products');
+    throw new Error('Không thể tải danh mục sản phẩm');
   }
 
   return {

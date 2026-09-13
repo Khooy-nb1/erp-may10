@@ -29,7 +29,7 @@ export async function getOrders(
   const json = (await res.json()) as PaginatedEnvelope<Order>;
 
   if (!res.ok) {
-    throw new Error('Failed to fetch sales orders');
+    throw new Error('Không thể tải danh sách đơn bán hàng');
   }
 
   return {

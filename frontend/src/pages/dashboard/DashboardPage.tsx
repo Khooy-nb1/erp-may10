@@ -291,11 +291,15 @@ export const DashboardPage: React.FC = () => {
     limit: 5,
   };
 
-  const summary = useWidget<DashboardSummary>(getDashboardSummary, params, true);
-  const status = useWidget<OrderStatusBreakdown>(getOrderStatus, params, true);
-  const revenue = useWidget<RevenueChart>(getRevenueChart, params, canViewMoney);
-  const topCustomers = useWidget<TopCustomers>(getTopCustomers, params, canViewMoney);
-  const topProducts = useWidget<TopProducts>(getTopProducts, params, canViewMoney);
+  // A custom period without both dates is rejected by the API, so every widget
+  // waits for the range the "Làm mới" button already requires.
+  const widgetsEnabled = !customRangeIncomplete;
+
+  const summary = useWidget<DashboardSummary>(getDashboardSummary, params, widgetsEnabled);
+  const status = useWidget<OrderStatusBreakdown>(getOrderStatus, params, widgetsEnabled);
+  const revenue = useWidget<RevenueChart>(getRevenueChart, params, widgetsEnabled && canViewMoney);
+  const topCustomers = useWidget<TopCustomers>(getTopCustomers, params, widgetsEnabled && canViewMoney);
+  const topProducts = useWidget<TopProducts>(getTopProducts, params, widgetsEnabled && canViewMoney);
 
   const refreshAll = () => {
     summary.reload();

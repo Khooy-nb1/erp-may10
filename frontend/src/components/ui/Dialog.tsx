@@ -2,6 +2,7 @@ import React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
+import { useReturnFocus } from '../../lib/useReturnFocus.js';
 
 export interface DialogProps {
   isOpen: boolean;
@@ -30,11 +31,14 @@ export const Dialog: React.FC<DialogProps> = ({
   footer,
   className,
 }) => {
+  const { onCloseAutoFocus } = useReturnFocus(isOpen);
+
   return (
     <DialogPrimitive.Root open={isOpen} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-foreground/40" />
         <DialogPrimitive.Content
+          onCloseAutoFocus={onCloseAutoFocus}
           onEscapeKeyDown={(event) => {
             if (purpose === 'required') event.preventDefault();
           }}

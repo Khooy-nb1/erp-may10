@@ -27,7 +27,7 @@ export async function getCustomers(
   const json = (await res.json()) as PaginatedEnvelope<Customer>;
 
   if (!res.ok) {
-    throw new Error('Failed to fetch customers');
+    throw new Error('Không thể tải danh sách khách hàng');
   }
 
   return {
