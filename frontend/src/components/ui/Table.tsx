@@ -77,6 +77,8 @@ export function Table<T extends Record<string, unknown>>({
     (sum, column) => sum + (column.width?.type === 'proportional' ? column.width.value : 0),
     0
   );
+  const minWidthOf = (column: TableColumn<T>) =>
+    column.width?.type === 'proportional' ? column.width.minWidth : undefined;
 
   return (
     <div className={cn('w-full overflow-x-auto', className)}>
@@ -96,6 +98,7 @@ export function Table<T extends Record<string, unknown>>({
               <th
                 key={column.key}
                 scope="col"
+                style={{ minWidth: minWidthOf(column) }}
                 className={cn(
                   'h-11 whitespace-nowrap px-4 font-medium',
                   ALIGN_CLASSES[column.align ?? 'start'],
@@ -117,6 +120,7 @@ export function Table<T extends Record<string, unknown>>({
               {columns.map((column, columnIndex) => (
                 <td
                   key={column.key}
+                  style={{ minWidth: minWidthOf(column) }}
                   className={cn(
                     'whitespace-nowrap px-4',
                     DENSITY_CLASSES[density],

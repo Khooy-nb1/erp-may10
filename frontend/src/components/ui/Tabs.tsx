@@ -23,7 +23,7 @@ export interface TabListProps {
   className?: string;
 }
 
-export const TabList: React.FC<TabListProps> = ({ children, label = 'Tab', className }) => (
+export const TabList: React.FC<TabListProps> = ({ children, label = 'Thẻ nội dung', className }) => (
   <TabsPrimitive.List aria-label={label} className={cn('flex flex-wrap gap-1', className)}>
     {children}
   </TabsPrimitive.List>

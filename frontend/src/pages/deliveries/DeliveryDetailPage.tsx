@@ -176,7 +176,7 @@ export const DeliveryDetailPage: React.FC = () => {
       }
     >
       <div className="flex flex-col gap-4">
-        <Banner status="info" title="Quy định kỹ thuật (P0 / Q11):">
+        <Banner status="info" title="Quy định kỹ thuật (ưu tiên P0 / câu hỏi Q11):">
           <Text variant="supporting">
             Mô hình cơ sở dữ liệu hiện tại quản lý thực hiện giao hàng theo phiếu vận chuyển cấp đầu phiếu (`giao_hang`). Việc hoàn thành đợt giao không tự động trừ tồn kho (`ton_kho` quản lý nguyên phụ liệu ở phân hệ Kho) và không cập nhật chi tiết dòng sản phẩm.
           </Text>

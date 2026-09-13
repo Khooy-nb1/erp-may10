@@ -168,7 +168,7 @@ export const DeliveryListPage: React.FC = () => {
       <Banner
         status="info"
         title="Quy tắc nghiệp vụ:"
-        description="Phân hệ Giao hàng vận hành theo quy trình phiếu giao hàng cấp đầu phiếu (header-only). Việc hoàn thành giao hàng không tự động trừ tồn kho và không ghi nhận chi tiết dòng sản phẩm (tuân thủ giới hạn schema)."
+        description="Phân hệ Giao hàng vận hành theo quy trình phiếu giao hàng ở cấp phiếu (không quản lý chi tiết dòng). Việc hoàn thành giao hàng không tự động trừ tồn kho và không ghi nhận chi tiết dòng sản phẩm (tuân thủ giới hạn lược đồ dữ liệu)."
       />
 
       <DataTableCard<DeliveryRow>

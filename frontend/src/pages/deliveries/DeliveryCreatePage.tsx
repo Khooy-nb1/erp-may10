@@ -87,7 +87,7 @@ export const DeliveryCreatePage: React.FC = () => {
   return (
     <PageScaffold
       title="Lập đợt giao hàng mới"
-      subtitle="Khởi tạo phiếu điều phối giao nhận cấp đầu phiếu (header-only)"
+      subtitle="Khởi tạo phiếu điều phối giao nhận ở cấp phiếu (không quản lý chi tiết dòng)"
       breadcrumbs={[{ label: 'Giao hàng', href: '/deliveries' }, { label: 'Lập đợt giao hàng mới' }]}
       actions={
         <Button variant="secondary" href="/deliveries">

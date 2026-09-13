@@ -117,7 +117,10 @@ export const NumberInput: React.FC<NumberInputProps> = (props) => {
       setDraft(formatDraft(value));
       return;
     }
-    const bounded = Math.min(Math.max(parsed, min ?? parsed), max ?? parsed);
+    const bounded = Math.max(
+      min ?? Number.NEGATIVE_INFINITY,
+      Math.min(parsed, max ?? Number.POSITIVE_INFINITY)
+    );
     setDraft(formatDraft(bounded));
     if (bounded !== value) emit(bounded);
   };

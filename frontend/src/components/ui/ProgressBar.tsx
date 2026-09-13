@@ -38,11 +38,23 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   variant = 'primary',
   isLabelHidden = false,
   className,
-}) => (
-  <div className={cn('flex flex-col gap-1.5', className)}>
-    <span className={cn('text-sm text-muted-foreground', isLabelHidden ? 'sr-only' : undefined)}>
-      {label}
-    </span>
-    <progress aria-label={label} value={value} max={max} className={barVariants({ variant })} />
-  </div>
-);
+}) => {
+  const currentValue = Math.min(Math.max(value, 0), max);
+  return (
+    <div className={cn('flex flex-col gap-1.5', className)}>
+      <span className={cn('text-sm text-muted-foreground', isLabelHidden ? 'sr-only' : undefined)}>
+        {label}
+      </span>
+      <progress
+        role="progressbar"
+        aria-label={label}
+        aria-valuenow={currentValue}
+        aria-valuemin={0}
+        aria-valuemax={max}
+        value={value}
+        max={max}
+        className={barVariants({ variant })}
+      />
+    </div>
+  );
+};

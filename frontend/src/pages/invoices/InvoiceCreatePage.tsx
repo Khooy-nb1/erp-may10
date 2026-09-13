@@ -49,7 +49,7 @@ export const InvoiceCreatePage: React.FC = () => {
   return (
     <PageScaffold
       title="Xuất hóa đơn bán hàng mới"
-      subtitle="Lập hóa đơn tài chính liên kết đơn hàng đã được xác nhận (Kế toán & Admin)"
+      subtitle="Lập hóa đơn tài chính liên kết đơn hàng đã được xác nhận (Kế toán & Quản trị)"
       breadcrumbs={[{ label: 'Hóa đơn', href: '/invoices' }, { label: 'Xuất hóa đơn bán hàng mới' }]}
       actions={
         <Button variant="secondary" href="/invoices">
