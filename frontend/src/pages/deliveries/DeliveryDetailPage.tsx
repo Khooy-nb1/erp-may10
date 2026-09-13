@@ -1,23 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Truck, X } from 'lucide-react';
-import { AlertDialog } from '@astryxdesign/core/AlertDialog';
-import { Banner } from '@astryxdesign/core/Banner';
-import { Button } from '@astryxdesign/core/Button';
-import { Card } from '@astryxdesign/core/Card';
-import { Dialog } from '@astryxdesign/core/Dialog';
-import { Link } from '@astryxdesign/core/Link';
-import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList';
-import { HStack, VStack } from '@astryxdesign/core/Stack';
-import { Text } from '@astryxdesign/core/Text';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { useToast } from '@astryxdesign/core/Toast';
+import { toast } from 'sonner';
 import { Delivery, DeliveryStatus } from '../../types/delivery.js';
 import { getDeliveryById, startDelivery, completeDelivery, failDelivery } from '../../services/deliveryService.js';
 import { useAuth } from '../../context/AuthContext.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { AsyncPanel } from '../../components/common/AsyncPanel.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
+import { AlertDialog } from '../../components/ui/AlertDialog.js';
+import { Banner } from '../../components/ui/Banner.js';
+import { Button } from '../../components/ui/Button.js';
+import { Card } from '../../components/ui/Card.js';
+import { Dialog } from '../../components/ui/Dialog.js';
+import { Input } from '../../components/ui/Input.js';
+import { MetadataList, MetadataListItem } from '../../components/ui/MetadataList.js';
+import { Text } from '../../components/ui/Typography.js';
+import { TextLink } from '../../components/ui/TextLink.js';
 
 /** `da_giao` reads "Đã giao thành công" on this screen; the shared badge labels it "Đã giao". */
 const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
@@ -31,7 +30,6 @@ export const DeliveryDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const deliveryId = Number(id);
   const { user } = useAuth();
-  const toast = useToast();
 
   const [delivery, setDelivery] = useState<Delivery | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -66,10 +64,7 @@ export const DeliveryDetailPage: React.FC = () => {
       const updated = await startDelivery(deliveryId);
       setDelivery(updated);
     } catch (err) {
-      toast({
-        body: err instanceof Error ? err.message : 'Không thể bắt đầu vận chuyển',
-        type: 'error',
-      });
+      toast.error(err instanceof Error ? err.message : 'Không thể bắt đầu vận chuyển');
     } finally {
       setActionLoading(false);
     }
@@ -81,10 +76,7 @@ export const DeliveryDetailPage: React.FC = () => {
       const updated = await completeDelivery(deliveryId);
       setDelivery(updated);
     } catch (err) {
-      toast({
-        body: err instanceof Error ? err.message : 'Không thể xác nhận hoàn thành',
-        type: 'error',
-      });
+      toast.error(err instanceof Error ? err.message : 'Không thể xác nhận hoàn thành');
     } finally {
       setActionLoading(false);
       setConfirmCompleteOpen(false);
@@ -101,10 +93,7 @@ export const DeliveryDetailPage: React.FC = () => {
       const updated = await failDelivery(deliveryId, reason);
       setDelivery(updated);
     } catch (err) {
-      toast({
-        body: err instanceof Error ? err.message : 'Không thể cập nhật thất bại',
-        type: 'error',
-      });
+      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật thất bại');
     } finally {
       setActionLoading(false);
       setFailDialogOpen(false);
@@ -142,59 +131,63 @@ export const DeliveryDetailPage: React.FC = () => {
         { label: delivery.ma_giao_hang },
       ]}
       actions={
-        <HStack gap={2} wrap="wrap">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
             icon={<ArrowLeft size={16} />}
-            label="Danh sách giao hàng"
             href="/deliveries"
-          />
+          >
+            Danh sách giao hàng
+          </Button>
           {isWarehouseOrAdmin && isPending && (
             <Button
               variant="primary"
               icon={<Truck size={16} />}
-              label="Bắt đầu vận chuyển"
-              isDisabled={actionLoading}
+              disabled={actionLoading}
               onClick={handleStart}
-            />
+            >
+              Bắt đầu vận chuyển
+            </Button>
           )}
           {isWarehouseOrAdmin && isInTransit && (
             <>
               <Button
                 variant="primary"
                 icon={<Check size={16} />}
-                label="Xác nhận giao thành công"
-                isDisabled={actionLoading}
+                disabled={actionLoading}
                 onClick={() => setConfirmCompleteOpen(true)}
-              />
+              >
+                Xác nhận giao thành công
+              </Button>
               <Button
                 variant="destructive"
                 icon={<X size={16} />}
-                label="Báo giao thất bại"
-                isDisabled={actionLoading}
+                disabled={actionLoading}
                 onClick={() => {
                   setFailReason('');
                   setFailDialogOpen(true);
                 }}
-              />
+              >
+                Báo giao thất bại
+              </Button>
             </>
           )}
-        </HStack>
+        </div>
       }
     >
-      <VStack gap={4}>
-        <Banner status="info" collapsible={false} title="Quy định kỹ thuật (P0 / Q11):">
-          <Text type="supporting">
+      <div className="flex flex-col gap-4">
+        <Banner status="info" title="Quy định kỹ thuật (P0 / Q11):">
+          <Text variant="supporting">
             Mô hình cơ sở dữ liệu hiện tại quản lý thực hiện giao hàng theo phiếu vận chuyển cấp đầu phiếu (`giao_hang`). Việc hoàn thành đợt giao không tự động trừ tồn kho (`ton_kho` quản lý nguyên phụ liệu ở phân hệ Kho) và không cập nhật chi tiết dòng sản phẩm.
           </Text>
         </Banner>
 
-        <Card padding={4}>
+        <Card className="p-4">
           <MetadataList title="Thông tin phiếu giao hàng" columns={2}>
             <MetadataListItem label="Đơn bán hàng liên kết:">
-              <Link href={`/sales-orders/${delivery.ma_don_ban_hang}`}>
+              <TextLink to={`/sales-orders/${delivery.ma_don_ban_hang}`}>
                 {delivery.ma_don_ban || `Đơn hàng #${delivery.ma_don_ban_hang}`}
-              </Link>
+              </TextLink>
             </MetadataListItem>
             <MetadataListItem label="Trạng thái vận chuyển:">
               <StatusBadge
@@ -215,7 +208,7 @@ export const DeliveryDetailPage: React.FC = () => {
             <MetadataListItem label="Ghi chú điều phối:">{delivery.ghi_chu || 'Không có ghi chú'}</MetadataListItem>
           </MetadataList>
         </Card>
-      </VStack>
+      </div>
 
       <AlertDialog
         isOpen={confirmCompleteOpen}
@@ -233,34 +226,33 @@ export const DeliveryDetailPage: React.FC = () => {
         isOpen={failDialogOpen}
         onOpenChange={setFailDialogOpen}
         purpose="form"
-        width={440}
+        title="Báo giao thất bại"
       >
-        <VStack gap={4}>
-          <Text as="h2" type="large" weight="semibold">
-            Báo giao thất bại
-          </Text>
-          <TextInput
+        <div className="flex flex-col gap-4">
+          <Input
             label="Nhập lý do giao hàng thất bại:"
             value={failReason}
             onChange={(value) => setFailReason(value)}
-            isDisabled={actionLoading}
+            disabled={actionLoading}
           />
-          <HStack gap={2} hAlign="end">
+          <div className="flex flex-row justify-end gap-2">
             <Button
               variant="secondary"
-              label="Hủy"
-              isDisabled={actionLoading}
+              disabled={actionLoading}
               onClick={() => setFailDialogOpen(false)}
-            />
+            >
+              Hủy
+            </Button>
             <Button
               variant="destructive"
-              label="Báo giao thất bại"
-              isDisabled={!failReason.trim() || actionLoading}
-              isLoading={actionLoading}
+              disabled={!failReason.trim() || actionLoading}
+              loading={actionLoading}
               onClick={handleFail}
-            />
-          </HStack>
-        </VStack>
+            >
+              Báo giao thất bại
+            </Button>
+          </div>
+        </div>
       </Dialog>
     </PageScaffold>
   );

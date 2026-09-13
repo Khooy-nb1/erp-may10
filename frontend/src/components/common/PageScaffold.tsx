@@ -1,6 +1,5 @@
 import React from 'react';
-import { VStack } from '@astryxdesign/core/Stack';
-import { Breadcrumbs, BreadcrumbItem } from '@astryxdesign/core/Breadcrumbs';
+import { Breadcrumbs } from '../ui/Breadcrumbs.js';
 import { PageHeader } from './PageHeader.js';
 
 export interface BreadcrumbEntry {
@@ -15,8 +14,6 @@ export interface PageScaffoldProps {
   breadcrumbs?: BreadcrumbEntry[];
   /** Page-level actions, end-aligned beside the title. */
   actions?: React.ReactNode;
-  /** Widest the page content is allowed to grow. */
-  maxWidth?: number | string;
   children: React.ReactNode;
 }
 
@@ -29,28 +26,17 @@ export const PageScaffold: React.FC<PageScaffoldProps> = ({
   subtitle,
   breadcrumbs,
   actions,
-  maxWidth,
   children,
 }) => {
   return (
-    <VStack gap={5} width="100%" maxWidth={maxWidth}>
+    <div className="flex w-full flex-col gap-5">
       {breadcrumbs && breadcrumbs.length > 0 ? (
-        <Breadcrumbs variant="supporting">
-          {breadcrumbs.map((entry, index) => (
-            <BreadcrumbItem
-              key={`${entry.label}-${index}`}
-              href={entry.href}
-              isCurrent={!entry.href || index === breadcrumbs.length - 1}
-            >
-              {entry.label}
-            </BreadcrumbItem>
-          ))}
-        </Breadcrumbs>
+        <Breadcrumbs items={breadcrumbs.map((entry) => ({ label: entry.label, to: entry.href }))} />
       ) : null}
       <PageHeader title={title} subtitle={subtitle}>
         {actions}
       </PageHeader>
-      {children}
-    </VStack>
+      <div className="flex w-full flex-col gap-5">{children}</div>
+    </div>
   );
 };

@@ -1,7 +1,5 @@
 import React from 'react';
-import { HStack, VStack } from '@astryxdesign/core/Stack';
-import { Heading, Text } from '@astryxdesign/core/Text';
-import { Divider } from '@astryxdesign/core/Divider';
+import { Heading, Text } from '../ui/Typography.js';
 
 export interface PageHeaderProps {
   title: string;
@@ -15,23 +13,19 @@ export interface PageHeaderProps {
  */
 export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, children }) => {
   return (
-    <VStack gap={3}>
-      <HStack gap={4} vAlign="start" hAlign="between" wrap="wrap">
-        <VStack gap={1}>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
           <Heading level={2}>{title}</Heading>
           {subtitle ? (
-            <Text type="supporting" as="p">
+            <Text variant="supporting" as="p">
               {subtitle}
             </Text>
           ) : null}
-        </VStack>
-        {children ? (
-          <HStack gap={2} vAlign="center" wrap="wrap">
-            {children}
-          </HStack>
-        ) : null}
-      </HStack>
-      <Divider />
-    </VStack>
+        </div>
+        {children ? <div className="flex flex-wrap items-center gap-2">{children}</div> : null}
+      </div>
+      <div className="border-t border-border" />
+    </div>
   );
 };

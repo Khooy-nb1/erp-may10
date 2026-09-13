@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { HStack } from '@astryxdesign/core/Stack';
-import { Text } from '@astryxdesign/core/Text';
-import { Banner } from '@astryxdesign/core/Banner';
-import { Button } from '@astryxdesign/core/Button';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { Selector } from '@astryxdesign/core/Selector';
-import { Link } from '@astryxdesign/core/Link';
-import { proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
+import { Text } from '../../components/ui/Typography.js';
+import { Banner } from '../../components/ui/Banner.js';
+import { Button } from '../../components/ui/Button.js';
+import { Input } from '../../components/ui/Input.js';
+import { Select } from '../../components/ui/Select.js';
+import { TextLink } from '../../components/ui/TextLink.js';
+import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
 import { Delivery, DeliveryStatus } from '../../types/delivery.js';
 import { getDeliveries } from '../../services/deliveryService.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
@@ -54,9 +53,9 @@ const columns: TableColumn<DeliveryRow>[] = [
     header: 'Mã giao hàng',
     width: proportional(1),
     renderCell: (item) => (
-      <Link href={`/deliveries/${item.id}`} weight="semibold">
+      <TextLink to={`/deliveries/${item.id}`} weight="semibold">
         {item.ma_giao_hang}
-      </Link>
+      </TextLink>
     ),
   },
   {
@@ -64,28 +63,28 @@ const columns: TableColumn<DeliveryRow>[] = [
     header: 'Đơn bán hàng',
     width: proportional(1),
     renderCell: (item) => (
-      <Link href={`/sales-orders/${item.ma_don_ban_hang}`} weight="medium">
+      <TextLink to={`/sales-orders/${item.ma_don_ban_hang}`} weight="medium">
         {item.ma_don_ban || `Đơn #${item.ma_don_ban_hang}`}
-      </Link>
+      </TextLink>
     ),
   },
   {
     key: 'ten_kho',
     header: 'Kho xuất',
     width: proportional(1),
-    renderCell: (item) => <Text type="supporting">{item.ten_kho || `Kho #${item.ma_kho}`}</Text>,
+    renderCell: (item) => <Text variant="supporting">{item.ten_kho || `Kho #${item.ma_kho}`}</Text>,
   },
   {
     key: 'ngay_giao',
     header: 'Ngày giao',
     width: pixel(120),
-    renderCell: (item) => <Text type="supporting">{formatDate(item.ngay_giao)}</Text>,
+    renderCell: (item) => <Text variant="supporting">{formatDate(item.ngay_giao)}</Text>,
   },
   {
     key: 'ten_nguoi_nhan',
     header: 'Người nhận',
     width: proportional(1),
-    renderCell: (item) => <Text type="label">{item.ten_nguoi_nhan}</Text>,
+    renderCell: (item) => <Text variant="label">{item.ten_nguoi_nhan}</Text>,
   },
   {
     key: 'trang_thai',
@@ -102,9 +101,9 @@ const columns: TableColumn<DeliveryRow>[] = [
     width: pixel(110),
     align: 'end',
     renderCell: (item) => (
-      <Link href={`/deliveries/${item.id}`} weight="medium">
+      <TextLink to={`/deliveries/${item.id}`} weight="medium">
         Chi tiết
-      </Link>
+      </TextLink>
     ),
   },
 ];
@@ -158,18 +157,18 @@ export const DeliveryListPage: React.FC = () => {
       subtitle={`Theo dõi vận chuyển và xác nhận giao nhận (${total} đợt giao)`}
       actions={
         <Button
-          label="Lập đợt giao hàng"
           variant="primary"
           icon={<Plus size={16} />}
           href="/deliveries/new"
-        />
+        >
+          Lập đợt giao hàng
+        </Button>
       }
     >
       <Banner
         status="info"
         title="Quy tắc nghiệp vụ:"
         description="Phân hệ Giao hàng vận hành theo quy trình phiếu giao hàng cấp đầu phiếu (header-only). Việc hoàn thành giao hàng không tự động trừ tồn kho và không ghi nhận chi tiết dòng sản phẩm (tuân thủ giới hạn schema)."
-        collapsible={false}
       />
 
       <DataTableCard<DeliveryRow>
@@ -187,20 +186,20 @@ export const DeliveryListPage: React.FC = () => {
         rowCount={total}
         toolbar={
           <form onSubmit={handleSearchSubmit}>
-            <HStack gap={2} vAlign="end" wrap="wrap">
-              <TextInput
+            <div className="flex flex-row flex-wrap items-end gap-2">
+              <Input
                 label="Tìm kiếm đợt giao hàng"
                 placeholder="Tìm theo mã giao hàng hoặc người nhận..."
                 value={search}
                 onChange={setSearch}
-                width={320}
+                className="w-80"
               />
-              <Button type="submit" label="Tìm kiếm" variant="secondary" />
-            </HStack>
+              <Button type="submit" variant="secondary">Tìm kiếm</Button>
+            </div>
           </form>
         }
         toolbarEnd={
-          <Selector
+          <Select
             label="Trạng thái"
             options={TRANG_THAI_OPTIONS}
             value={trangThai}
@@ -208,7 +207,7 @@ export const DeliveryListPage: React.FC = () => {
               setTrangThai(value as DeliveryStatus | '');
               setPage(1);
             }}
-            width={190}
+            className="w-48"
           />
         }
       />

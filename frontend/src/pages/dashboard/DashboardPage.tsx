@@ -15,17 +15,15 @@ import {
   getTopCustomers,
   getTopProducts,
 } from '../../services/dashboardService.js';
-import { VStack, HStack } from '@astryxdesign/core/Stack';
-import { Grid } from '@astryxdesign/core/Grid';
-import { Card } from '@astryxdesign/core/Card';
-import { Heading, Text } from '@astryxdesign/core/Text';
-import { Button } from '@astryxdesign/core/Button';
-import { Selector } from '@astryxdesign/core/Selector';
-import { DateInput } from '@astryxdesign/core/DateInput';
-import type { ISODateString } from '@astryxdesign/core/Calendar';
-import { ProgressBar } from '@astryxdesign/core/ProgressBar';
-import { Table, proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
-import { Banner } from '@astryxdesign/core/Banner';
+import { Card } from '../../components/ui/Card.js';
+import { Heading, Text } from '../../components/ui/Typography.js';
+import { Button } from '../../components/ui/Button.js';
+import { Select } from '../../components/ui/Select.js';
+import { DateInput } from '../../components/ui/DateInput.js';
+import type { ISODateString } from '../../components/ui/DateInput.js';
+import { ProgressBar } from '../../components/ui/ProgressBar.js';
+import { Table, proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
+import { Banner } from '../../components/ui/Banner.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { AsyncPanel } from '../../components/common/AsyncPanel.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
@@ -150,7 +148,7 @@ const Widget: React.FC<{
   children: React.ReactNode;
 }> = ({ title, loading, error, isEmpty, onRetry, emptyMessage, children }) => (
   <Card>
-    <VStack gap={3}>
+    <div className="flex flex-col gap-3">
       <Heading level={3}>{title}</Heading>
       <AsyncPanel
         isLoading={loading}
@@ -162,33 +160,39 @@ const Widget: React.FC<{
       >
         {children}
       </AsyncPanel>
-    </VStack>
+    </div>
   </Card>
 );
 
 /** Horizontal bar list shared by the revenue and status widgets. */
 const BarList: React.FC<{
-  rows: Array<{ key: string; label: string; value: number; display: string; variant?: 'accent' | 'success' | 'warning' | 'error' | 'neutral' }>;
+  rows: Array<{
+    key: string;
+    label: string;
+    value: number;
+    display: string;
+    variant?: 'primary' | 'success' | 'warning' | 'danger' | 'neutral';
+  }>;
 }> = ({ rows }) => {
   const max = Math.max(...rows.map((r) => r.value), 1);
   return (
-    <VStack gap={3}>
+    <div className="flex flex-col gap-3">
       {rows.map((row) => (
-        <VStack gap={1} key={row.key}>
-          <HStack gap={2} hAlign="between">
-            <Text type="supporting">{row.label}</Text>
-            <Text type="label">{row.display}</Text>
-          </HStack>
+        <div className="flex flex-col gap-1" key={row.key}>
+          <div className="flex flex-row justify-between gap-2">
+            <Text variant="supporting">{row.label}</Text>
+            <Text variant="label">{row.display}</Text>
+          </div>
           <ProgressBar
             label={row.label}
             value={row.value}
             max={max}
             isLabelHidden
-            variant={row.variant ?? 'accent'}
+            variant={row.variant ?? 'primary'}
           />
-        </VStack>
+        </div>
       ))}
-    </VStack>
+    </div>
   );
 };
 
@@ -214,10 +218,10 @@ const customerColumns: TableColumn<CustomerRankRow>[] = [
     header: 'Khách hàng',
     width: proportional(2),
     renderCell: (item) => (
-      <VStack gap={0}>
-        <Text type="label">{item.tenKhachHang}</Text>
-        <Text type="supporting">{item.maKhachHangCode}</Text>
-      </VStack>
+      <div className="flex flex-col">
+        <Text variant="label">{item.tenKhachHang}</Text>
+        <Text variant="supporting">{item.maKhachHangCode}</Text>
+      </div>
     ),
   },
   { key: 'orderCount', header: 'Số đơn', width: pixel(80), align: 'end' },
@@ -226,7 +230,11 @@ const customerColumns: TableColumn<CustomerRankRow>[] = [
     header: 'Giá trị',
     width: pixel(140),
     align: 'end',
-    renderCell: (item) => <Text type="label" hasTabularNumbers>{formatCurrency(item.totalValue)}</Text>,
+    renderCell: (item) => (
+      <Text variant="label" className="tabular-nums">
+        {formatCurrency(item.totalValue)}
+      </Text>
+    ),
   },
 ];
 
@@ -236,10 +244,10 @@ const productColumns: TableColumn<ProductRankRow>[] = [
     header: 'Sản phẩm',
     width: proportional(2),
     renderCell: (item) => (
-      <VStack gap={0}>
-        <Text type="label">{item.tenSanPham}</Text>
-        <Text type="supporting">{item.maSanPhamCode}</Text>
-      </VStack>
+      <div className="flex flex-col">
+        <Text variant="label">{item.tenSanPham}</Text>
+        <Text variant="supporting">{item.maSanPhamCode}</Text>
+      </div>
     ),
   },
   {
@@ -247,14 +255,18 @@ const productColumns: TableColumn<ProductRankRow>[] = [
     header: 'Số lượng',
     width: pixel(90),
     align: 'end',
-    renderCell: (item) => <Text hasTabularNumbers>{formatQuantity(item.quantity)}</Text>,
+    renderCell: (item) => <Text className="tabular-nums">{formatQuantity(item.quantity)}</Text>,
   },
   {
     key: 'totalValue',
     header: 'Giá trị',
     width: pixel(140),
     align: 'end',
-    renderCell: (item) => <Text type="label" hasTabularNumbers>{formatCurrency(item.totalValue)}</Text>,
+    renderCell: (item) => (
+      <Text variant="label" className="tabular-nums">
+        {formatCurrency(item.totalValue)}
+      </Text>
+    ),
   },
 ];
 
@@ -310,45 +322,30 @@ export const DashboardPage: React.FC = () => {
     >
       {/* Shared date filter — one control drives every widget. */}
       <Card>
-        <HStack gap={3} vAlign="end" wrap="wrap">
-          <Selector
+        <div className="flex flex-row flex-wrap items-end gap-3">
+          <Select
             label="Khoảng thời gian"
             options={PERIOD_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
             value={period}
             onChange={(value) => {
               if (value && isDashboardPeriod(value)) setPeriod(value);
             }}
-            width={200}
+            className="w-50"
           />
           {period === 'custom' && (
             <>
-              <DateInput
-                label="Từ ngày"
-                value={fromDate}
-                onChange={setFromDate}
-              />
-              <DateInput
-                label="Đến ngày"
-                value={toDate}
-                onChange={setToDate}
-              />
+              <DateInput label="Từ ngày" value={fromDate} onChange={setFromDate} />
+              <DateInput label="Đến ngày" value={toDate} onChange={setToDate} />
             </>
           )}
-          <Button
-            label="Làm mới"
-            variant="primary"
-            isDisabled={customRangeIncomplete}
-            onClick={refreshAll}
-          />
-        </HStack>
+          <Button variant="primary" disabled={customRangeIncomplete} onClick={refreshAll}>
+            Làm mới
+          </Button>
+        </div>
       </Card>
 
       {customRangeIncomplete && (
-        <Banner
-          status="warning"
-          title="Chọn đủ ngày bắt đầu và kết thúc để xem số liệu tùy chọn."
-          collapsible={false}
-        />
+        <Banner status="warning" title="Chọn đủ ngày bắt đầu và kết thúc để xem số liệu tùy chọn." />
       )}
 
       {/* KPI cards — role-scoped by the server; absent metrics are simply not rendered. */}
@@ -360,7 +357,7 @@ export const DashboardPage: React.FC = () => {
         onRetry={summary.reload}
         emptyMessage="Chưa có số liệu trong khoảng thời gian đã chọn."
       >
-        <Grid columns={{ minWidth: 176, repeat: 'fit' }} gap={3}>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {metrics?.orderCount !== undefined && (
             <Kpi label="Tổng số đơn" value={String(metrics.orderCount)} />
           )}
@@ -379,10 +376,10 @@ export const DashboardPage: React.FC = () => {
           {metrics?.overdueInvoiceCount !== undefined && (
             <Kpi label="Hóa đơn quá hạn" value={String(metrics.overdueInvoiceCount)} tone="danger" />
           )}
-        </Grid>
+        </div>
       </Widget>
 
-      <Grid columns={{ minWidth: 320, repeat: 'fit' }} gap={5}>
+      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
         {canViewMoney && (
           <Widget
             title={revenue.data?.label ?? 'Doanh thu theo hóa đơn'}
@@ -393,9 +390,9 @@ export const DashboardPage: React.FC = () => {
             emptyMessage="Chưa có hóa đơn nào trong khoảng thời gian đã chọn."
           >
             {revenue.data && (
-              <VStack gap={3}>
-                <Text type="supporting">
-                  Nguồn dữ liệu: <Text type="code">{revenue.data.source}</Text> — tổng{' '}
+              <div className="flex flex-col gap-3">
+                <Text variant="supporting">
+                  Nguồn dữ liệu: <Text variant="code">{revenue.data.source}</Text> — tổng{' '}
                   {formatCurrency(revenueMaxTotal)}
                 </Text>
                 <BarList
@@ -406,7 +403,7 @@ export const DashboardPage: React.FC = () => {
                     display: formatCurrency(point.revenue),
                   }))}
                 />
-              </VStack>
+              </div>
             )}
           </Widget>
         )}
@@ -419,27 +416,27 @@ export const DashboardPage: React.FC = () => {
           onRetry={status.reload}
           emptyMessage="Chưa có đơn hàng nào trong khoảng thời gian đã chọn."
         >
-          <VStack gap={3}>
+          <div className="flex flex-col gap-3">
             {(status.data?.statuses ?? []).map((entry) => (
-              <HStack key={entry.status} gap={2} hAlign="between" vAlign="center">
+              <div key={entry.status} className="flex flex-row items-center justify-between gap-2">
                 <StatusBadge status={entry.status} />
-                <Text type="label" hasTabularNumbers>
+                <Text variant="label" className="tabular-nums">
                   {entry.count}
                 </Text>
-              </HStack>
+              </div>
             ))}
-          </VStack>
+          </div>
         </Widget>
-      </Grid>
+      </div>
 
       {/* Order value is aggregate-only; the breakdown chart covers all statuses. */}
       {statusRows.length > 0 && (
-        <Text type="supporting">
+        <Text variant="supporting">
           Tổng số đơn theo trạng thái: {statusTotal} (bao gồm đơn đã hủy).
         </Text>
       )}
 
-      <Grid columns={{ minWidth: 352, repeat: 'fit' }} gap={5}>
+      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(352px,1fr))]">
         {canViewMoney && (
           <Widget
             title="Khách hàng mua nhiều nhất"
@@ -487,10 +484,10 @@ export const DashboardPage: React.FC = () => {
             />
           </Widget>
         )}
-      </Grid>
+      </div>
 
       {!canViewReceivables && (
-        <Text type="supporting">
+        <Text variant="supporting">
           Chỉ số công nợ chi tiết được giới hạn cho quản trị viên và kế toán.
         </Text>
       )}
@@ -499,12 +496,12 @@ export const DashboardPage: React.FC = () => {
 };
 
 const Kpi: React.FC<{ label: string; value: string; tone?: 'info' | 'danger' }> = ({ label, value, tone }) => (
-  <Card variant={tone === 'danger' ? 'red' : tone === 'info' ? 'blue' : 'muted'} padding={3}>
-    <VStack gap={1}>
-      <Text type="supporting">{label}</Text>
-      <Text type="label" hasTabularNumbers>
+  <Card variant={tone === 'danger' ? 'red' : tone === 'info' ? 'blue' : 'muted'} className="p-3">
+    <div className="flex flex-col gap-1">
+      <Text variant="supporting">{label}</Text>
+      <Text variant="label" className="tabular-nums">
         {value}
       </Text>
-    </VStack>
+    </div>
   </Card>
 );

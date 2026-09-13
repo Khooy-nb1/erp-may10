@@ -1,6 +1,6 @@
 import React from 'react';
-import { Banner } from '@astryxdesign/core/Banner';
-import { Button } from '@astryxdesign/core/Button';
+import { Banner } from '../ui/Banner.js';
+import { Button } from '../ui/Button.js';
 
 export interface ErrorStateProps {
   code?: string;
@@ -19,10 +19,11 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
       status="error"
       title="Đã xảy ra lỗi"
       description={`[${code}] ${message}`}
-      collapsible={false}
       endContent={
         onRetry ? (
-          <Button label="Thử lại" variant="secondary" size="sm" onClick={onRetry} />
+          <Button variant="secondary" size="sm" onClick={onRetry}>
+            Thử lại
+          </Button>
         ) : undefined
       }
     />

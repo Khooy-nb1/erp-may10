@@ -1,21 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
-import { VStack, HStack } from '@astryxdesign/core/Stack';
-import { Grid } from '@astryxdesign/core/Grid';
-import { Text } from '@astryxdesign/core/Text';
-import { Card } from '@astryxdesign/core/Card';
-import { Button } from '@astryxdesign/core/Button';
-import { IconButton } from '@astryxdesign/core/IconButton';
-import { Banner } from '@astryxdesign/core/Banner';
-import { Divider } from '@astryxdesign/core/Divider';
-import { Table, proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { NumberInput } from '@astryxdesign/core/NumberInput';
-import { TextArea } from '@astryxdesign/core/TextArea';
-import { Selector } from '@astryxdesign/core/Selector';
-import { DateInput } from '@astryxdesign/core/DateInput';
-import type { ISODateString } from '@astryxdesign/core/Calendar';
+import { Text } from '../../components/ui/Typography.js';
+import { Card } from '../../components/ui/Card.js';
+import { Button } from '../../components/ui/Button.js';
+import { IconButton } from '../../components/ui/IconButton.js';
+import { Banner } from '../../components/ui/Banner.js';
+import { Table, proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
+import { Input } from '../../components/ui/Input.js';
+import { NumberInput } from '../../components/ui/NumberInput.js';
+import { Textarea } from '../../components/ui/Textarea.js';
+import { Select } from '../../components/ui/Select.js';
+import { DateInput, type ISODateString } from '../../components/ui/DateInput.js';
 import { Customer } from '../../types/customer.js';
 import { Product } from '../../types/product.js';
 import { getCustomers } from '../../services/customerService.js';
@@ -164,12 +160,12 @@ export const SalesOrderCreatePage: React.FC = () => {
       header: 'Sản phẩm',
       width: proportional(1),
       renderCell: (row) => (
-        <VStack gap={0.5}>
-          <Text weight="semibold">{row.line.product.ten_san_pham}</Text>
-          <Text type="supporting">
+        <div className="flex flex-col gap-0.5">
+          <Text className="font-semibold">{row.line.product.ten_san_pham}</Text>
+          <Text variant="supporting">
             {`${row.line.product.ma_san_pham} • ĐVT: ${row.line.product.ten_don_vi || 'Cái'}`}
           </Text>
-        </VStack>
+        </div>
       ),
     },
     {
@@ -190,7 +186,7 @@ export const SalesOrderCreatePage: React.FC = () => {
       key: 'unitPrice',
       header: 'Đơn giá',
       align: 'end',
-      renderCell: (row) => <Text weight="medium">{formatCurrency(Number(row.line.product.gia_ban))}</Text>,
+      renderCell: (row) => <Text className="font-medium">{formatCurrency(Number(row.line.product.gia_ban))}</Text>,
     },
     {
       key: 'discountRate',
@@ -216,7 +212,7 @@ export const SalesOrderCreatePage: React.FC = () => {
       renderCell: (row) => {
         const gross = row.line.quantity * Number(row.line.product.gia_ban);
         const discount = (gross * row.line.discountRate) / 100;
-        return <Text weight="semibold">{formatCurrency(gross - discount)}</Text>;
+        return <Text className="font-semibold">{formatCurrency(gross - discount)}</Text>;
       },
     },
     {
@@ -248,26 +244,31 @@ export const SalesOrderCreatePage: React.FC = () => {
         { label: 'Đơn bán hàng', href: '/sales-orders' },
         { label: 'Tạo đơn bán hàng mới' },
       ]}
-      actions={<Button variant="secondary" label="Hủy bỏ" href="/sales-orders" />}
+      actions={
+        <Button variant="secondary" href="/sales-orders">
+          Hủy bỏ
+        </Button>
+      }
     >
       <form onSubmit={handleSubmit} noValidate>
-        <VStack gap={5}>
+        <div className="flex w-full flex-col gap-5">
           {error ? (
             <Banner
               status="error"
               title="Đã xảy ra lỗi"
               description={`[ERROR] ${error}`}
-              collapsible={false}
               endContent={
-                <Button label="Thử lại" variant="secondary" size="sm" onClick={() => setError(null)} />
+                <Button variant="secondary" size="sm" onClick={() => setError(null)}>
+                  Thử lại
+                </Button>
               }
             />
           ) : null}
 
           <FormSection title="1. Thông tin chung đơn hàng">
-            <VStack gap={4}>
-              <Grid columns={{ minWidth: 260 }} gap={4}>
-                <Selector
+            <div className="flex flex-col gap-4">
+              <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+                <Select
                   label="Khách hàng *"
                   placeholder="-- Chọn khách hàng --"
                   value={selectedCustomerId === '' ? undefined : String(selectedCustomerId)}
@@ -278,7 +279,7 @@ export const SalesOrderCreatePage: React.FC = () => {
                   }))}
                 />
 
-                <TextInput
+                <Input
                   label="Địa chỉ giao hàng *"
                   value={deliveryAddress}
                   onChange={(value) => setDeliveryAddress(value)}
@@ -295,84 +296,87 @@ export const SalesOrderCreatePage: React.FC = () => {
                   value={requestedDeliveryDate as ISODateString}
                   onChange={(value) => setRequestedDeliveryDate(value ?? '')}
                 />
-              </Grid>
+              </div>
 
-              <TextArea label="Ghi chú đơn hàng" rows={2} value={notes} onChange={(value) => setNotes(value)} />
-            </VStack>
+              <Textarea label="Ghi chú đơn hàng" rows={2} value={notes} onChange={(value) => setNotes(value)} />
+            </div>
           </FormSection>
 
           <FormSection
             title="2. Danh sách sản phẩm đặt mua"
             description="Giá niêm yết được áp dụng tự động từ máy chủ"
           >
-            <VStack gap={4}>
-              <VStack gap={2}>
-                <Text type="label" as="label">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Text variant="label" as="label">
                   Tra cứu &amp; thêm sản phẩm vào đơn:
                 </Text>
                 <ProductSelector onSelect={handleAddProduct} />
-              </VStack>
+              </div>
 
               {lines.length === 0 ? (
-                <Card variant="muted" padding={4}>
-                  <HStack hAlign="center" width="100%">
-                    <Text type="supporting" as="p">
+                <Card variant="muted" className="p-4">
+                  <div className="flex flex-row w-full justify-center">
+                    <Text variant="supporting" as="p">
                       Chưa có sản phẩm nào được chọn. Hãy tra cứu sản phẩm ở trên để thêm vào đơn hàng.
                     </Text>
-                  </HStack>
+                  </div>
                 </Card>
               ) : (
-                <VStack gap={4}>
+                <div className="flex flex-col gap-4">
                   <Table data={lineRows} columns={lineColumns} idKey="key" density="compact" />
 
-                  <Divider />
+                  <div className="border-t border-border" />
 
-                  <HStack hAlign="end" width="100%">
-                    <VStack gap={2} width={340}>
-                      <HStack hAlign="between" width="100%">
-                        <Text type="supporting" as="span">
+                  <div className="flex flex-row w-full justify-end">
+                    <div className="flex w-85 flex-col gap-2">
+                      <div className="flex flex-row w-full justify-between">
+                        <Text variant="supporting" as="span">
                           Tổng tiền hàng:
                         </Text>
-                        <Text weight="medium" as="span">
+                        <Text className="font-medium" as="span">
                           {formatCurrency(grossTotal)}
                         </Text>
-                      </HStack>
+                      </div>
 
-                      <HStack hAlign="between" width="100%">
-                        <Text type="supporting" as="span">
+                      <div className="flex flex-row w-full justify-between">
+                        <Text variant="supporting" as="span">
                           Tiền giảm giá:
                         </Text>
                         <Text as="span">{`- ${formatCurrency(discountTotal)}`}</Text>
-                      </HStack>
+                      </div>
 
-                      <Divider />
+                      <div className="border-t border-border" />
 
-                      <HStack hAlign="between" width="100%">
-                        <Text weight="bold" as="span">
+                      <div className="flex flex-row w-full justify-between">
+                        <Text className="font-bold" as="span">
                           Tổng thanh toán:
                         </Text>
-                        <Text weight="bold" as="span">
+                        <Text className="font-bold" as="span">
                           {formatCurrency(netTotal)}
                         </Text>
-                      </HStack>
-                    </VStack>
-                  </HStack>
-                </VStack>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
-            </VStack>
+            </div>
           </FormSection>
 
-          <HStack hAlign="end" gap={3}>
-            <Button variant="secondary" label="Hủy" href="/sales-orders" />
+          <div className="flex flex-row items-center justify-end gap-3">
+            <Button variant="secondary" href="/sales-orders">
+              Hủy
+            </Button>
             <Button
               type="submit"
               variant="primary"
-              label={isSubmitting ? 'Đang tạo đơn hàng...' : 'Lưu đơn bán hàng'}
-              isLoading={isSubmitting}
-              isDisabled={isSubmitting || lines.length === 0}
-            />
-          </HStack>
-        </VStack>
+              loading={isSubmitting}
+              disabled={isSubmitting || lines.length === 0}
+            >
+              {isSubmitting ? 'Đang tạo đơn hàng...' : 'Lưu đơn bán hàng'}
+            </Button>
+          </div>
+        </div>
       </form>
     </PageScaffold>
   );

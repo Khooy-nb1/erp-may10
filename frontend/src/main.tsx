@@ -1,8 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import '@astryxdesign/core/reset.css';
-import '@astryxdesign/theme-neutral/theme.css';
-import './styles/global.css';
+import '@fontsource-variable/inter';
+import './styles/index.css';
 import App from './App.js';
 
 const rootElement = document.getElementById('root');

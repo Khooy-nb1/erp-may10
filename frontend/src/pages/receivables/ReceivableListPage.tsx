@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowDown, ArrowUp } from 'lucide-react';
-import { Grid } from '@astryxdesign/core/Grid';
-import { HStack, VStack } from '@astryxdesign/core/Stack';
-import { Text, Heading } from '@astryxdesign/core/Text';
-import { Banner } from '@astryxdesign/core/Banner';
-import { Button } from '@astryxdesign/core/Button';
-import { Card } from '@astryxdesign/core/Card';
-import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { Selector } from '@astryxdesign/core/Selector';
-import { proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
+import { Text, Heading } from '../../components/ui/Typography.js';
+import { Banner } from '../../components/ui/Banner.js';
+import { Button } from '../../components/ui/Button.js';
+import { Card } from '../../components/ui/Card.js';
+import { Checkbox } from '../../components/ui/Checkbox.js';
+import { Input } from '../../components/ui/Input.js';
+import { Select } from '../../components/ui/Select.js';
+import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
 import { Receivable, ReceivableStatus, ReceivableSummary, AgingReport, AgingBucket } from '../../types/receivable.js';
 import { getReceivables, getReceivableSummary, getAgingReport } from '../../services/receivableService.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
@@ -68,7 +66,7 @@ const agingColumns: TableColumn<AgingRow>[] = [
     key: 'label',
     header: 'Nhóm tuổi nợ',
     width: proportional(2),
-    renderCell: (item) => <Text weight={item.isTotal ? 'bold' : 'normal'}>{item.label}</Text>,
+    renderCell: (item) => <Text className={item.isTotal ? 'font-bold' : undefined}>{item.label}</Text>,
   },
   {
     key: 'count',
@@ -76,7 +74,7 @@ const agingColumns: TableColumn<AgingRow>[] = [
     width: pixel(120),
     align: 'center',
     renderCell: (item) => (
-      <Text weight={item.isTotal ? 'bold' : 'normal'} hasTabularNumbers>
+      <Text className={item.isTotal ? 'font-bold tabular-nums' : 'tabular-nums'}>
         {item.count}
       </Text>
     ),
@@ -87,7 +85,7 @@ const agingColumns: TableColumn<AgingRow>[] = [
     width: pixel(200),
     align: 'end',
     renderCell: (item) => (
-      <Text weight={item.isTotal ? 'bold' : 'semibold'} hasTabularNumbers>
+      <Text className={item.isTotal ? 'font-bold tabular-nums' : 'font-semibold tabular-nums'}>
         {formatCurrency(item.totalAmount)}
       </Text>
     ),
@@ -192,13 +190,13 @@ export const ReceivableListPage: React.FC = () => {
    */
   const renderSortHeader = (column: SortColumn, label: string, tooltip: string) => (
     <Button
-      label={sortBy === column ? `${label} (sắp xếp ${sortOrder === 'ASC' ? 'tăng dần' : 'giảm dần'})` : label}
+      aria-label={sortBy === column ? `${label} (sắp xếp ${sortOrder === 'ASC' ? 'tăng dần' : 'giảm dần'})` : label}
       variant="ghost"
       size="sm"
       icon={
         sortBy === column ? sortOrder === 'ASC' ? <ArrowUp size={14} /> : <ArrowDown size={14} /> : undefined
       }
-      tooltip={tooltip}
+      title={tooltip}
       onClick={() => handleSort(column)}
     >
       {label}
@@ -211,14 +209,14 @@ export const ReceivableListPage: React.FC = () => {
       header: 'Khách hàng',
       width: proportional(2),
       renderCell: (item) => (
-        <VStack gap={0.5}>
-          <Text weight="medium">{item.ten_khach_hang || `Mã #${item.ma_khach_hang}`}</Text>
+        <div className="flex flex-col gap-0.5">
+          <Text className="font-medium">{item.ten_khach_hang || `Mã #${item.ma_khach_hang}`}</Text>
           {item.ma_khach_hang_code ? (
-            <Text type="code" color="secondary">
+            <Text variant="code" className="text-muted-foreground">
               {item.ma_khach_hang_code}
             </Text>
           ) : null}
-        </VStack>
+        </div>
       ),
     },
     {
@@ -226,7 +224,7 @@ export const ReceivableListPage: React.FC = () => {
       header: 'Hóa đơn',
       width: proportional(1),
       renderCell: (item) => (
-        <Text type="code" weight="semibold">
+        <Text variant="code" className="font-semibold">
           {item.ma_hoa_don_code || '—'}
         </Text>
       ),
@@ -236,14 +234,16 @@ export const ReceivableListPage: React.FC = () => {
       header: 'Phát sinh',
       width: pixel(160),
       align: 'end',
-      renderCell: (item) => <Text hasTabularNumbers>{formatCurrency(item.so_tien_phat_sinh)}</Text>,
+      renderCell: (item) => <Text className="tabular-nums">{formatCurrency(item.so_tien_phat_sinh)}</Text>,
     },
     {
       key: 'so_tien_da_thanh_toan',
       header: 'Đã thanh toán',
       width: pixel(160),
       align: 'end',
-      renderCell: (item) => <Text hasTabularNumbers>{formatCurrency(item.so_tien_da_thanh_toan)}</Text>,
+      renderCell: (item) => (
+        <Text className="tabular-nums">{formatCurrency(item.so_tien_da_thanh_toan)}</Text>
+      ),
     },
     {
       key: 'so_tien_con_lai',
@@ -251,7 +251,7 @@ export const ReceivableListPage: React.FC = () => {
       width: pixel(160),
       align: 'end',
       renderCell: (item) => (
-        <Text weight="bold" hasTabularNumbers>
+        <Text className="font-bold tabular-nums">
           {formatCurrency(item.so_tien_con_lai)}
         </Text>
       ),
@@ -260,7 +260,7 @@ export const ReceivableListPage: React.FC = () => {
       key: 'ngay_dao_han',
       header: renderSortHeader('ngay_dao_han', 'Ngày đáo hạn', 'Sắp xếp theo ngày đáo hạn'),
       width: pixel(170),
-      renderCell: (item) => <Text type="supporting">{formatDate(item.ngay_dao_han)}</Text>,
+      renderCell: (item) => <Text variant="supporting">{formatDate(item.ngay_dao_han)}</Text>,
     },
     {
       key: 'days_overdue',
@@ -269,9 +269,9 @@ export const ReceivableListPage: React.FC = () => {
       renderCell: (item) => {
         const daysOverdue = Number(item.daysOverdue) || 0;
         return daysOverdue > 0 ? (
-          <Text weight="semibold">Quá hạn {daysOverdue} ngày</Text>
+          <Text className="font-semibold">Quá hạn {daysOverdue} ngày</Text>
         ) : (
-          <Text color="secondary">—</Text>
+          <Text className="text-muted-foreground">—</Text>
         );
       },
     },
@@ -323,47 +323,47 @@ export const ReceivableListPage: React.FC = () => {
         <Banner
           status="error"
           title={`Không thể tải đầy đủ số liệu tổng quan: ${overviewError}`}
-          endContent={<Button label="Thử lại" variant="secondary" size="sm" onClick={fetchOverview} />}
+          endContent={<Button variant="secondary" size="sm" onClick={fetchOverview}>Thử lại</Button>}
         />
       )}
 
       {/* Summary KPI Cards */}
       {summary && (
-        <Grid columns={{ minWidth: 200, repeat: 'fit' }} gap={4}>
-          <Card padding={4}>
-            <VStack gap={1}>
-              <Text type="supporting">Tổng phát sinh</Text>
-              <Text type="large" weight="semibold">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+          <Card className="p-4">
+            <div className="flex flex-col gap-1">
+              <Text variant="supporting">Tổng phát sinh</Text>
+              <Text variant="large" className="font-semibold">
                 {formatCurrency(summary.totalOriginal)}
               </Text>
-            </VStack>
+            </div>
           </Card>
-          <Card padding={4}>
-            <VStack gap={1}>
-              <Text type="supporting">Đã thu</Text>
-              <Text type="large" weight="semibold">
+          <Card className="p-4">
+            <div className="flex flex-col gap-1">
+              <Text variant="supporting">Đã thu</Text>
+              <Text variant="large" className="font-semibold">
                 {formatCurrency(summary.totalPaid)}
               </Text>
-            </VStack>
+            </div>
           </Card>
-          <Card padding={4}>
-            <VStack gap={1}>
-              <Text type="supporting">Còn phải thu</Text>
-              <Text type="large" weight="semibold">
+          <Card className="p-4">
+            <div className="flex flex-col gap-1">
+              <Text variant="supporting">Còn phải thu</Text>
+              <Text variant="large" className="font-semibold">
                 {formatCurrency(summary.totalOutstanding)}
               </Text>
-            </VStack>
+            </div>
           </Card>
-          <Card padding={4}>
-            <VStack gap={1}>
-              <Text type="supporting">Quá hạn</Text>
-              <Text type="large" weight="semibold">
+          <Card className="p-4">
+            <div className="flex flex-col gap-1">
+              <Text variant="supporting">Quá hạn</Text>
+              <Text variant="large" className="font-semibold">
                 {formatCurrency(summary.totalOverdue)}
               </Text>
-              <Text type="supporting">{summary.overdueCount} khoản quá hạn</Text>
-            </VStack>
+              <Text variant="supporting">{summary.overdueCount} khoản quá hạn</Text>
+            </div>
           </Card>
-        </Grid>
+        </div>
       )}
 
       {/* Aging Report (admin and ke_toan only) */}
@@ -374,12 +374,12 @@ export const ReceivableListPage: React.FC = () => {
           columns={agingColumns}
           idKey="id"
           toolbar={
-            <VStack gap={0.5}>
+            <div className="flex flex-col gap-0.5">
               <Heading level={3}>Báo cáo tuổi nợ</Heading>
-              <Text type="supporting">
+              <Text variant="supporting">
                 Phân nhóm số tiền còn phải thu theo số ngày quá hạn so với ngày đáo hạn.
               </Text>
-            </VStack>
+            </div>
           }
         />
       )}
@@ -400,21 +400,21 @@ export const ReceivableListPage: React.FC = () => {
         rowCount={total}
         toolbar={
           <form onSubmit={handleSearchSubmit}>
-            <HStack gap={2} vAlign="end" wrap="wrap">
-              <TextInput
+            <div className="flex flex-row flex-wrap items-end gap-2">
+              <Input
                 label="Tìm kiếm công nợ"
                 placeholder="Tìm theo mã hóa đơn hoặc tên khách hàng..."
                 value={search}
                 onChange={setSearch}
-                width={320}
+                className="w-80"
               />
-              <Button type="submit" label="Tìm kiếm" variant="secondary" />
-            </HStack>
+              <Button type="submit" variant="secondary">Tìm kiếm</Button>
+            </div>
           </form>
         }
         toolbarEnd={
-          <HStack gap={3} vAlign="end" wrap="wrap">
-            <Selector
+          <div className="flex flex-row flex-wrap items-end gap-3">
+            <Select
               label="Trạng thái"
               options={STATUS_OPTIONS}
               value={trangThai}
@@ -422,17 +422,17 @@ export const ReceivableListPage: React.FC = () => {
                 setTrangThai(value as ReceivableStatus | '');
                 setPage(1);
               }}
-              width={190}
+              className="w-48"
             />
-            <CheckboxInput
+            <Checkbox
               label="Chỉ công nợ quá hạn"
-              value={overdueOnly}
+              checked={overdueOnly}
               onChange={(checked) => {
                 setOverdueOnly(checked);
                 setPage(1);
               }}
             />
-          </HStack>
+          </div>
         }
       />
     </PageScaffold>

@@ -3,13 +3,11 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Card } from '@astryxdesign/core/Card';
-import { VStack } from '@astryxdesign/core/Stack';
-import { Heading, Text } from '@astryxdesign/core/Text';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { Button } from '@astryxdesign/core/Button';
-import { Banner } from '@astryxdesign/core/Banner';
-import { Center } from '@astryxdesign/core/Center';
+import { ClipboardList } from 'lucide-react';
+import { Heading, Text } from '../../components/ui/Typography.js';
+import { Input } from '../../components/ui/Input.js';
+import { Button } from '../../components/ui/Button.js';
+import { Banner } from '../../components/ui/Banner.js';
 import { useAuth, UserProfile } from '../../context/AuthContext.js';
 import { apiFetch, ApiError } from '../../services/api.js';
 
@@ -79,83 +77,94 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <Center height="100vh" padding={4}>
-      <Card width="100%" maxWidth={440} elevation="med">
-        <VStack gap={5}>
-          <VStack gap={1} align="center">
-            <Heading level={1}>Đăng nhập Hệ thống</Heading>
-            <Text type="supporting" as="p" justify="center">
-              Phân hệ Quản lý Bán hàng &amp; Khách hàng
-            </Text>
-          </VStack>
+    <div className="grid min-h-screen lg:grid-cols-2">
+      <aside className="hidden flex-col justify-center gap-6 bg-primary p-10 text-primary-foreground lg:flex">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-control bg-primary-foreground/15">
+            <ClipboardList size={22} aria-hidden />
+          </span>
+          <span className="flex flex-col leading-tight">
+            <span className="text-lg font-semibold">ERP Sales &amp; CRM</span>
+            <span className="text-sm text-primary-foreground/80">Phân hệ Quản lý Bán hàng</span>
+          </span>
+        </div>
+      </aside>
 
-          {errorMessage && (
-            <Banner
-              status="error"
-              title="Đã xảy ra lỗi"
-              description={`[${errorCode}] ${errorMessage}`}
-              collapsible={false}
-              endContent={
-                <Button
-                  label="Thử lại"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setErrorMessage(null)}
+      <div className="flex items-center justify-center p-6">
+        <div className="w-full max-w-[440px] rounded-card border border-border bg-surface p-6 shadow-card">
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-1 text-center">
+              <Heading level={1}>Đăng nhập Hệ thống</Heading>
+              <Text variant="supporting" as="p">
+                Phân hệ Quản lý Bán hàng &amp; Khách hàng
+              </Text>
+            </div>
+
+            {errorMessage && (
+              <Banner
+                status="error"
+                title="Đã xảy ra lỗi"
+                description={`[${errorCode}] ${errorMessage}`}
+                endContent={
+                  <Button variant="secondary" size="sm" onClick={() => setErrorMessage(null)}>
+                    Thử lại
+                  </Button>
+                }
+              />
+            )}
+
+            <form onSubmit={handleSubmit(onSubmit)} noValidate>
+              <div className="flex w-full flex-col gap-4">
+                <Controller
+                  name="email"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      label="Địa chỉ Email"
+                      value={field.value}
+                      onChange={(value) => field.onChange(value)}
+                      type="email"
+                      autoComplete="email"
+                      status={
+                        errors.email ? { type: 'error', message: errors.email.message } : undefined
+                      }
+                    />
+                  )}
                 />
-              }
-            />
-          )}
 
-          <form onSubmit={handleSubmit(onSubmit)} noValidate>
-            <VStack gap={4} width="100%">
-              <Controller
-                name="email"
-                control={control}
-                render={({ field }) => (
-                  <TextInput
-                    label="Địa chỉ Email"
-                    value={field.value}
-                    onChange={(value) => field.onChange(value)}
-                    type="email"
-                    autoComplete="email"
-                    status={
-                      errors.email ? { type: 'error', message: errors.email.message } : undefined
-                    }
-                  />
-                )}
-              />
+                <Controller
+                  name="password"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      label="Mật khẩu"
+                      value={field.value}
+                      onChange={(value) => field.onChange(value)}
+                      type="password"
+                      autoComplete="current-password"
+                      status={
+                        errors.password
+                          ? { type: 'error', message: errors.password.message }
+                          : undefined
+                      }
+                    />
+                  )}
+                />
 
-              <Controller
-                name="password"
-                control={control}
-                render={({ field }) => (
-                  <TextInput
-                    label="Mật khẩu"
-                    value={field.value}
-                    onChange={(value) => field.onChange(value)}
-                    type="password"
-                    autoComplete="current-password"
-                    status={
-                      errors.password
-                        ? { type: 'error', message: errors.password.message }
-                        : undefined
-                    }
-                  />
-                )}
-              />
-
-              <Button
-                type="submit"
-                label={isSubmitting ? 'Đang xác thực...' : 'Đăng nhập'}
-                variant="primary"
-                width="100%"
-                isLoading={isSubmitting}
-                isDisabled={isSubmitting}
-              />
-            </VStack>
-          </form>
-        </VStack>
-      </Card>
-    </Center>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="w-full"
+                  loading={isSubmitting}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Đang xác thực...' : 'Đăng nhập'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };

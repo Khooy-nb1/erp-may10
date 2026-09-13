@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { HStack } from '@astryxdesign/core/Stack';
-import { Text } from '@astryxdesign/core/Text';
-import { Button } from '@astryxdesign/core/Button';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { Selector } from '@astryxdesign/core/Selector';
-import { Link } from '@astryxdesign/core/Link';
-import { proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
+import { Text } from '../../components/ui/Typography.js';
+import { Button } from '../../components/ui/Button.js';
+import { Input } from '../../components/ui/Input.js';
+import { Select } from '../../components/ui/Select.js';
+import { TextLink } from '../../components/ui/TextLink.js';
+import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
 import { Customer, CustomerType, CustomerStatus } from '../../types/customer.js';
 import { getCustomers } from '../../services/customerService.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
@@ -53,16 +52,16 @@ const columns: TableColumn<CustomerRow>[] = [
     header: 'Mã khách',
     width: proportional(1),
     renderCell: (item) => (
-      <Link href={`/customers/${item.id}`} weight="semibold">
+      <TextLink to={`/customers/${item.id}`} weight="semibold">
         {item.ma_khach_hang}
-      </Link>
+      </TextLink>
     ),
   },
   {
     key: 'ten_khach_hang',
     header: 'Tên khách hàng',
     width: proportional(2),
-    renderCell: (item) => <Text type="label">{item.ten_khach_hang}</Text>,
+    renderCell: (item) => <Text variant="label">{item.ten_khach_hang}</Text>,
   },
   { key: 'loai_khach_hang', header: 'Loại', width: proportional(1) },
   { key: 'so_dien_thoai', header: 'Số điện thoại', width: proportional(1) },
@@ -72,7 +71,7 @@ const columns: TableColumn<CustomerRow>[] = [
     header: 'Hạn mức công nợ',
     width: proportional(1),
     align: 'end',
-    renderCell: (item) => <Text hasTabularNumbers>{formatCurrency(item.han_muc_cong_no)}</Text>,
+    renderCell: (item) => <Text className="tabular-nums">{formatCurrency(item.han_muc_cong_no)}</Text>,
   },
   {
     key: 'trang_thai',
@@ -86,9 +85,9 @@ const columns: TableColumn<CustomerRow>[] = [
     width: pixel(110),
     align: 'end',
     renderCell: (item) => (
-      <Link href={`/customers/${item.id}`} weight="medium">
+      <TextLink to={`/customers/${item.id}`} weight="medium">
         Chi tiết
-      </Link>
+      </TextLink>
     ),
   },
 ];
@@ -144,11 +143,12 @@ export const CustomerListPage: React.FC = () => {
       subtitle={`Tổng số ${total} khách hàng trong hệ thống`}
       actions={
         <Button
-          label="Thêm khách hàng mới"
           variant="primary"
           icon={<Plus size={16} />}
           href="/customers/new"
-        />
+        >
+          Thêm khách hàng mới
+        </Button>
       }
     >
       <DataTableCard<CustomerRow>
@@ -166,21 +166,21 @@ export const CustomerListPage: React.FC = () => {
         rowCount={total}
         toolbar={
           <form onSubmit={handleSearchSubmit}>
-            <HStack gap={2} vAlign="end" wrap="wrap">
-              <TextInput
+            <div className="flex flex-row flex-wrap items-end gap-2">
+              <Input
                 label="Tìm kiếm khách hàng"
                 placeholder="Tìm theo mã, tên, số điện thoại, MST..."
                 value={search}
                 onChange={setSearch}
-                width={320}
+                className="w-80"
               />
-              <Button type="submit" label="Tìm kiếm" variant="secondary" />
-            </HStack>
+              <Button type="submit" variant="secondary">Tìm kiếm</Button>
+            </div>
           </form>
         }
         toolbarEnd={
-          <HStack gap={2} vAlign="end" wrap="wrap">
-            <Selector
+          <div className="flex flex-row flex-wrap items-end gap-2">
+            <Select
               label="Loại khách hàng"
               options={LOAI_KHACH_OPTIONS}
               value={loaiKhachHang}
@@ -188,9 +188,9 @@ export const CustomerListPage: React.FC = () => {
                 setLoaiKhachHang(value as CustomerType | '');
                 setPage(1);
               }}
-              width={190}
+              className="w-48"
             />
-            <Selector
+            <Select
               label="Trạng thái"
               options={TRANG_THAI_OPTIONS}
               value={trangThai}
@@ -198,9 +198,9 @@ export const CustomerListPage: React.FC = () => {
                 setTrangThai(value as CustomerStatus | '');
                 setPage(1);
               }}
-              width={190}
+              className="w-48"
             />
-          </HStack>
+          </div>
         }
       />
     </PageScaffold>

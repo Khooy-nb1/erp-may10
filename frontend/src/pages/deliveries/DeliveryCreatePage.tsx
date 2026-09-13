@@ -2,15 +2,12 @@ import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { createDelivery } from '../../services/deliveryService.js';
-import { VStack, HStack } from '@astryxdesign/core/Stack';
-import { Grid, GridSpan } from '@astryxdesign/core/Grid';
-import { Button } from '@astryxdesign/core/Button';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { TextArea } from '@astryxdesign/core/TextArea';
-import { NumberInput } from '@astryxdesign/core/NumberInput';
-import { Selector } from '@astryxdesign/core/Selector';
-import { DateInput } from '@astryxdesign/core/DateInput';
-import type { ISODateString } from '@astryxdesign/core/Calendar';
+import { Button } from '../../components/ui/Button.js';
+import { Input } from '../../components/ui/Input.js';
+import { Textarea } from '../../components/ui/Textarea.js';
+import { NumberInput } from '../../components/ui/NumberInput.js';
+import { Select } from '../../components/ui/Select.js';
+import { DateInput, type ISODateString } from '../../components/ui/DateInput.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { FormSection } from '../../components/common/FormSection.js';
 import { ErrorState } from '../../components/common/ErrorState.js';
@@ -92,130 +89,138 @@ export const DeliveryCreatePage: React.FC = () => {
       title="Lập đợt giao hàng mới"
       subtitle="Khởi tạo phiếu điều phối giao nhận cấp đầu phiếu (header-only)"
       breadcrumbs={[{ label: 'Giao hàng', href: '/deliveries' }, { label: 'Lập đợt giao hàng mới' }]}
-      actions={<Button label="Hủy bỏ" variant="secondary" href="/deliveries" />}
-      maxWidth={750}
+      actions={
+        <Button variant="secondary" href="/deliveries">
+          Hủy bỏ
+        </Button>
+      }
     >
-      {error && <ErrorState message={error} onRetry={() => setError(null)} />}
+      <div className="flex w-full flex-col gap-5 max-w-[750px]">
+        {error && <ErrorState message={error} onRetry={() => setError(null)} />}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <VStack gap={5}>
-          <FormSection title="Thông tin phiếu giao hàng">
-            <Grid columns={2} gap={4}>
-              <Controller
-                name="orderId"
-                control={control}
-                render={({ field }) => (
-                  <NumberInput
-                    label="ID đơn bán hàng liên kết *"
-                    placeholder="VD: 1"
-                    value={field.value}
-                    onChange={(value) => field.onChange(value)}
-                    hasClear
-                    width="100%"
-                  />
-                )}
-              />
-
-              <Controller
-                name="warehouseId"
-                control={control}
-                render={({ field }) => (
-                  <Selector
-                    label="Kho hàng xuất kho *"
-                    options={WAREHOUSE_OPTIONS}
-                    value={field.value}
-                    onChange={(value) => field.onChange(value)}
-                    width="100%"
-                  />
-                )}
-              />
-
-              <Controller
-                name="deliveryDate"
-                control={control}
-                render={({ field }) => (
-                  <DateInput
-                    label="Ngày giao hàng *"
-                    value={field.value ? (field.value as ISODateString) : undefined}
-                    onChange={(value) => field.onChange(value ?? '')}
-                    width="100%"
-                  />
-                )}
-              />
-
-              <Controller
-                name="receiverName"
-                control={control}
-                render={({ field }) => (
-                  <TextInput
-                    label="Người nhận hàng *"
-                    placeholder="Họ tên người nhận"
-                    value={field.value}
-                    onChange={field.onChange}
-                    width="100%"
-                  />
-                )}
-              />
-
-              <GridSpan columns={2}>
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+          <div className="flex w-full flex-col gap-5">
+            <FormSection title="Thông tin phiếu giao hàng">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                 <Controller
-                  name="deliveryAddress"
+                  name="orderId"
                   control={control}
                   render={({ field }) => (
-                    <TextInput
-                      label="Địa chỉ giao nhận *"
-                      placeholder="Địa chỉ giao nhận hàng hóa"
+                    <NumberInput
+                      label="ID đơn bán hàng liên kết *"
+                      placeholder="VD: 1"
                       value={field.value}
-                      onChange={field.onChange}
-                      width="100%"
+                      onChange={(value) => field.onChange(value)}
+                      hasClear
+                      className="w-full"
                     />
                   )}
                 />
-              </GridSpan>
 
-              <Controller
-                name="transportMethod"
-                control={control}
-                render={({ field }) => (
-                  <TextInput
-                    label="Phương tiện vận chuyển"
-                    value={field.value}
-                    onChange={field.onChange}
-                    width="100%"
-                  />
-                )}
-              />
-
-              <GridSpan columns={2}>
                 <Controller
-                  name="notes"
+                  name="warehouseId"
                   control={control}
                   render={({ field }) => (
-                    <TextArea
-                      label="Ghi chú điều phối"
-                      rows={2}
+                    <Select
+                      label="Kho hàng xuất kho *"
+                      options={WAREHOUSE_OPTIONS}
                       value={field.value}
-                      onChange={field.onChange}
-                      width="100%"
+                      onChange={(value) => field.onChange(value)}
+                      className="w-full"
                     />
                   )}
                 />
-              </GridSpan>
-            </Grid>
-          </FormSection>
 
-          <HStack gap={2} hAlign="end">
-            <Button label="Hủy" variant="secondary" href="/deliveries" />
-            <Button
-              type="submit"
-              label={isSubmitting ? 'Đang tạo...' : 'Lưu phiếu giao hàng'}
-              variant="primary"
-              isLoading={isSubmitting}
-              isDisabled={isSubmitting}
-            />
-          </HStack>
-        </VStack>
-      </form>
+                <Controller
+                  name="deliveryDate"
+                  control={control}
+                  render={({ field }) => (
+                    <DateInput
+                      label="Ngày giao hàng *"
+                      value={field.value ? (field.value as ISODateString) : undefined}
+                      onChange={(value) => field.onChange(value ?? '')}
+                      className="w-full"
+                    />
+                  )}
+                />
+
+                <Controller
+                  name="receiverName"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      label="Người nhận hàng *"
+                      placeholder="Họ tên người nhận"
+                      value={field.value}
+                      onChange={field.onChange}
+                      className="w-full"
+                    />
+                  )}
+                />
+
+                <div className="sm:col-span-2">
+                  <Controller
+                    name="deliveryAddress"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        label="Địa chỉ giao nhận *"
+                        placeholder="Địa chỉ giao nhận hàng hóa"
+                        value={field.value}
+                        onChange={field.onChange}
+                        className="w-full"
+                      />
+                    )}
+                  />
+                </div>
+
+                <Controller
+                  name="transportMethod"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      label="Phương tiện vận chuyển"
+                      value={field.value}
+                      onChange={field.onChange}
+                      className="w-full"
+                    />
+                  )}
+                />
+
+                <div className="sm:col-span-2">
+                  <Controller
+                    name="notes"
+                    control={control}
+                    render={({ field }) => (
+                      <Textarea
+                        label="Ghi chú điều phối"
+                        rows={2}
+                        value={field.value}
+                        onChange={field.onChange}
+                        className="w-full"
+                      />
+                    )}
+                  />
+                </div>
+              </div>
+            </FormSection>
+
+            <div className="flex flex-row items-center justify-end gap-2">
+              <Button variant="secondary" href="/deliveries">
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={isSubmitting}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Đang tạo...' : 'Lưu phiếu giao hàng'}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
     </PageScaffold>
   );
 };

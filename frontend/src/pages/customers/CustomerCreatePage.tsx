@@ -4,14 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { createCustomer } from '../../services/customerService.js';
-import { VStack, HStack } from '@astryxdesign/core/Stack';
-import { Grid, GridSpan } from '@astryxdesign/core/Grid';
-import { Button } from '@astryxdesign/core/Button';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { NumberInput } from '@astryxdesign/core/NumberInput';
-import { TextArea } from '@astryxdesign/core/TextArea';
-import { Selector } from '@astryxdesign/core/Selector';
-import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '../../components/ui/Button.js';
+import { Input } from '../../components/ui/Input.js';
+import { NumberInput } from '../../components/ui/NumberInput.js';
+import { Textarea } from '../../components/ui/Textarea.js';
+import { Select } from '../../components/ui/Select.js';
+import { Banner } from '../../components/ui/Banner.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { FormSection } from '../../components/common/FormSection.js';
 
@@ -86,222 +84,229 @@ export const CustomerCreatePage: React.FC = () => {
       title="Thêm khách hàng mới"
       subtitle="Khởi tạo hồ sơ khách hàng và thiết lập hạn mức tín dụng"
       breadcrumbs={[{ label: 'Khách hàng', href: '/customers' }, { label: 'Thêm khách hàng mới' }]}
-      actions={<Button label="Hủy bỏ" variant="secondary" href="/customers" />}
-      maxWidth={800}
+      actions={
+        <Button variant="secondary" href="/customers">
+          Hủy bỏ
+        </Button>
+      }
     >
-      {serverError && (
-        <Banner
-          status="error"
-          title="Đã xảy ra lỗi"
-          description={serverError}
-          collapsible={false}
-          endContent={
-            <Button label="Thử lại" variant="secondary" size="sm" onClick={() => setServerError(null)} />
-          }
-        />
-      )}
+      <div className="flex w-full flex-col gap-5 max-w-[800px]">
+        {serverError && (
+          <Banner
+            status="error"
+            title="Đã xảy ra lỗi"
+            description={serverError}
+            endContent={
+              <Button variant="secondary" size="sm" onClick={() => setServerError(null)}>
+                Thử lại
+              </Button>
+            }
+          />
+        )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <VStack gap={5}>
-          <FormSection title="Thông tin khách hàng">
-            <Grid columns={2} gap={4}>
-              <GridSpan columns={2}>
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+          <div className="flex w-full flex-col gap-5">
+            <FormSection title="Thông tin khách hàng">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Controller
+                    name="ten_khach_hang"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        label="Tên khách hàng / Đơn vị *"
+                        value={field.value}
+                        onChange={field.onChange}
+                        status={
+                          errors.ten_khach_hang
+                            ? { type: 'error', message: errors.ten_khach_hang.message }
+                            : undefined
+                        }
+                      />
+                    )}
+                  />
+                </div>
+
                 <Controller
-                  name="ten_khach_hang"
+                  name="loai_khach_hang"
                   control={control}
                   render={({ field }) => (
-                    <TextInput
-                      label="Tên khách hàng / Đơn vị *"
+                    <Select
+                      label="Loại khách hàng *"
+                      options={LOAI_KHACH_HANG_OPTIONS.map((option) => ({
+                        value: option.value,
+                        label: option.label,
+                      }))}
+                      value={field.value}
+                      onChange={(value) => {
+                        if (isCustomerType(value)) field.onChange(value);
+                      }}
+                      className="w-full"
+                    />
+                  )}
+                />
+
+                <Controller
+                  name="ma_so_thue"
+                  control={control}
+                  render={({ field }) => (
+                    <Input label="Mã số thuế" value={field.value ?? ''} onChange={field.onChange} />
+                  )}
+                />
+
+                <Controller
+                  name="so_dien_thoai"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      label="Số điện thoại liên hệ *"
                       value={field.value}
                       onChange={field.onChange}
                       status={
-                        errors.ten_khach_hang
-                          ? { type: 'error', message: errors.ten_khach_hang.message }
+                        errors.so_dien_thoai
+                          ? { type: 'error', message: errors.so_dien_thoai.message }
                           : undefined
                       }
                     />
                   )}
                 />
-              </GridSpan>
 
-              <Controller
-                name="loai_khach_hang"
-                control={control}
-                render={({ field }) => (
-                  <Selector
-                    label="Loại khách hàng *"
-                    options={LOAI_KHACH_HANG_OPTIONS.map((option) => ({
-                      value: option.value,
-                      label: option.label,
-                    }))}
-                    value={field.value}
-                    onChange={(value) => {
-                      if (isCustomerType(value)) field.onChange(value);
-                    }}
-                    width="100%"
-                  />
-                )}
-              />
-
-              <Controller
-                name="ma_so_thue"
-                control={control}
-                render={({ field }) => (
-                  <TextInput
-                    label="Mã số thuế"
-                    value={field.value ?? ''}
-                    onChange={field.onChange}
-                  />
-                )}
-              />
-
-              <Controller
-                name="so_dien_thoai"
-                control={control}
-                render={({ field }) => (
-                  <TextInput
-                    label="Số điện thoại liên hệ *"
-                    value={field.value}
-                    onChange={field.onChange}
-                    status={
-                      errors.so_dien_thoai
-                        ? { type: 'error', message: errors.so_dien_thoai.message }
-                        : undefined
-                    }
-                  />
-                )}
-              />
-
-              <Controller
-                name="email"
-                control={control}
-                render={({ field }) => (
-                  <TextInput
-                    label="Địa chỉ Email"
-                    type="email"
-                    value={field.value ?? ''}
-                    onChange={field.onChange}
-                    status={
-                      errors.email ? { type: 'error', message: errors.email.message } : undefined
-                    }
-                  />
-                )}
-              />
-
-              <GridSpan columns={2}>
                 <Controller
-                  name="dia_chi"
+                  name="email"
                   control={control}
                   render={({ field }) => (
-                    <TextInput
-                      label="Địa chỉ trụ sở / nhận hàng *"
-                      value={field.value}
+                    <Input
+                      label="Địa chỉ Email"
+                      type="email"
+                      value={field.value ?? ''}
                       onChange={field.onChange}
                       status={
-                        errors.dia_chi ? { type: 'error', message: errors.dia_chi.message } : undefined
+                        errors.email ? { type: 'error', message: errors.email.message } : undefined
                       }
                     />
                   )}
                 />
-              </GridSpan>
 
-              <Controller
-                name="tinh_thanh_pho"
-                control={control}
-                render={({ field }) => (
-                  <TextInput
-                    label="Tỉnh / Thành phố *"
-                    value={field.value}
-                    onChange={field.onChange}
-                    status={
-                      errors.tinh_thanh_pho
-                        ? { type: 'error', message: errors.tinh_thanh_pho.message }
-                        : undefined
-                    }
+                <div className="sm:col-span-2">
+                  <Controller
+                    name="dia_chi"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        label="Địa chỉ trụ sở / nhận hàng *"
+                        value={field.value}
+                        onChange={field.onChange}
+                        status={
+                          errors.dia_chi
+                            ? { type: 'error', message: errors.dia_chi.message }
+                            : undefined
+                        }
+                      />
+                    )}
                   />
-                )}
-              />
+                </div>
 
-              <Controller
-                name="nguoi_lien_he"
-                control={control}
-                render={({ field }) => (
-                  <TextInput
-                    label="Người liên hệ đại diện"
-                    value={field.value ?? ''}
-                    onChange={field.onChange}
-                  />
-                )}
-              />
-            </Grid>
-          </FormSection>
-
-          <FormSection title="Chính sách công nợ">
-            <Grid columns={2} gap={4}>
-              <Controller
-                name="han_muc_cong_no"
-                control={control}
-                render={({ field }) => (
-                  <NumberInput
-                    label="Hạn mức công nợ (VNĐ)"
-                    value={field.value}
-                    onChange={(value) => field.onChange(value)}
-                    hasClear
-                    status={
-                      errors.han_muc_cong_no
-                        ? { type: 'error', message: errors.han_muc_cong_no.message }
-                        : undefined
-                    }
-                  />
-                )}
-              />
-
-              <Controller
-                name="so_ngay_cong_no"
-                control={control}
-                render={({ field }) => (
-                  <NumberInput
-                    label="Số ngày được nợ (ngày)"
-                    value={field.value}
-                    onChange={(value) => field.onChange(value)}
-                    hasClear
-                    status={
-                      errors.so_ngay_cong_no
-                        ? { type: 'error', message: errors.so_ngay_cong_no.message }
-                        : undefined
-                    }
-                  />
-                )}
-              />
-
-              <GridSpan columns={2}>
                 <Controller
-                  name="ghi_chu"
+                  name="tinh_thanh_pho"
                   control={control}
                   render={({ field }) => (
-                    <TextArea
-                      label="Ghi chú"
+                    <Input
+                      label="Tỉnh / Thành phố *"
+                      value={field.value}
+                      onChange={field.onChange}
+                      status={
+                        errors.tinh_thanh_pho
+                          ? { type: 'error', message: errors.tinh_thanh_pho.message }
+                          : undefined
+                      }
+                    />
+                  )}
+                />
+
+                <Controller
+                  name="nguoi_lien_he"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      label="Người liên hệ đại diện"
                       value={field.value ?? ''}
                       onChange={field.onChange}
                     />
                   )}
                 />
-              </GridSpan>
-            </Grid>
-          </FormSection>
+              </div>
+            </FormSection>
 
-          <HStack gap={2} hAlign="end">
-            <Button label="Hủy" variant="secondary" href="/customers" />
-            <Button
-              type="submit"
-              label={isSubmitting ? 'Đang lưu...' : 'Lưu khách hàng'}
-              variant="primary"
-              isLoading={isSubmitting}
-              isDisabled={isSubmitting}
-            />
-          </HStack>
-        </VStack>
-      </form>
+            <FormSection title="Chính sách công nợ">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                <Controller
+                  name="han_muc_cong_no"
+                  control={control}
+                  render={({ field }) => (
+                    <NumberInput
+                      label="Hạn mức công nợ (VNĐ)"
+                      value={field.value}
+                      onChange={(value) => field.onChange(value)}
+                      hasClear
+                      status={
+                        errors.han_muc_cong_no
+                          ? { type: 'error', message: errors.han_muc_cong_no.message }
+                          : undefined
+                      }
+                    />
+                  )}
+                />
+
+                <Controller
+                  name="so_ngay_cong_no"
+                  control={control}
+                  render={({ field }) => (
+                    <NumberInput
+                      label="Số ngày được nợ (ngày)"
+                      value={field.value}
+                      onChange={(value) => field.onChange(value)}
+                      hasClear
+                      status={
+                        errors.so_ngay_cong_no
+                          ? { type: 'error', message: errors.so_ngay_cong_no.message }
+                          : undefined
+                      }
+                    />
+                  )}
+                />
+
+                <div className="sm:col-span-2">
+                  <Controller
+                    name="ghi_chu"
+                    control={control}
+                    render={({ field }) => (
+                      <Textarea
+                        label="Ghi chú"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                      />
+                    )}
+                  />
+                </div>
+              </div>
+            </FormSection>
+
+            <div className="flex flex-row items-center justify-end gap-2">
+              <Button variant="secondary" href="/customers">
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={isSubmitting}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Đang lưu...' : 'Lưu khách hàng'}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
     </PageScaffold>
   );
 };

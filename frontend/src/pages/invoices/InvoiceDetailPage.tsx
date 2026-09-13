@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { Invoice } from '../../types/invoice.js';
 import { getInvoiceById } from '../../services/invoiceService.js';
-import { Card } from '@astryxdesign/core/Card';
-import { VStack } from '@astryxdesign/core/Stack';
-import { Grid } from '@astryxdesign/core/Grid';
-import { Heading, Text } from '@astryxdesign/core/Text';
-import { Button } from '@astryxdesign/core/Button';
-import { Banner } from '@astryxdesign/core/Banner';
-import { Link } from '@astryxdesign/core/Link';
-import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList';
-import { ArrowLeft } from 'lucide-react';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { AsyncPanel } from '../../components/common/AsyncPanel.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
+import { Banner } from '../../components/ui/Banner.js';
+import { Button } from '../../components/ui/Button.js';
+import { Card } from '../../components/ui/Card.js';
+import { MetadataList, MetadataListItem } from '../../components/ui/MetadataList.js';
+import { Heading, Text } from '../../components/ui/Typography.js';
+import { TextLink } from '../../components/ui/TextLink.js';
 
 /** `qua_han` reads "Quá hạn thanh toán" on this screen; the shared badge labels it "Quá hạn". */
 const STATUS_LABELS: Partial<Record<Invoice['trang_thai'], string>> = {
@@ -75,11 +73,12 @@ export const InvoiceDetailPage: React.FC = () => {
       ]}
       actions={
         <Button
-          label="Danh sách hóa đơn"
           variant="secondary"
           icon={<ArrowLeft size={16} aria-hidden />}
           href="/invoices"
-        />
+        >
+          Danh sách hóa đơn
+        </Button>
       }
     >
       <AsyncPanel
@@ -92,74 +91,73 @@ export const InvoiceDetailPage: React.FC = () => {
         onRetry={fetchInvoice}
       >
         {invoice && (
-          <VStack gap={5}>
+          <div className="flex flex-col gap-5">
             {isOverdue && (
               <Banner
                 status="warning"
                 title="Hóa đơn đã quá hạn thanh toán"
                 description={`Hóa đơn này đã quá ngày đáo hạn (${formatDate(invoice.ngay_dao_han)}). Số tiền còn nợ: ${formatCurrency(remainingDebt)}. Cần liên hệ đối tác để thu hồi nợ.`}
-                collapsible={false}
               />
             )}
 
             {/* Financial Summary Breakdown */}
-            <Grid columns={{ minWidth: 200, repeat: 'fit' }} gap={3}>
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
               <Card>
-                <VStack gap={1}>
-                  <Text type="supporting">Tiền trước thuế</Text>
-                  <Text type="label" hasTabularNumbers>
+                <div className="flex flex-col gap-1">
+                  <Text variant="supporting">Tiền trước thuế</Text>
+                  <Text variant="label" className="tabular-nums">
                     {formatCurrency(invoice.tong_tien_truoc_thue)}
                   </Text>
-                </VStack>
+                </div>
               </Card>
               <Card>
-                <VStack gap={1}>
-                  <Text type="supporting">Tiền thuế GTGT</Text>
-                  <Text type="label" hasTabularNumbers>
+                <div className="flex flex-col gap-1">
+                  <Text variant="supporting">Tiền thuế GTGT</Text>
+                  <Text variant="label" className="tabular-nums">
                     {formatCurrency(invoice.tien_thue)}
                   </Text>
-                </VStack>
+                </div>
               </Card>
               <Card variant="blue">
-                <VStack gap={1}>
-                  <Text type="supporting">Tổng tiền sau thuế</Text>
-                  <Text type="label" hasTabularNumbers>
+                <div className="flex flex-col gap-1">
+                  <Text variant="supporting">Tổng tiền sau thuế</Text>
+                  <Text variant="label" className="tabular-nums">
                     {formatCurrency(invoice.tong_tien_sau_thue)}
                   </Text>
-                </VStack>
+                </div>
               </Card>
               <Card variant="green">
-                <VStack gap={1}>
-                  <Text type="supporting">Đã thu lũy kế</Text>
-                  <Text type="label" hasTabularNumbers>
+                <div className="flex flex-col gap-1">
+                  <Text variant="supporting">Đã thu lũy kế</Text>
+                  <Text variant="label" className="tabular-nums">
                     {formatCurrency(invoice.so_tien_da_thu)}
                   </Text>
-                </VStack>
+                </div>
               </Card>
               <Card variant={remainingDebt > 0 ? 'red' : 'green'}>
-                <VStack gap={1}>
-                  <Text type="supporting">Còn phải thu</Text>
-                  <Text type="label" hasTabularNumbers>
+                <div className="flex flex-col gap-1">
+                  <Text variant="supporting">Còn phải thu</Text>
+                  <Text variant="label" className="tabular-nums">
                     {formatCurrency(remainingDebt)}
                   </Text>
-                </VStack>
+                </div>
               </Card>
-            </Grid>
+            </div>
 
             {/* Invoice Information Card */}
             <Card>
-              <VStack gap={4}>
+              <div className="flex flex-col gap-4">
                 <Heading level={3}>Thông tin chứng từ liên kết</Heading>
                 <MetadataList columns={2}>
                   <MetadataListItem label="Đơn bán hàng liên kết">
-                    <Link href={`/sales-orders/${invoice.ma_don_ban_hang}`}>
+                    <TextLink to={`/sales-orders/${invoice.ma_don_ban_hang}`}>
                       {invoice.ma_don_ban || `Đơn hàng #${invoice.ma_don_ban_hang}`}
-                    </Link>
+                    </TextLink>
                   </MetadataListItem>
                   <MetadataListItem label="Khách hàng">
-                    <Link href={`/customers/${invoice.ma_khach_hang}`}>
+                    <TextLink to={`/customers/${invoice.ma_khach_hang}`}>
                       {invoice.ten_khach_hang || `Khách hàng #${invoice.ma_khach_hang}`}
-                    </Link>
+                    </TextLink>
                   </MetadataListItem>
                   <MetadataListItem label="Trạng thái thanh toán">
                     <StatusBadge
@@ -177,7 +175,7 @@ export const InvoiceDetailPage: React.FC = () => {
                     {invoice.ghi_chu || 'Không có ghi chú'}
                   </MetadataListItem>
                 </MetadataList>
-              </VStack>
+              </div>
             </Card>
 
             {/* Informational Disclaimer Card */}
@@ -185,9 +183,8 @@ export const InvoiceDetailPage: React.FC = () => {
               status="info"
               title="Lưu ý về lịch sử thanh toán:"
               description="Cơ sở dữ liệu ERP hiện tại chỉ lưu trữ số tiền đã thu lũy kế (so_tien_da_thu) mà không có bảng nhật ký từng đợt thanh toán (chi_tiet_thanh_toan). Do đó, giao diện không hiển thị lịch sử phân kỳ thanh toán để đảm bảo tính toàn vẹn dữ liệu."
-              collapsible={false}
             />
-          </VStack>
+          </div>
         )}
       </AsyncPanel>
     </PageScaffold>

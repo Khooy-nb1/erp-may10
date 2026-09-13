@@ -1,7 +1,5 @@
 import React from 'react';
-import { VStack } from '@astryxdesign/core/Stack';
-import { Skeleton } from '@astryxdesign/core/Skeleton';
-import { VisuallyHidden } from '@astryxdesign/core/VisuallyHidden';
+import { Skeleton } from '../ui/Skeleton.js';
 import { ErrorState } from './ErrorState.js';
 import { EmptyState } from './EmptyState.js';
 
@@ -45,23 +43,25 @@ export const AsyncPanel: React.FC<AsyncPanelProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <VStack gap={2} aria-live="polite" aria-busy="true">
-        <VisuallyHidden>{loadingMessage}</VisuallyHidden>
+      <div className="flex flex-col gap-2 p-4" aria-live="polite" aria-busy="true">
+        <span className="sr-only">{loadingMessage}</span>
         {Array.from({ length: skeletonRows }, (_, index) => (
-          <Skeleton key={index} index={index} height={20} radius={2} />
+          <Skeleton key={index} className="h-5 w-full" />
         ))}
-      </VStack>
+      </div>
     );
   }
 
   if (error) {
-    return <ErrorState code={errorCode} message={error} onRetry={onRetry} />;
+    return (
+      <div className="p-4">
+        <ErrorState code={errorCode} message={error} onRetry={onRetry} />
+      </div>
+    );
   }
 
   if (isEmpty) {
-    return (
-      <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
-    );
+    return <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />;
   }
 
   return <>{children}</>;

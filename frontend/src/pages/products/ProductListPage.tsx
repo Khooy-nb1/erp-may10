@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { HStack } from '@astryxdesign/core/Stack';
-import { Text } from '@astryxdesign/core/Text';
-import { Button } from '@astryxdesign/core/Button';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { Selector } from '@astryxdesign/core/Selector';
-import { proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
+import { Text } from '../../components/ui/Typography.js';
+import { Button } from '../../components/ui/Button.js';
+import { Input } from '../../components/ui/Input.js';
+import { Select } from '../../components/ui/Select.js';
+import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
 import { Product, ProductStatus } from '../../types/product.js';
 import { getProducts } from '../../services/productService.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
@@ -58,13 +57,13 @@ const columns: TableColumn<ProductRow>[] = [
     key: 'ma_san_pham',
     header: 'Mã sản phẩm',
     width: proportional(1),
-    renderCell: (item) => <Text type="label">{item.ma_san_pham}</Text>,
+    renderCell: (item) => <Text variant="label">{item.ma_san_pham}</Text>,
   },
   {
     key: 'ten_san_pham',
     header: 'Tên sản phẩm',
     width: proportional(2),
-    renderCell: (item) => <Text type="label">{item.ten_san_pham}</Text>,
+    renderCell: (item) => <Text variant="label">{item.ten_san_pham}</Text>,
   },
   { key: 'size', header: 'Kích cỡ', width: proportional(1), renderCell: (item) => item.size || '—' },
   { key: 'mau_sac', header: 'Màu sắc', width: proportional(1), renderCell: (item) => item.mau_sac || '—' },
@@ -80,7 +79,7 @@ const columns: TableColumn<ProductRow>[] = [
     width: proportional(1),
     align: 'end',
     renderCell: (item) => (
-      <Text type="label" hasTabularNumbers>
+      <Text variant="label" className="tabular-nums">
         {formatCurrency(item.gia_ban)}
       </Text>
     ),
@@ -161,21 +160,21 @@ export const ProductListPage: React.FC = () => {
         rowCount={total}
         toolbar={
           <form onSubmit={handleSearchSubmit}>
-            <HStack gap={2} vAlign="end" wrap="wrap">
-              <TextInput
+            <div className="flex flex-row flex-wrap items-end gap-2">
+              <Input
                 label="Tìm kiếm sản phẩm"
                 placeholder="Tìm theo mã sản phẩm hoặc tên hàng..."
                 value={search}
                 onChange={setSearch}
-                width={320}
+                className="w-80"
               />
-              <Button type="submit" label="Tìm kiếm" variant="secondary" />
-            </HStack>
+              <Button type="submit" variant="secondary">Tìm kiếm</Button>
+            </div>
           </form>
         }
         toolbarEnd={
-          <HStack gap={2} vAlign="end" wrap="wrap">
-            <Selector
+          <div className="flex flex-row flex-wrap items-end gap-2">
+            <Select
               label="Kích cỡ"
               options={SIZE_OPTIONS}
               value={size}
@@ -183,9 +182,9 @@ export const ProductListPage: React.FC = () => {
                 setSize(value);
                 setPage(1);
               }}
-              width={160}
+              className="w-40"
             />
-            <Selector
+            <Select
               label="Màu sắc"
               options={MAU_SAC_OPTIONS}
               value={mauSac}
@@ -193,9 +192,9 @@ export const ProductListPage: React.FC = () => {
                 setMauSac(value);
                 setPage(1);
               }}
-              width={180}
+              className="w-[180px]"
             />
-            <Selector
+            <Select
               label="Trạng thái"
               options={TRANG_THAI_OPTIONS}
               value={trangThai}
@@ -203,9 +202,9 @@ export const ProductListPage: React.FC = () => {
                 setTrangThai(value as ProductStatus | '');
                 setPage(1);
               }}
-              width={170}
+              className="w-[170px]"
             />
-          </HStack>
+          </div>
         }
       />
     </PageScaffold>

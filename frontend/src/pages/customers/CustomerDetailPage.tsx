@@ -1,18 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { Card } from '@astryxdesign/core/Card';
-import { Grid } from '@astryxdesign/core/Grid';
-import { HStack, VStack } from '@astryxdesign/core/Stack';
-import { Text } from '@astryxdesign/core/Text';
-import { Button } from '@astryxdesign/core/Button';
-import { Banner } from '@astryxdesign/core/Banner';
-import { Link } from '@astryxdesign/core/Link';
-import { AlertDialog } from '@astryxdesign/core/AlertDialog';
-import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList';
-import { TabList, Tab } from '@astryxdesign/core/TabList';
-import { Table, proportional, type TableColumn } from '@astryxdesign/core/Table';
-import { useToast } from '@astryxdesign/core/Toast';
+import { toast } from 'sonner';
 import { Customer, CustomerSummary } from '../../types/customer.js';
 import { Receivable, ReceivableStatus, ReceivableSummary } from '../../types/receivable.js';
 import { getCustomerById, getCustomerSummary, updateCustomerStatus } from '../../services/customerService.js';
@@ -22,6 +11,15 @@ import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { AsyncPanel } from '../../components/common/AsyncPanel.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
 import { EmptyState } from '../../components/common/EmptyState.js';
+import { AlertDialog } from '../../components/ui/AlertDialog.js';
+import { Banner } from '../../components/ui/Banner.js';
+import { Button } from '../../components/ui/Button.js';
+import { Card } from '../../components/ui/Card.js';
+import { MetadataList, MetadataListItem } from '../../components/ui/MetadataList.js';
+import { Table, proportional, type TableColumn } from '../../components/ui/Table.js';
+import { Tab, TabList, TabPanel, Tabs } from '../../components/ui/Tabs.js';
+import { Text } from '../../components/ui/Typography.js';
+import { TextLink } from '../../components/ui/TextLink.js';
 
 interface ReceivableRow extends Record<string, unknown> {
   id: number;
@@ -41,7 +39,6 @@ export const CustomerDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const customerId = Number(id);
   const { user } = useAuth();
-  const toast = useToast();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [summary, setSummary] = useState<CustomerSummary | null>(null);
@@ -127,10 +124,7 @@ export const CustomerDetailPage: React.FC = () => {
       const updated = await updateCustomerStatus(customerId, pendingStatus);
       setCustomer(updated);
     } catch (err) {
-      toast({
-        body: err instanceof Error ? err.message : 'Không thể cập nhật trạng thái',
-        type: 'error',
-      });
+      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái');
     } finally {
       setUpdatingStatus(false);
       handleConfirmOpenChange(false);
@@ -153,7 +147,7 @@ export const CustomerDetailPage: React.FC = () => {
       width: proportional(1),
       renderCell: (r) =>
         r.ma_hoa_don ? (
-          <Link href={`/invoices/${r.ma_hoa_don}`}>{r.ma_hoa_don_code || `#${r.ma_hoa_don}`}</Link>
+          <TextLink to={`/invoices/${r.ma_hoa_don}`}>{r.ma_hoa_don_code || `#${r.ma_hoa_don}`}</TextLink>
         ) : (
           r.ma_hoa_don_code || '—'
         ),
@@ -164,7 +158,7 @@ export const CustomerDetailPage: React.FC = () => {
       align: 'end',
       width: proportional(1),
       renderCell: (r) => (
-        <Text as="span" weight="semibold" hasTabularNumbers>
+        <Text as="span" className="font-semibold tabular-nums">
           {formatCurrency(r.so_tien_phat_sinh)}
         </Text>
       ),
@@ -174,7 +168,7 @@ export const CustomerDetailPage: React.FC = () => {
       header: 'Đã thanh toán',
       align: 'end',
       width: proportional(1),
-      renderCell: (r) => <Text as="span" hasTabularNumbers>{formatCurrency(r.so_tien_da_thanh_toan)}</Text>,
+      renderCell: (r) => <Text as="span" className="tabular-nums">{formatCurrency(r.so_tien_da_thanh_toan)}</Text>,
     },
     {
       key: 'so_tien_con_lai',
@@ -182,7 +176,7 @@ export const CustomerDetailPage: React.FC = () => {
       align: 'end',
       width: proportional(1),
       renderCell: (r) => (
-        <Text as="span" weight="semibold" hasTabularNumbers>
+        <Text as="span" className="font-semibold tabular-nums">
           {formatCurrency(r.so_tien_con_lai)}
         </Text>
       ),
@@ -200,7 +194,7 @@ export const CustomerDetailPage: React.FC = () => {
       width: proportional(1),
       renderCell: (r) =>
         r.daysOverdue && r.daysOverdue > 0 ? (
-          <Text as="span" weight="semibold" hasTabularNumbers>
+          <Text as="span" className="font-semibold tabular-nums">
             {r.daysOverdue}
           </Text>
         ) : (
@@ -233,40 +227,43 @@ export const CustomerDetailPage: React.FC = () => {
       subtitle={customer ? `Loại: ${customer.loai_khach_hang} • Khu vực: ${customer.tinh_thanh_pho}` : undefined}
       breadcrumbs={breadcrumbs}
       actions={
-        <HStack gap={2} wrap="wrap" vAlign="center">
-          <Link href="/customers" weight="medium">
+        <div className="flex flex-wrap items-center gap-2">
+          <TextLink to="/customers" weight="medium">
             <ArrowLeft size={16} aria-hidden /> Danh sách
-          </Link>
+          </TextLink>
 
           {isAdmin && customer ? (
-            <HStack gap={2} wrap="wrap" vAlign="center">
+            <div className="flex flex-wrap items-center gap-2">
               {customer.trang_thai === 'hoat_dong' ? (
                 <Button
-                  label="Tạm khóa"
                   variant="secondary"
-                  isDisabled={updatingStatus}
+                  disabled={updatingStatus}
                   onClick={() => setPendingStatus('tam_khoa')}
-                />
+                >
+                  Tạm khóa
+                </Button>
               ) : (
                 <Button
-                  label="Kích hoạt lại"
                   variant="secondary"
-                  isDisabled={updatingStatus}
+                  disabled={updatingStatus}
                   onClick={() => setPendingStatus('hoat_dong')}
-                />
+                >
+                  Kích hoạt lại
+                </Button>
               )}
 
               {customer.trang_thai !== 'ngung_giao_dich' && (
                 <Button
-                  label="Ngừng giao dịch"
                   variant="destructive"
-                  isDisabled={updatingStatus}
+                  disabled={updatingStatus}
                   onClick={() => setPendingStatus('ngung_giao_dich')}
-                />
+                >
+                  Ngừng giao dịch
+                </Button>
               )}
-            </HStack>
+            </div>
           ) : null}
-        </HStack>
+        </div>
       }
     >
       <AsyncPanel
@@ -276,192 +273,174 @@ export const CustomerDetailPage: React.FC = () => {
         onRetry={fetchData}
       >
         {customer ? (
-          <VStack gap={5} width="100%">
+          <div className="flex w-full flex-col gap-5">
             {/* Commercial Summary Cards */}
             {summary && (
-              <Grid columns={{ minWidth: 200 }} gap={4}>
+              <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                 <Card>
-                  <VStack gap={1}>
-                    <Text type="supporting" color="secondary">
-                      Tổng số đơn hàng
-                    </Text>
-                    <Text type="large" weight="bold" hasTabularNumbers>
+                  <div className="flex flex-col gap-1">
+                    <Text variant="supporting">Tổng số đơn hàng</Text>
+                    <Text variant="large" className="font-bold tabular-nums">
                       {summary.totalOrders}
                     </Text>
-                  </VStack>
+                  </div>
                 </Card>
                 <Card>
-                  <VStack gap={1}>
-                    <Text type="supporting" color="secondary">
-                      Tổng giá trị đặt hàng
-                    </Text>
-                    <Text type="large" weight="bold" hasTabularNumbers>
+                  <div className="flex flex-col gap-1">
+                    <Text variant="supporting">Tổng giá trị đặt hàng</Text>
+                    <Text variant="large" className="font-bold tabular-nums">
                       {formatCurrency(summary.totalOrderValue)}
                     </Text>
-                  </VStack>
+                  </div>
                 </Card>
                 <Card>
-                  <VStack gap={1}>
-                    <Text type="supporting" color="secondary">
-                      Công nợ phải thu hiện tại
-                    </Text>
-                    <Text type="large" weight="bold" hasTabularNumbers>
+                  <div className="flex flex-col gap-1">
+                    <Text variant="supporting">Công nợ phải thu hiện tại</Text>
+                    <Text variant="large" className="font-bold tabular-nums">
                       {formatCurrency(summary.outstandingReceivable)}
                     </Text>
-                  </VStack>
+                  </div>
                 </Card>
                 <Card>
-                  <VStack gap={1}>
-                    <Text type="supporting" color="secondary">
-                      Nợ quá hạn
-                    </Text>
-                    <Text type="large" weight="bold" hasTabularNumbers>
+                  <div className="flex flex-col gap-1">
+                    <Text variant="supporting">Nợ quá hạn</Text>
+                    <Text variant="large" className="font-bold tabular-nums">
                       {formatCurrency(summary.overdueReceivable)}
                     </Text>
-                  </VStack>
+                  </div>
                 </Card>
-              </Grid>
+              </div>
             )}
 
             {/* Tabs */}
-            <TabList
-              value={activeTab}
-              onChange={(value) => setActiveTab(value as DetailTab)}
-              hasDivider
-            >
-              <Tab value="info" label="Thông tin chi tiết" />
-              <Tab value="orders" label="Đơn bán hàng" />
-              <Tab value="invoices" label="Hóa đơn" />
-              <Tab value="receivables" label="Sổ công nợ" />
-            </TabList>
+            <Tabs value={activeTab} onChange={(value) => setActiveTab(value as DetailTab)}>
+              <TabList className="border-b border-border">
+                <Tab value="info" label="Thông tin chi tiết" />
+                <Tab value="orders" label="Đơn bán hàng" />
+                <Tab value="invoices" label="Hóa đơn" />
+                <Tab value="receivables" label="Sổ công nợ" />
+              </TabList>
 
-            {/* Tab Content */}
-            {activeTab === 'info' && (
-              <Card>
-                <MetadataList columns={2}>
-                  <MetadataListItem label="Mã số thuế">{customer.ma_so_thue || 'Chưa cập nhật'}</MetadataListItem>
-                  <MetadataListItem label="Số điện thoại">{customer.so_dien_thoai}</MetadataListItem>
-                  <MetadataListItem label="Email">{customer.email || 'Chưa cập nhật'}</MetadataListItem>
-                  <MetadataListItem label="Người liên hệ">{customer.nguoi_lien_he || 'Chưa cập nhật'}</MetadataListItem>
-                  <MetadataListItem label="Địa chỉ">
-                    {customer.dia_chi}, {customer.tinh_thanh_pho}
-                  </MetadataListItem>
-                  <MetadataListItem label="Hạn mức công nợ được cấp">
-                    <Text as="span" weight="semibold" hasTabularNumbers>
-                      {formatCurrency(customer.han_muc_cong_no)}
-                    </Text>
-                  </MetadataListItem>
-                  <MetadataListItem label="Thời hạn nợ tối đa">{customer.so_ngay_cong_no} ngày</MetadataListItem>
-                  <MetadataListItem label="Trạng thái">
-                    <StatusBadge status={customer.trang_thai} />
-                  </MetadataListItem>
-                  <MetadataListItem label="Ghi chú nội bộ">
-                    {customer.ghi_chu || 'Không có ghi chú'}
-                  </MetadataListItem>
-                </MetadataList>
-              </Card>
-            )}
+              {/* Tab Content */}
+              <TabPanel value="info">
+                <Card>
+                  <MetadataList columns={2}>
+                    <MetadataListItem label="Mã số thuế">{customer.ma_so_thue || 'Chưa cập nhật'}</MetadataListItem>
+                    <MetadataListItem label="Số điện thoại">{customer.so_dien_thoai}</MetadataListItem>
+                    <MetadataListItem label="Email">{customer.email || 'Chưa cập nhật'}</MetadataListItem>
+                    <MetadataListItem label="Người liên hệ">{customer.nguoi_lien_he || 'Chưa cập nhật'}</MetadataListItem>
+                    <MetadataListItem label="Địa chỉ">
+                      {customer.dia_chi}, {customer.tinh_thanh_pho}
+                    </MetadataListItem>
+                    <MetadataListItem label="Hạn mức công nợ được cấp">
+                      <Text as="span" className="font-semibold tabular-nums">
+                        {formatCurrency(customer.han_muc_cong_no)}
+                      </Text>
+                    </MetadataListItem>
+                    <MetadataListItem label="Thời hạn nợ tối đa">{customer.so_ngay_cong_no} ngày</MetadataListItem>
+                    <MetadataListItem label="Trạng thái">
+                      <StatusBadge status={customer.trang_thai} />
+                    </MetadataListItem>
+                    <MetadataListItem label="Ghi chú nội bộ">
+                      {customer.ghi_chu || 'Không có ghi chú'}
+                    </MetadataListItem>
+                  </MetadataList>
+                </Card>
+              </TabPanel>
 
-            {activeTab === 'orders' && (
-              <EmptyState
-                title="Đơn bán hàng của khách"
-                description="Danh sách đơn hàng liên kết sẽ hiển thị khi phân hệ Đơn bán hàng (P5) được hoàn thiện."
-              />
-            )}
+              <TabPanel value="orders">
+                <EmptyState
+                  title="Đơn bán hàng của khách"
+                  description="Danh sách đơn hàng liên kết sẽ hiển thị khi phân hệ Đơn bán hàng (P5) được hoàn thiện."
+                />
+              </TabPanel>
 
-            {activeTab === 'invoices' && (
-              <EmptyState
-                title="Hóa đơn bán hàng"
-                description="Danh sách hóa đơn liên kết sẽ hiển thị khi phân hệ Hóa đơn (P7) được hoàn thiện."
-              />
-            )}
+              <TabPanel value="invoices">
+                <EmptyState
+                  title="Hóa đơn bán hàng"
+                  description="Danh sách hóa đơn liên kết sẽ hiển thị khi phân hệ Hóa đơn (P7) được hoàn thiện."
+                />
+              </TabPanel>
 
-            {activeTab === 'receivables' && (
-              <VStack gap={4} width="100%">
-                <Banner status="info" title="Chỉ đọc — ghi nhận thanh toán thuộc Kế toán." />
+              <TabPanel value="receivables">
+                <div className="flex w-full flex-col gap-4">
+                  <Banner status="info" title="Chỉ đọc — ghi nhận thanh toán thuộc Kế toán." />
 
-                <AsyncPanel
-                  isLoading={!receivablesError && (receivablesLoading || receivablesLoadedFor !== customerId)}
-                  error={receivablesError}
-                  isEmpty={
-                    !receivablesError &&
-                    !receivablesLoading &&
-                    receivablesLoadedFor === customerId &&
-                    receivables.length === 0
-                  }
-                  loadingMessage="Đang tải sổ công nợ..."
-                  onRetry={() => setReceivablesReloadKey((k) => k + 1)}
-                  emptyTitle="Không có công nợ phải thu"
-                  emptyDescription="Khách hàng này hiện không có khoản công nợ phải thu nào."
-                >
-                  <VStack gap={4} width="100%">
-                    {receivableSummary && (
-                      <Grid columns={{ minWidth: 180 }} gap={3}>
-                        <Card>
-                          <VStack gap={1}>
-                            <Text type="supporting" color="secondary">
-                              Phát sinh
-                            </Text>
-                            <Text type="large" weight="bold" hasTabularNumbers>
-                              {formatCurrency(receivableSummary.totalOriginal)}
-                            </Text>
-                          </VStack>
-                        </Card>
-                        <Card>
-                          <VStack gap={1}>
-                            <Text type="supporting" color="secondary">
-                              Đã thu
-                            </Text>
-                            <Text type="large" weight="bold" hasTabularNumbers>
-                              {formatCurrency(receivableSummary.totalPaid)}
-                            </Text>
-                          </VStack>
-                        </Card>
-                        <Card>
-                          <VStack gap={1}>
-                            <Text type="supporting" color="secondary">
-                              Còn lại
-                            </Text>
-                            <Text type="large" weight="bold" hasTabularNumbers>
-                              {formatCurrency(receivableSummary.totalOutstanding)}
-                            </Text>
-                          </VStack>
-                        </Card>
-                        <Card>
-                          <VStack gap={1}>
-                            <Text type="supporting" color="secondary">
-                              Quá hạn
-                            </Text>
-                            <Text type="large" weight="bold" hasTabularNumbers>
-                              {formatCurrency(receivableSummary.totalOverdue)}
-                            </Text>
-                            <Text type="supporting" color="secondary">
-                              {receivableSummary.overdueCount} khoản quá hạn
-                            </Text>
-                          </VStack>
-                        </Card>
-                      </Grid>
-                    )}
+                  <AsyncPanel
+                    isLoading={!receivablesError && (receivablesLoading || receivablesLoadedFor !== customerId)}
+                    error={receivablesError}
+                    isEmpty={
+                      !receivablesError &&
+                      !receivablesLoading &&
+                      receivablesLoadedFor === customerId &&
+                      receivables.length === 0
+                    }
+                    loadingMessage="Đang tải sổ công nợ..."
+                    onRetry={() => setReceivablesReloadKey((k) => k + 1)}
+                    emptyTitle="Không có công nợ phải thu"
+                    emptyDescription="Khách hàng này hiện không có khoản công nợ phải thu nào."
+                  >
+                    <div className="flex w-full flex-col gap-4">
+                      {receivableSummary && (
+                        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+                          <Card>
+                            <div className="flex flex-col gap-1">
+                              <Text variant="supporting">Phát sinh</Text>
+                              <Text variant="large" className="font-bold tabular-nums">
+                                {formatCurrency(receivableSummary.totalOriginal)}
+                              </Text>
+                            </div>
+                          </Card>
+                          <Card>
+                            <div className="flex flex-col gap-1">
+                              <Text variant="supporting">Đã thu</Text>
+                              <Text variant="large" className="font-bold tabular-nums">
+                                {formatCurrency(receivableSummary.totalPaid)}
+                              </Text>
+                            </div>
+                          </Card>
+                          <Card>
+                            <div className="flex flex-col gap-1">
+                              <Text variant="supporting">Còn lại</Text>
+                              <Text variant="large" className="font-bold tabular-nums">
+                                {formatCurrency(receivableSummary.totalOutstanding)}
+                              </Text>
+                            </div>
+                          </Card>
+                          <Card>
+                            <div className="flex flex-col gap-1">
+                              <Text variant="supporting">Quá hạn</Text>
+                              <Text variant="large" className="font-bold tabular-nums">
+                                {formatCurrency(receivableSummary.totalOverdue)}
+                              </Text>
+                              <Text variant="supporting">
+                                {receivableSummary.overdueCount} khoản quá hạn
+                              </Text>
+                            </div>
+                          </Card>
+                        </div>
+                      )}
 
-                    <Card padding={0}>
-                      <Table
-                        data={receivableRows}
-                        columns={receivableColumns}
-                        idKey="id"
-                        hasHover
-                      />
-                      <HStack gap={1} paddingBlock={3} paddingInline={4} wrap="wrap">
-                        <Text type="supporting" color="secondary">
-                          Hiển thị {receivables.length}/{receivablesTotal} khoản công nợ phải thu
-                          {receivablesTotal > receivables.length && ' — xem đầy đủ tại trang Sổ công nợ.'}
-                        </Text>
-                      </HStack>
-                    </Card>
-                  </VStack>
-                </AsyncPanel>
-              </VStack>
-            )}
-          </VStack>
+                      <Card className="p-0">
+                        <Table
+                          data={receivableRows}
+                          columns={receivableColumns}
+                          idKey="id"
+                          hasHover
+                        />
+                        <div className="flex flex-wrap gap-1 px-4 py-3">
+                          <Text variant="supporting">
+                            Hiển thị {receivables.length}/{receivablesTotal} khoản công nợ phải thu
+                            {receivablesTotal > receivables.length && ' — xem đầy đủ tại trang Sổ công nợ.'}
+                          </Text>
+                        </div>
+                      </Card>
+                    </div>
+                  </AsyncPanel>
+                </div>
+              </TabPanel>
+            </Tabs>
+          </div>
         ) : null}
       </AsyncPanel>
 

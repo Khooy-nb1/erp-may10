@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+
+/*
+ * Single source of truth for the product's visual tokens. Tailwind v4 is
+ * CSS-first: every `--color-*` entry below generates the matching `bg-*`,
+ * `text-*` and `border-*` utilities, `--radius-*` generates `rounded-*`, and
+ * `--shadow-*` generates `shadow-*`. There is no tailwind.config.js.
+ */
+@theme {
+  /* Surfaces */
+  --color-background: #f4f7fb;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-border: #e4e7ec;
+  --color-border-strong: #cbd5e1;
+
+  /* Text */
+  --color-foreground: #0f172a;
+  --color-muted-foreground: #475569;
+  --color-subtle-foreground: #94a3b8;
+
+  /* Brand */
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-soft: #eff6ff;
+  --color-ring: #2563eb;
+
+  /* Semantic — base, soft (fill) and strong (text on soft) per status */
+  --color-success: #16a34a;
+  --color-success-soft: #f0fdf4;
+  --color-success-strong: #15803d;
+  --color-warning: #d97706;
+  --color-warning-soft: #fffbeb;
+  --color-warning-strong: #b45309;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+  --color-danger-strong: #b91c1c;
+  --color-info: #0284c7;
+  --color-info-soft: #f0f9ff;
+  --color-info-strong: #0369a1;
+
+  /* Radius */
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+
+  /* Shadows — near-flat, the references never use a heavy drop shadow */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-raised: 0 4px 12px -2px rgb(15 23 42 / 0.08);
+
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}

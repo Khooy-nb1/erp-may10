@@ -1,25 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { ArrowLeft, Check, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { Order } from '../../types/order.js';
 import { getOrderById, confirmOrder, cancelOrder } from '../../services/orderService.js';
 import { useAuth } from '../../context/AuthContext.js';
 import { ApiError } from '../../services/api.js';
-import { Card } from '@astryxdesign/core/Card';
-import { VStack, HStack } from '@astryxdesign/core/Stack';
-import { Grid, GridSpan } from '@astryxdesign/core/Grid';
-import { Heading, Text } from '@astryxdesign/core/Text';
-import { Button } from '@astryxdesign/core/Button';
-import { Banner } from '@astryxdesign/core/Banner';
-import { Link } from '@astryxdesign/core/Link';
-import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList';
-import { Table, TableColumn, proportional } from '@astryxdesign/core/Table';
-import { Dialog } from '@astryxdesign/core/Dialog';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { useToast } from '@astryxdesign/core/Toast';
-import { ArrowLeft, Check, X } from 'lucide-react';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { AsyncPanel } from '../../components/common/AsyncPanel.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
+import { Banner } from '../../components/ui/Banner.js';
+import { Button } from '../../components/ui/Button.js';
+import { Card } from '../../components/ui/Card.js';
+import { Dialog } from '../../components/ui/Dialog.js';
+import { Input } from '../../components/ui/Input.js';
+import { MetadataList, MetadataListItem } from '../../components/ui/MetadataList.js';
+import { Table, TableColumn, proportional } from '../../components/ui/Table.js';
+import { Heading, Text } from '../../components/ui/Typography.js';
+import { TextLink } from '../../components/ui/TextLink.js';
 
 type OrderLine = NonNullable<Order['lines']>[number];
 
@@ -44,7 +42,6 @@ export const SalesOrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const orderId = Number(id);
   const { user } = useAuth();
-  const toast = useToast();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -86,10 +83,10 @@ export const SalesOrderDetailPage: React.FC = () => {
         if (err.details && err.details.some((d) => d.field === 'acknowledgeCreditLimit')) {
           setCreditWarning(err.message);
         } else {
-          toast({ body: err.message, type: 'error' });
+          toast.error(err.message);
         }
       } else {
-        toast({ body: err instanceof Error ? err.message : 'Xác nhận đơn hàng thất bại', type: 'error' });
+        toast.error(err instanceof Error ? err.message : 'Xác nhận đơn hàng thất bại');
       }
     } finally {
       setActionLoading(false);
@@ -106,7 +103,7 @@ export const SalesOrderDetailPage: React.FC = () => {
       const cancelled = await cancelOrder(orderId, reason.trim());
       setOrder(cancelled);
     } catch (err) {
-      toast({ body: err instanceof Error ? err.message : 'Hủy đơn hàng thất bại', type: 'error' });
+      toast.error(err instanceof Error ? err.message : 'Hủy đơn hàng thất bại');
     } finally {
       setActionLoading(false);
       setCancelOpen(false);
@@ -152,32 +149,35 @@ export const SalesOrderDetailPage: React.FC = () => {
         { label: order?.ma_don_ban ?? 'Chi tiết' },
       ]}
       actions={
-        <HStack gap={2} wrap="wrap">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
             icon={<ArrowLeft size={16} aria-hidden />}
-            label="Danh sách đơn"
             href="/sales-orders"
-          />
+          >
+            Danh sách đơn
+          </Button>
           {isSales && isPending && (
             <Button
               variant="primary"
               icon={<Check size={16} aria-hidden />}
-              label="Xác nhận đơn hàng"
-              isDisabled={actionLoading}
+              disabled={actionLoading}
               onClick={() => handleConfirm(false)}
-            />
+            >
+              Xác nhận đơn hàng
+            </Button>
           )}
           {(isPending || (isConfirmed && isAdmin)) && (
             <Button
               variant="secondary"
               icon={<X size={16} aria-hidden />}
-              label="Hủy đơn hàng"
-              isDisabled={actionLoading}
+              disabled={actionLoading}
               onClick={() => setCancelOpen(true)}
-            />
+            >
+              Hủy đơn hàng
+            </Button>
           )}
-        </HStack>
+        </div>
       }
     >
       <AsyncPanel
@@ -190,40 +190,41 @@ export const SalesOrderDetailPage: React.FC = () => {
         onRetry={fetchOrder}
       >
         {order && (
-          <VStack gap={5}>
+          <div className="flex flex-col gap-5">
             {creditWarning && (
               <Banner
                 status="warning"
                 title="Cảnh báo vượt hạn mức tín dụng khách hàng"
                 description={creditWarning}
-                collapsible={false}
                 endContent={
-                  <HStack gap={2}>
+                  <div className="flex flex-row gap-2">
                     <Button
                       variant="primary"
-                      label="Tôi xác nhận duyệt đơn vượt hạn mức"
                       onClick={() => handleConfirm(true)}
-                    />
+                    >
+                      Tôi xác nhận duyệt đơn vượt hạn mức
+                    </Button>
                     <Button
                       variant="secondary"
-                      label="Hủy"
                       onClick={() => setCreditWarning(null)}
-                    />
-                  </HStack>
+                    >
+                      Hủy
+                    </Button>
+                  </div>
                 }
               />
             )}
 
-            <Grid columns={3} gap={4}>
-              <GridSpan columns={2}>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="sm:col-span-2">
                 <Card>
-                  <VStack gap={4}>
+                  <div className="flex flex-col gap-4">
                     <Heading level={3}>Thông tin giao nhận &amp; Khách hàng</Heading>
                     <MetadataList columns={2}>
                       <MetadataListItem label="Khách hàng">
-                        <Link href={`/customers/${order.ma_khach_hang}`}>
+                        <TextLink to={`/customers/${order.ma_khach_hang}`}>
                           {order.ten_khach_hang || `Mã #${order.ma_khach_hang}`}
-                        </Link>
+                        </TextLink>
                       </MetadataListItem>
                       <MetadataListItem label="Trạng thái đơn">
                         <StatusBadge status={order.trang_thai} label={STATUS_LABELS[order.trang_thai]} />
@@ -244,45 +245,45 @@ export const SalesOrderDetailPage: React.FC = () => {
                         {order.ghi_chu || 'Không có ghi chú'}
                       </MetadataListItem>
                     </MetadataList>
-                  </VStack>
+                  </div>
                 </Card>
-              </GridSpan>
+              </div>
 
               <Card>
-                <VStack gap={4}>
+                <div className="flex flex-col gap-4">
                   <Heading level={3}>Tổng kết thanh toán</Heading>
-                  <VStack gap={2}>
-                    <HStack hAlign="between">
-                      <Text type="supporting">Tiền hàng:</Text>
-                      <Text type="body" hasTabularNumbers>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-row justify-between">
+                      <Text variant="supporting">Tiền hàng:</Text>
+                      <Text variant="body" className="tabular-nums">
                         {formatCurrency(order.tong_tien_hang)}
                       </Text>
-                    </HStack>
-                    <HStack hAlign="between">
-                      <Text type="supporting">Giảm giá:</Text>
-                      <Text type="body" hasTabularNumbers>
+                    </div>
+                    <div className="flex flex-row justify-between">
+                      <Text variant="supporting">Giảm giá:</Text>
+                      <Text variant="body" className="tabular-nums">
                         - {formatCurrency(order.tien_giam_gia)}
                       </Text>
-                    </HStack>
-                    <HStack hAlign="between">
-                      <Text type="supporting">Tiền thuế:</Text>
-                      <Text type="body" hasTabularNumbers>
+                    </div>
+                    <div className="flex flex-row justify-between">
+                      <Text variant="supporting">Tiền thuế:</Text>
+                      <Text variant="body" className="tabular-nums">
                         {formatCurrency(order.tien_thue)}
                       </Text>
-                    </HStack>
-                  </VStack>
-                  <HStack hAlign="between" vAlign="center">
-                    <Text type="label">Tổng thanh toán:</Text>
-                    <Text type="label" hasTabularNumbers>
+                    </div>
+                  </div>
+                  <div className="flex flex-row items-center justify-between">
+                    <Text variant="label">Tổng thanh toán:</Text>
+                    <Text variant="label" className="tabular-nums">
                       {formatCurrency(order.tong_thanh_toan)}
                     </Text>
-                  </HStack>
-                </VStack>
+                  </div>
+                </div>
               </Card>
-            </Grid>
+            </div>
 
             <Card>
-              <VStack gap={4}>
+              <div className="flex flex-col gap-4">
                 <Heading level={3}>
                   Chi tiết sản phẩm đặt hàng ({order.lines?.length || 0} sản phẩm)
                 </Heading>
@@ -345,9 +346,9 @@ export const SalesOrderDetailPage: React.FC = () => {
                     ] satisfies TableColumn<OrderLineRow>[]}
                   />
                 </AsyncPanel>
-              </VStack>
+              </div>
             </Card>
-          </VStack>
+          </div>
         )}
       </AsyncPanel>
 
@@ -355,34 +356,33 @@ export const SalesOrderDetailPage: React.FC = () => {
         isOpen={cancelOpen}
         onOpenChange={setCancelOpen}
         purpose="form"
-        width={440}
+        title="Hủy đơn hàng"
       >
-        <VStack gap={4}>
-          <Text as="h2" type="large" weight="semibold">
-            Hủy đơn hàng
-          </Text>
-          <TextInput
+        <div className="flex flex-col gap-4">
+          <Input
             label="Nhập lý do hủy đơn hàng:"
             value={cancelReason}
             onChange={setCancelReason}
-            isDisabled={actionLoading}
+            disabled={actionLoading}
           />
-          <HStack gap={2} hAlign="end">
+          <div className="flex flex-row justify-end gap-2">
             <Button
               variant="secondary"
-              label="Đóng"
-              isDisabled={actionLoading}
+              disabled={actionLoading}
               onClick={() => setCancelOpen(false)}
-            />
+            >
+              Đóng
+            </Button>
             <Button
               variant="destructive"
-              label="Hủy đơn hàng"
-              isDisabled={!cancelReason.trim() || actionLoading}
-              isLoading={actionLoading}
+              disabled={!cancelReason.trim() || actionLoading}
+              loading={actionLoading}
               onClick={() => handleCancel(cancelReason)}
-            />
-          </HStack>
-        </VStack>
+            >
+              Hủy đơn hàng
+            </Button>
+          </div>
+        </div>
       </Dialog>
     </PageScaffold>
   );

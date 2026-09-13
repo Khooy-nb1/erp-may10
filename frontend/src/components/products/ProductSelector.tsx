@@ -1,17 +1,11 @@
-import React, { useCallback, useMemo, useRef } from 'react';
-import { Typeahead } from '@astryxdesign/core/Typeahead';
-import { TypeaheadItem } from '@astryxdesign/core/Typeahead';
-import type { SearchableItem, SearchSource } from '@astryxdesign/core/Typeahead';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Combobox, type ComboboxItem } from '../ui/Combobox.js';
 import { Product } from '../../types/product.js';
 import { getProducts } from '../../services/productService.js';
 
 interface ProductSelectorProps {
   onSelect: (product: Product) => void;
   disabled?: boolean;
-}
-
-interface ProductSearchItem extends SearchableItem {
-  auxiliaryData: { product: Product };
 }
 
 /** Display label: mã + tên, with size/colour when the product carries them. */
@@ -26,72 +20,78 @@ function describeProduct(product: Product): string {
  * caller so pricing and unit data stay authoritative on the server.
  */
 export const ProductSelector: React.FC<ProductSelectorProps> = ({ onSelect, disabled = false }) => {
+  const [items, setItems] = useState<ComboboxItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const debounceRef = useRef<number | null>(null);
+  const productsById = useRef(new Map<string, Product>());
 
-  const searchSource = useMemo<SearchSource<ProductSearchItem>>(
-    () => ({
-      search: async (query: string) => {
+  const runSearch = useCallback(async (query: string) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsLoading(true);
+
+    try {
+      const res = await getProducts({
+        search: query.trim(),
+        trang_thai: 'dang_ban', // Strictly sellable only
+        pageSize: 10,
+      });
+      if (controller.signal.aborted) return;
+      for (const product of res.products) productsById.current.set(String(product.id), product);
+      setItems(
+        res.products.map((product) => ({
+          id: String(product.id),
+          label: describeProduct(product),
+          description: describeProduct(product).replace(`${product.ma_san_pham} — `, ''),
+        }))
+      );
+    } catch {
+      if (!controller.signal.aborted) setItems([]);
+    } finally {
+      if (!controller.signal.aborted) setIsLoading(false);
+    }
+  }, []);
+
+  const handleSearch = useCallback(
+    (query: string) => {
+      if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
+      if (query.trim() === '') {
         abortRef.current?.abort();
-        const controller = new AbortController();
-        abortRef.current = controller;
+        setItems([]);
+        setIsLoading(false);
+        return;
+      }
+      debounceRef.current = window.setTimeout(() => {
+        void runSearch(query);
+      }, 300);
+    },
+    [runSearch]
+  );
 
-        try {
-          const res = await getProducts({
-            search: query.trim(),
-            trang_thai: 'dang_ban', // Strictly sellable only
-            pageSize: 10,
-          });
-          if (controller.signal.aborted) return [];
-          return res.products.map(toSearchItem);
-        } catch {
-          return [];
-        }
-      },
-      bootstrap: () => [],
-      cancel: () => abortRef.current?.abort(),
-    }),
+  useEffect(
+    () => () => {
+      if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    },
     []
   );
 
-  const handleChange = useCallback(
-    (item: ProductSearchItem | null) => {
-      if (!item) return;
-      onSelect(item.auxiliaryData.product);
-    },
-    [onSelect]
-  );
-
   return (
-    <Typeahead<ProductSearchItem>
+    <Combobox
       label="Tìm sản phẩm"
       placeholder="Gõ mã hoặc tên sản phẩm để tìm kiếm..."
-      searchSource={searchSource}
-      value={null}
-      onChange={handleChange}
-      hasClear={false}
-      maxMenuItems={10}
-      minQueryLength={1}
-      debounceMs={300}
-      isDisabled={disabled}
-      emptySearchResultsText="Không tìm thấy sản phẩm phù hợp."
-      width="100%"
-      renderItem={(item) => {
-        const product = item.auxiliaryData.product;
-        return (
-          <TypeaheadItem
-            item={item}
-            description={describeProduct(product).replace(`${product.ma_san_pham} — `, '')}
-          />
-        );
+      items={items}
+      isLoading={isLoading}
+      onSearch={handleSearch}
+      disabled={disabled}
+      emptyMessage="Không tìm thấy sản phẩm phù hợp."
+      onSelect={(item) => {
+        const product = productsById.current.get(item.id);
+        if (product) onSelect(product);
       }}
+      className="w-full"
     />
   );
 };
-
-function toSearchItem(product: Product): ProductSearchItem {
-  return {
-    id: String(product.id),
-    label: describeProduct(product),
-    auxiliaryData: { product },
-  };
-}

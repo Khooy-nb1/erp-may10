@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { HStack } from '@astryxdesign/core/Stack';
-import { Text } from '@astryxdesign/core/Text';
-import { Button } from '@astryxdesign/core/Button';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { Selector } from '@astryxdesign/core/Selector';
-import { Link } from '@astryxdesign/core/Link';
-import { proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
+import { Text } from '../../components/ui/Typography.js';
+import { Button } from '../../components/ui/Button.js';
+import { Input } from '../../components/ui/Input.js';
+import { Select } from '../../components/ui/Select.js';
+import { TextLink } from '../../components/ui/TextLink.js';
+import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
 import { Invoice, InvoiceStatus } from '../../types/invoice.js';
 import { getInvoices } from '../../services/invoiceService.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
@@ -55,9 +54,9 @@ const columns: TableColumn<InvoiceRow>[] = [
     header: 'Mã hóa đơn',
     width: proportional(1),
     renderCell: (item) => (
-      <Link href={`/invoices/${item.id}`} weight="semibold">
+      <TextLink to={`/invoices/${item.id}`} weight="semibold">
         {item.ma_hoa_don}
-      </Link>
+      </TextLink>
     ),
   },
   {
@@ -65,9 +64,9 @@ const columns: TableColumn<InvoiceRow>[] = [
     header: 'Đơn bán hàng',
     width: proportional(1),
     renderCell: (item) => (
-      <Link href={`/sales-orders/${item.ma_don_ban_hang}`}>
+      <TextLink to={`/sales-orders/${item.ma_don_ban_hang}`}>
         {item.ma_don_ban || `Đơn #${item.ma_don_ban_hang}`}
-      </Link>
+      </TextLink>
     ),
   },
   {
@@ -80,13 +79,13 @@ const columns: TableColumn<InvoiceRow>[] = [
     key: 'ngay_xuat_hoa_don',
     header: 'Ngày xuất',
     width: pixel(120),
-    renderCell: (item) => <Text type="supporting">{formatDate(item.ngay_xuat_hoa_don)}</Text>,
+    renderCell: (item) => <Text variant="supporting">{formatDate(item.ngay_xuat_hoa_don)}</Text>,
   },
   {
     key: 'ngay_dao_han',
     header: 'Ngày đáo hạn',
     width: pixel(130),
-    renderCell: (item) => <Text type="supporting">{formatDate(item.ngay_dao_han)}</Text>,
+    renderCell: (item) => <Text variant="supporting">{formatDate(item.ngay_dao_han)}</Text>,
   },
   {
     key: 'tong_tien_sau_thue',
@@ -94,7 +93,7 @@ const columns: TableColumn<InvoiceRow>[] = [
     width: pixel(160),
     align: 'end',
     renderCell: (item) => (
-      <Text type="label" hasTabularNumbers>
+      <Text variant="label" className="tabular-nums">
         {formatCurrency(item.tong_tien_sau_thue)}
       </Text>
     ),
@@ -104,7 +103,7 @@ const columns: TableColumn<InvoiceRow>[] = [
     header: 'Đã thu',
     width: pixel(150),
     align: 'end',
-    renderCell: (item) => <Text hasTabularNumbers>{formatCurrency(item.so_tien_da_thu)}</Text>,
+    renderCell: (item) => <Text className="tabular-nums">{formatCurrency(item.so_tien_da_thu)}</Text>,
   },
   {
     key: 'trang_thai',
@@ -119,9 +118,9 @@ const columns: TableColumn<InvoiceRow>[] = [
     width: pixel(110),
     align: 'end',
     renderCell: (item) => (
-      <Link href={`/invoices/${item.id}`} weight="medium">
+      <TextLink to={`/invoices/${item.id}`} weight="medium">
         Chi tiết
-      </Link>
+      </TextLink>
     ),
   },
 ];
@@ -177,7 +176,9 @@ export const InvoiceListPage: React.FC = () => {
       subtitle={`Theo dõi xuất hóa đơn và tình trạng thanh toán (${total} hóa đơn)`}
       actions={
         canCreateInvoice ? (
-          <Button label="Xuất hóa đơn mới" variant="primary" icon={<Plus size={16} />} href="/invoices/new" />
+          <Button variant="primary" icon={<Plus size={16} />} href="/invoices/new">
+            Xuất hóa đơn mới
+          </Button>
         ) : undefined
       }
     >
@@ -196,20 +197,20 @@ export const InvoiceListPage: React.FC = () => {
         rowCount={total}
         toolbar={
           <form onSubmit={handleSearchSubmit}>
-            <HStack gap={2} vAlign="end" wrap="wrap">
-              <TextInput
+            <div className="flex flex-row flex-wrap items-end gap-2">
+              <Input
                 label="Tìm kiếm hóa đơn"
                 placeholder="Tìm theo mã hóa đơn hoặc tên khách hàng..."
                 value={search}
                 onChange={setSearch}
-                width={320}
+                className="w-80"
               />
-              <Button type="submit" label="Tìm kiếm" variant="secondary" />
-            </HStack>
+              <Button type="submit" variant="secondary">Tìm kiếm</Button>
+            </div>
           </form>
         }
         toolbarEnd={
-          <Selector
+          <Select
             label="Trạng thái"
             options={TRANG_THAI_OPTIONS}
             value={trangThai}
@@ -217,7 +218,7 @@ export const InvoiceListPage: React.FC = () => {
               setTrangThai(value as InvoiceStatus | '');
               setPage(1);
             }}
-            width={190}
+            className="w-48"
           />
         }
       />

@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { HStack } from '@astryxdesign/core/Stack';
-import { Text } from '@astryxdesign/core/Text';
-import { Button } from '@astryxdesign/core/Button';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { Selector } from '@astryxdesign/core/Selector';
-import { Link } from '@astryxdesign/core/Link';
-import { proportional, pixel, type TableColumn } from '@astryxdesign/core/Table';
+import { Text } from '../../components/ui/Typography.js';
+import { Button } from '../../components/ui/Button.js';
+import { Input } from '../../components/ui/Input.js';
+import { Select } from '../../components/ui/Select.js';
+import { TextLink } from '../../components/ui/TextLink.js';
+import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
 import { Order, OrderStatus } from '../../types/order.js';
 import { getOrders } from '../../services/orderService.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
@@ -58,9 +57,9 @@ const columns: TableColumn<OrderRow>[] = [
     header: 'Mã đơn',
     width: proportional(1),
     renderCell: (item) => (
-      <Link href={`/sales-orders/${item.id}`} weight="semibold">
+      <TextLink to={`/sales-orders/${item.id}`} weight="semibold">
         {item.ma_don_ban}
-      </Link>
+      </TextLink>
     ),
   },
   {
@@ -68,20 +67,20 @@ const columns: TableColumn<OrderRow>[] = [
     header: 'Khách hàng',
     width: proportional(2),
     renderCell: (item) => (
-      <Text type="label">{item.ten_khach_hang || `Khách #${item.ma_khach_hang}`}</Text>
+      <Text variant="label">{item.ten_khach_hang || `Khách #${item.ma_khach_hang}`}</Text>
     ),
   },
   {
     key: 'ngay_dat_hang',
     header: 'Ngày đặt',
     width: pixel(120),
-    renderCell: (item) => <Text type="supporting">{formatDate(item.ngay_dat_hang)}</Text>,
+    renderCell: (item) => <Text variant="supporting">{formatDate(item.ngay_dat_hang)}</Text>,
   },
   {
     key: 'ngay_giao_hang_yc',
     header: 'Hạn giao',
     width: pixel(120),
-    renderCell: (item) => <Text type="supporting">{formatDate(item.ngay_giao_hang_yc)}</Text>,
+    renderCell: (item) => <Text variant="supporting">{formatDate(item.ngay_giao_hang_yc)}</Text>,
   },
   {
     key: 'tong_thanh_toan',
@@ -89,7 +88,7 @@ const columns: TableColumn<OrderRow>[] = [
     width: pixel(160),
     align: 'end',
     renderCell: (item) => (
-      <Text type="label" hasTabularNumbers>
+      <Text variant="label" className="tabular-nums">
         {formatCurrency(item.tong_thanh_toan)}
       </Text>
     ),
@@ -98,7 +97,7 @@ const columns: TableColumn<OrderRow>[] = [
     key: 'ten_nguoi_ban',
     header: 'Người bán',
     width: proportional(1),
-    renderCell: (item) => <Text type="supporting">{item.ten_nguoi_ban || '—'}</Text>,
+    renderCell: (item) => <Text variant="supporting">{item.ten_nguoi_ban || '—'}</Text>,
   },
   {
     key: 'trang_thai',
@@ -115,9 +114,9 @@ const columns: TableColumn<OrderRow>[] = [
     width: pixel(110),
     align: 'end',
     renderCell: (item) => (
-      <Link href={`/sales-orders/${item.id}`} weight="medium">
+      <TextLink to={`/sales-orders/${item.id}`} weight="medium">
         Chi tiết
-      </Link>
+      </TextLink>
     ),
   },
 ];
@@ -171,11 +170,12 @@ export const SalesOrderListPage: React.FC = () => {
       subtitle={`Theo dõi và xử lý đơn hàng (${total} đơn hàng)`}
       actions={
         <Button
-          label="Tạo đơn hàng mới"
           variant="primary"
           icon={<Plus size={16} />}
           href="/sales-orders/new"
-        />
+        >
+          Tạo đơn hàng mới
+        </Button>
       }
     >
       <DataTableCard<OrderRow>
@@ -193,20 +193,20 @@ export const SalesOrderListPage: React.FC = () => {
         rowCount={total}
         toolbar={
           <form onSubmit={handleSearchSubmit}>
-            <HStack gap={2} vAlign="end" wrap="wrap">
-              <TextInput
+            <div className="flex flex-row flex-wrap items-end gap-2">
+              <Input
                 label="Tìm kiếm đơn hàng"
                 placeholder="Tìm theo mã đơn hàng hoặc tên khách..."
                 value={search}
                 onChange={setSearch}
-                width={320}
+                className="w-80"
               />
-              <Button type="submit" label="Tìm kiếm" variant="secondary" />
-            </HStack>
+              <Button type="submit" variant="secondary">Tìm kiếm</Button>
+            </div>
           </form>
         }
         toolbarEnd={
-          <Selector
+          <Select
             label="Trạng thái"
             options={TRANG_THAI_OPTIONS}
             value={trangThai}
@@ -214,7 +214,7 @@ export const SalesOrderListPage: React.FC = () => {
               setTrangThai(value as OrderStatus | '');
               setPage(1);
             }}
-            width={190}
+            className="w-48"
           />
         }
       />

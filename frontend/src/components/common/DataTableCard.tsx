@@ -1,9 +1,7 @@
 import React from 'react';
-import { Card } from '@astryxdesign/core/Card';
-import { VStack } from '@astryxdesign/core/Stack';
-import { Toolbar } from '@astryxdesign/core/Toolbar';
-import { Table, type TableColumn } from '@astryxdesign/core/Table';
-import { Pagination } from '@astryxdesign/core/Pagination';
+import { Card } from '../ui/Card.js';
+import { Table, type TableColumn } from '../ui/Table.js';
+import { Pagination } from '../ui/Pagination.js';
 import { AsyncPanel } from './AsyncPanel.js';
 
 export interface DataTableCardProps<T extends Record<string, unknown>> {
@@ -66,11 +64,18 @@ export function DataTableCard<T extends Record<string, unknown>>({
   rowCount,
 }: DataTableCardProps<T>) {
   return (
-    <VStack gap={4} width="100%">
-      <Card padding={0}>
-        <VStack gap={0}>
+    <div className="flex w-full flex-col gap-4">
+      <Card className="overflow-hidden p-0">
+        <div className="flex flex-col">
           {toolbar || toolbarEnd ? (
-            <Toolbar label={label} startContent={toolbar} endContent={toolbarEnd} dividers={['bottom']} gap={2} />
+            <div
+              role="group"
+              aria-label={label}
+              className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4"
+            >
+              <div className="flex flex-wrap items-center gap-2">{toolbar}</div>
+              <div className="flex flex-wrap items-center gap-2">{toolbarEnd}</div>
+            </div>
           ) : null}
           <AsyncPanel
             isLoading={isLoading}
@@ -87,14 +92,14 @@ export function DataTableCard<T extends Record<string, unknown>>({
               data={data}
               columns={columns}
               idKey={idKey}
+              label={label}
               density={density}
               hasHover={hasHover}
-              isStriped
               rowIndexStart={rowIndexStart}
               rowCount={rowCount}
             />
           </AsyncPanel>
-        </VStack>
+        </div>
       </Card>
 
       {pagination && !isLoading && !error && data.length > 0 ? (
@@ -104,9 +109,8 @@ export function DataTableCard<T extends Record<string, unknown>>({
           totalItems={pagination.totalItems}
           pageSize={pagination.pageSize}
           onChange={pagination.onChange}
-          variant="pages"
         />
       ) : null}
-    </VStack>
+    </div>
   );
 }

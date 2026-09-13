@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createInvoice } from '../../services/invoiceService.js';
-import { VStack, HStack } from '@astryxdesign/core/Stack';
-import { Button } from '@astryxdesign/core/Button';
-import { NumberInput } from '@astryxdesign/core/NumberInput';
-import { TextArea } from '@astryxdesign/core/TextArea';
-import { DateInput } from '@astryxdesign/core/DateInput';
-import type { ISODateString } from '@astryxdesign/core/Calendar';
+import { Button } from '../../components/ui/Button.js';
+import { NumberInput } from '../../components/ui/NumberInput.js';
+import { Textarea } from '../../components/ui/Textarea.js';
+import { DateInput, type ISODateString } from '../../components/ui/DateInput.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { FormSection } from '../../components/common/FormSection.js';
 import { ErrorState } from '../../components/common/ErrorState.js';
@@ -53,63 +51,71 @@ export const InvoiceCreatePage: React.FC = () => {
       title="Xuất hóa đơn bán hàng mới"
       subtitle="Lập hóa đơn tài chính liên kết đơn hàng đã được xác nhận (Kế toán & Admin)"
       breadcrumbs={[{ label: 'Hóa đơn', href: '/invoices' }, { label: 'Xuất hóa đơn bán hàng mới' }]}
-      actions={<Button label="Hủy bỏ" variant="secondary" href="/invoices" />}
-      maxWidth={650}
+      actions={
+        <Button variant="secondary" href="/invoices">
+          Hủy bỏ
+        </Button>
+      }
     >
-      {error && <ErrorState message={error} onRetry={() => setError(null)} />}
+      <div className="flex w-full flex-col gap-5 max-w-[650px]">
+        {error && <ErrorState message={error} onRetry={() => setError(null)} />}
 
-      <form onSubmit={handleSubmit} noValidate>
-        <VStack gap={5}>
-          <FormSection title="Thông tin hóa đơn">
-            <VStack gap={4}>
-              <NumberInput
-                label="ID Đơn bán hàng *"
-                placeholder="Nhập ID đơn hàng cần xuất hóa đơn (VD: 1)"
-                description="Hóa đơn chỉ được tạo cho đơn hàng đã xác nhận và chưa từng được xuất hóa đơn trước đó."
-                value={orderId}
-                onChange={(value) => setOrderId(value)}
-                hasClear
-                width="100%"
-              />
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="flex w-full flex-col gap-5">
+            <FormSection title="Thông tin hóa đơn">
+              <div className="flex flex-col gap-4">
+                <NumberInput
+                  label="ID Đơn bán hàng *"
+                  placeholder="Nhập ID đơn hàng cần xuất hóa đơn (VD: 1)"
+                  description="Hóa đơn chỉ được tạo cho đơn hàng đã xác nhận và chưa từng được xuất hóa đơn trước đó."
+                  value={orderId}
+                  onChange={(value) => setOrderId(value)}
+                  hasClear
+                  className="w-full"
+                />
 
-              <DateInput
-                label="Ngày xuất hóa đơn *"
-                description="Hạn thanh toán sẽ được hệ thống tính tự động dựa trên số ngày công nợ của khách hàng."
-                value={issueDate ? (issueDate as ISODateString) : undefined}
-                onChange={(value) => setIssueDate(value ?? '')}
-                width="100%"
-              />
+                <DateInput
+                  label="Ngày xuất hóa đơn *"
+                  description="Hạn thanh toán sẽ được hệ thống tính tự động dựa trên số ngày công nợ của khách hàng."
+                  value={issueDate ? (issueDate as ISODateString) : undefined}
+                  onChange={(value) => setIssueDate(value ?? '')}
+                  className="w-full"
+                />
 
-              <NumberInput
-                label="Số tiền tạm ứng / đã thu ban đầu (VNĐ)"
-                min={0}
-                value={paidAmount}
-                onChange={(value) => setPaidAmount(Math.max(0, Number(value) || 0))}
-                width="100%"
-              />
+                <NumberInput
+                  label="Số tiền tạm ứng / đã thu ban đầu (VNĐ)"
+                  min={0}
+                  value={paidAmount}
+                  onChange={(value) => setPaidAmount(Math.max(0, Number(value) || 0))}
+                  className="w-full"
+                />
 
-              <TextArea
-                label="Ghi chú hóa đơn"
-                rows={2}
-                value={notes}
-                onChange={(value) => setNotes(value)}
-                width="100%"
-              />
-            </VStack>
-          </FormSection>
+                <Textarea
+                  label="Ghi chú hóa đơn"
+                  rows={2}
+                  value={notes}
+                  onChange={(value) => setNotes(value)}
+                  className="w-full"
+                />
+              </div>
+            </FormSection>
 
-          <HStack gap={2} hAlign="end">
-            <Button label="Hủy" variant="secondary" href="/invoices" />
-            <Button
-              type="submit"
-              label={isSubmitting ? 'Đang xử lý...' : 'Xác nhận xuất hóa đơn'}
-              variant="primary"
-              isLoading={isSubmitting}
-              isDisabled={isSubmitting}
-            />
-          </HStack>
-        </VStack>
-      </form>
+            <div className="flex flex-row items-center justify-end gap-2">
+              <Button variant="secondary" href="/invoices">
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={isSubmitting}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Đang xử lý...' : 'Xác nhận xuất hóa đơn'}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
     </PageScaffold>
   );
 };
