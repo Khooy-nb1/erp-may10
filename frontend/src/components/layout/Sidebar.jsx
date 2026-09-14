@@ -20,6 +20,7 @@ import {
   CreditCard,
   DollarSign,
   ShieldCheck,
+  TrendingUp,
   ArrowLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -46,6 +47,7 @@ const ICON_MAP = {
   CreditCard,
   DollarSign,
   ShieldCheck,
+  TrendingUp,
 };
 
 const getActiveModuleMeta = (pathname) => {
