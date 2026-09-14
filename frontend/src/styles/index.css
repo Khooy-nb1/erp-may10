@@ -39,6 +39,15 @@
   --color-info: #0284c7;
   --color-info-soft: #f0f9ff;
   --color-info-strong: #0369a1;
+  --color-violet: #7c3aed;
+  --color-violet-soft: #f5f3ff;
+  --color-violet-strong: #6d28d9;
+
+  /* Data visualisation — gridlines sit below the 3:1 non-text floor on purpose
+     (they are decorative), while every series colour clears it against the
+     card surface. */
+  --color-chart-grid: #eef2f7;
+  --color-chart-axis: #cbd5e1;
 
   /* Radius */
   --radius-control: 0.5rem;

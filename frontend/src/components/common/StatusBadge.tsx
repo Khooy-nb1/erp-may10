@@ -69,6 +69,14 @@ export interface StatusBadgeProps {
   label?: string;
 }
 
+/**
+ * Tone behind a status, for consumers that paint the status in their own
+ * medium (charts, bars) and must stay in step with the badge colour.
+ */
+export function statusTone(status: string): BadgeVariant {
+  return (DOMAIN_STATUS as Record<string, StatusMeta | undefined>)[status]?.variant ?? 'neutral';
+}
+
 /** Status pill with the ERP's Vietnamese labels and semantic variants. */
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label }) => {
   const meta = (DOMAIN_STATUS as Record<string, StatusMeta | undefined>)[status];

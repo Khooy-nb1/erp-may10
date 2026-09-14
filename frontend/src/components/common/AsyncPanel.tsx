@@ -19,6 +19,11 @@ export interface AsyncPanelProps {
   emptyTitle?: string;
   emptyDescription?: string;
   emptyAction?: { label: string; onClick: () => void };
+  /**
+   * Caller-shaped placeholder shown while loading, for regions whose geometry a
+   * generic text skeleton would misrepresent, e.g. charts.
+   */
+  skeleton?: React.ReactNode;
   /** Rendered when the request has settled without error and with data. */
   children: React.ReactNode;
 }
@@ -39,15 +44,17 @@ export const AsyncPanel: React.FC<AsyncPanelProps> = ({
   emptyTitle,
   emptyDescription,
   emptyAction,
+  skeleton,
   children,
 }) => {
   if (isLoading) {
     return (
       <div className="flex flex-col gap-2 p-4" aria-live="polite" aria-busy="true">
         <span className="sr-only">{loadingMessage}</span>
-        {Array.from({ length: skeletonRows }, (_, index) => (
-          <Skeleton key={index} className="h-5 w-full" />
-        ))}
+        {skeleton ??
+          Array.from({ length: skeletonRows }, (_, index) => (
+            <Skeleton key={index} className="h-5 w-full" />
+          ))}
       </div>
     );
   }

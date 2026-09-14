@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  AlertTriangle,
+  CircleDollarSign,
+  ClipboardList,
+  Clock,
+  ReceiptText,
+  RefreshCw,
+  Wallet,
+} from 'lucide-react';
+import {
   DashboardPeriod,
   DashboardQueryParams,
   DashboardSummary,
@@ -22,24 +31,37 @@ import { Select } from '../../components/ui/Select.js';
 import { DateInput } from '../../components/ui/DateInput.js';
 import type { ISODateString } from '../../components/ui/DateInput.js';
 import { ProgressBar } from '../../components/ui/ProgressBar.js';
-import { Table, proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
+import { Table, pixel, proportional, type TableColumn } from '../../components/ui/Table.js';
 import { Banner } from '../../components/ui/Banner.js';
+import { TextLink } from '../../components/ui/TextLink.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { AsyncPanel } from '../../components/common/AsyncPanel.js';
-import { StatusBadge } from '../../components/common/StatusBadge.js';
+import { statusLabel } from '../../components/common/StatusBadge.js';
+import { CategoryBarChart, CategoryBarChartSkeleton } from '../../components/charts/CategoryBarChart.js';
+import { TrendChart, TrendChartSkeleton } from '../../components/charts/TrendChart.js';
+import { statusColor } from '../../components/charts/chartTheme.js';
+import { KpiCard, KpiCardSkeleton } from '../../components/dashboard/KpiCard.js';
+import {
+  formatClock,
+  formatCount,
+  formatCurrency,
+  formatCurrencyCompact,
+  formatMonthLabel,
+  formatQuantity,
+} from '../../lib/format.js';
+import { cn } from '../../lib/cn.js';
 import { useAuth } from '../../context/AuthContext.js';
 
 /**
  * P9 dashboard.
  *
- * Each widget owns its own request, loading and error state: a failing revenue
- * chart must not blank out the KPI cards or the status breakdown. That is why
- * every panel below is wrapped in its own `Widget` boundary rather than sharing
- * one page-level loading flag.
- *
  * Role scoping is enforced server-side; the client additionally avoids *calling*
  * endpoints the role is denied (`kho` on the three money endpoints) so a
- * legitimate page load never produces a 403.
+ * legitimate page load never produces a 403, and it renders a KPI only when the
+ * server actually serialized its metric.
+ *
+ * "Revenue" is the invoice-based metric only; order money is always labelled
+ * "giá trị đơn hàng" (docs/architecture/dashboard-metrics.md §1).
  */
 
 type Loadable<T> = {
@@ -124,149 +146,224 @@ function useWidget<T>(
   return { data, loading, error, reload };
 }
 
-const PERIOD_OPTIONS: Array<{ value: DashboardPeriod; label: string }> = [
-  { value: 'month', label: 'Tháng này' },
-  { value: 'quarter', label: 'Quý này' },
-  { value: 'year', label: 'Năm nay' },
-  { value: 'custom', label: 'Tùy chọn' },
-];
+/** Window label per preset, shared by the filter options and the KPI caption. */
+const PERIOD_LABEL: Record<DashboardPeriod, string> = {
+  month: 'Tháng này',
+  quarter: 'Quý này',
+  year: 'Năm nay',
+  custom: 'Tùy chọn',
+};
 
-const formatCurrency = (value: string | number | undefined): string =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value ?? 0) || 0);
+const PERIOD_OPTIONS = PERIOD_VALUES.map((value) => ({ value, label: PERIOD_LABEL[value] }));
 
-const formatQuantity = (value: string | number | undefined): string =>
-  new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 }).format(Number(value ?? 0) || 0);
+/** Six tiles: the grid keeps its height while the summary loads. */
+const KPI_SKELETON = (
+  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    {Array.from({ length: 6 }, (_, index) => (
+      <KpiCardSkeleton key={index} />
+    ))}
+  </div>
+);
 
-/** Shared panel boundary: loading, error and empty are handled identically per widget. */
+const SectionHeading: React.FC<{ title: string; supporting?: string }> = ({ title, supporting }) => (
+  <div className="flex flex-col gap-1">
+    <Heading level={2}>{title}</Heading>
+    {supporting ? (
+      <Text variant="supporting" as="p">
+        {supporting}
+      </Text>
+    ) : null}
+  </div>
+);
+
+/**
+ * Widget boundary for the chart and ranking cards. Each widget owns its own
+ * request, loading, error and empty state, so one failing request never blanks
+ * a page that still has other data.
+ *
+ * `min-w-0` matters on narrow screens: without it the grid track refuses to
+ * shrink below the table's min-content width, and a ranking table pushes the
+ * whole page wider instead of scrolling inside its own card.
+ */
 const Widget: React.FC<{
   title: string;
+  description?: React.ReactNode;
+  /** Trailing slot in the header row: a period total, a link to the module. */
+  action?: React.ReactNode;
   loading: boolean;
   error: string | null;
   isEmpty: boolean;
   onRetry: () => void;
   emptyMessage: string;
+  /** Keeps the widget's geometry while it loads instead of showing text rows. */
+  skeleton?: React.ReactNode;
+  className?: string;
   children: React.ReactNode;
-}> = ({ title, loading, error, isEmpty, onRetry, emptyMessage, children }) => (
-  <Card>
-    <div className="flex flex-col gap-3">
-      <Heading level={3}>{title}</Heading>
-      <AsyncPanel
-        isLoading={loading}
-        error={error}
-        isEmpty={isEmpty}
-        onRetry={onRetry}
-        emptyTitle="Chưa có dữ liệu"
-        emptyDescription={emptyMessage}
-      >
-        {children}
-      </AsyncPanel>
+}> = ({
+  title,
+  description,
+  action,
+  loading,
+  error,
+  isEmpty,
+  onRetry,
+  emptyMessage,
+  skeleton,
+  className,
+  children,
+}) => (
+  <Card className={cn('flex min-w-0 flex-col gap-4', className)}>
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-1">
+        <Heading level={3}>{title}</Heading>
+        {description ? (
+          <Text variant="supporting" as="p">
+            {description}
+          </Text>
+        ) : null}
+      </div>
+      {action}
     </div>
+    <AsyncPanel
+      isLoading={loading}
+      error={error}
+      isEmpty={isEmpty}
+      onRetry={onRetry}
+      emptyTitle="Chưa có dữ liệu"
+      emptyDescription={emptyMessage}
+      skeleton={skeleton}
+    >
+      {children}
+    </AsyncPanel>
   </Card>
 );
 
-/** Horizontal bar list shared by the revenue and status widgets. */
-const BarList: React.FC<{
-  rows: Array<{
-    key: string;
-    label: string;
-    value: number;
-    display: string;
-    variant?: 'primary' | 'success' | 'warning' | 'danger' | 'neutral';
-  }>;
-}> = ({ rows }) => {
-  const max = Math.max(...rows.map((r) => r.value), 1);
-  return (
-    <div className="flex flex-col gap-3">
-      {rows.map((row) => (
-        <div className="flex flex-col gap-1" key={row.key}>
-          <div className="flex flex-row justify-between gap-2">
-            <Text variant="supporting">{row.label}</Text>
-            <Text variant="label">{row.display}</Text>
-          </div>
-          <ProgressBar
-            label={row.label}
-            value={row.value}
-            max={max}
-            isLabelHidden
-            variant={row.variant ?? 'primary'}
-          />
-        </div>
-      ))}
-    </div>
-  );
-};
-
-interface CustomerRankRow extends Record<string, unknown> {
+/**
+ * Columns this screen reads off `TopCustomer`. Declared as object type aliases
+ * so the API payload goes to the tables as-is, without re-mapping rows.
+ */
+type CustomerRankRow = {
   maKhachHang: number;
   maKhachHangCode: string;
   tenKhachHang: string;
   orderCount: number;
   totalValue: string;
-}
+};
 
-interface ProductRankRow extends Record<string, unknown> {
+type ProductRankRow = {
   maSanPham: number;
   maSanPhamCode: string;
   tenSanPham: string;
-  quantity: string | number;
+  quantity: string;
   totalValue: string;
-}
+};
 
-const customerColumns: TableColumn<CustomerRankRow>[] = [
+/** `maxTotalValue` is the largest value in the current result set, floored at 1. */
+const customerColumns = (maxTotalValue: number): TableColumn<CustomerRankRow>[] => [
+  {
+    key: 'rank',
+    header: '#',
+    width: pixel(44),
+    renderCell: (_row, rowIndex) => (
+      <Text variant="supporting" className="tabular-nums">
+        {rowIndex + 1}
+      </Text>
+    ),
+  },
   {
     key: 'tenKhachHang',
     header: 'Khách hàng',
-    width: proportional(2),
+    width: proportional(2, { minWidth: 150 }),
+    // The name cell must be allowed to wrap: a long name kept on one line makes
+    // the table wider than the card and clips the money column beside it.
     renderCell: (item) => (
-      <div className="flex flex-col">
+      <TextLink
+        to={`/customers/${item.maKhachHang}`}
+        className="flex min-w-0 flex-col gap-0.5 whitespace-normal"
+      >
         <Text variant="label">{item.tenKhachHang}</Text>
-        <Text variant="supporting">{item.maKhachHangCode}</Text>
-      </div>
+        <Text variant="supporting">
+          {item.maKhachHangCode} · {formatCount(item.orderCount)} đơn
+        </Text>
+      </TextLink>
     ),
   },
-  { key: 'orderCount', header: 'Số đơn', width: pixel(80), align: 'end' },
   {
     key: 'totalValue',
     header: 'Giá trị',
-    width: pixel(140),
+    width: proportional(1, { minWidth: 128 }),
     align: 'end',
-    renderCell: (item) => (
-      <Text variant="label" className="tabular-nums">
-        {formatCurrency(item.totalValue)}
-      </Text>
-    ),
+    renderCell: (item) => {
+      const totalValue = Number(item.totalValue) || 0;
+      return (
+        <div className="flex flex-col">
+          <Text variant="label" className="tabular-nums whitespace-nowrap">
+            {formatCurrency(item.totalValue)}
+          </Text>
+          <ProgressBar
+            label={`${item.tenKhachHang}: ${Math.round((totalValue / maxTotalValue) * 100)}% so với khách hàng dẫn đầu`}
+            value={totalValue}
+            max={maxTotalValue}
+            isLabelHidden
+            variant="primary"
+            className="mt-1"
+          />
+        </div>
+      );
+    },
   },
 ];
 
-const productColumns: TableColumn<ProductRankRow>[] = [
+/** `maxTotalValue` is the largest value in the current result set. */
+const productColumns = (maxTotalValue: number): TableColumn<ProductRankRow>[] => [
+  {
+    key: 'rank',
+    header: '#',
+    width: pixel(44),
+    renderCell: (_row, rowIndex) => (
+      <Text variant="supporting" className="tabular-nums">
+        {rowIndex + 1}
+      </Text>
+    ),
+  },
   {
     key: 'tenSanPham',
     header: 'Sản phẩm',
-    width: proportional(2),
+    width: proportional(2, { minWidth: 150 }),
+    // The name cell must be allowed to wrap: a long name kept on one line makes
+    // the table wider than the card and clips the money column beside it.
     renderCell: (item) => (
-      <div className="flex flex-col">
+      <div className="flex min-w-0 flex-col gap-0.5 whitespace-normal">
         <Text variant="label">{item.tenSanPham}</Text>
-        <Text variant="supporting">{item.maSanPhamCode}</Text>
+        <Text variant="supporting">
+          {item.maSanPhamCode} · {formatQuantity(item.quantity)}
+        </Text>
       </div>
     ),
   },
   {
-    key: 'quantity',
-    header: 'Số lượng',
-    width: pixel(90),
-    align: 'end',
-    renderCell: (item) => <Text className="tabular-nums">{formatQuantity(item.quantity)}</Text>,
-  },
-  {
     key: 'totalValue',
     header: 'Giá trị',
-    width: pixel(140),
+    width: proportional(1, { minWidth: 128 }),
     align: 'end',
-    renderCell: (item) => (
-      <Text variant="label" className="tabular-nums">
-        {formatCurrency(item.totalValue)}
-      </Text>
-    ),
+    renderCell: (item) => {
+      const totalValue = Number(item.totalValue) || 0;
+      return (
+        <div className="flex flex-col">
+          <Text variant="label" className="tabular-nums whitespace-nowrap">
+            {formatCurrency(item.totalValue)}
+          </Text>
+          <ProgressBar
+            label={`${item.tenSanPham}: ${Math.round((totalValue / maxTotalValue) * 100)}% so với sản phẩm dẫn đầu`}
+            value={totalValue}
+            max={maxTotalValue}
+            isLabelHidden
+            variant="primary"
+            className="mt-1"
+          />
+        </div>
+      );
+    },
   },
 ];
 
@@ -282,6 +379,7 @@ export const DashboardPage: React.FC = () => {
   const [period, setPeriod] = useState<DashboardPeriod>('month');
   const [fromDate, setFromDate] = useState<ISODateString | undefined>(undefined);
   const [toDate, setToDate] = useState<ISODateString | undefined>(undefined);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const customRangeIncomplete = period === 'custom' && (!fromDate || !toDate);
 
@@ -292,7 +390,7 @@ export const DashboardPage: React.FC = () => {
   };
 
   // A custom period without both dates is rejected by the API, so every widget
-  // waits for the range the "Làm mới" button already requires.
+  // waits for a complete range instead of guessing one.
   const widgetsEnabled = !customRangeIncomplete;
 
   const summary = useWidget<DashboardSummary>(getDashboardSummary, params, widgetsEnabled);
@@ -311,201 +409,303 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  const metrics = summary.data?.metrics;
-  const statusCounts = metrics?.statusCounts ?? {};
-  const statusRows = Object.entries(statusCounts);
-  const statusTotal = statusRows.reduce((sum, [, count]) => sum + count, 0);
+  // Any in-flight widget means the page is not up to date yet. Widgets the role
+  // may not call stay `loading: false`, so they never hold the stamp back.
+  const isRefreshing =
+    summary.loading || status.loading || revenue.loading || topCustomers.loading || topProducts.loading;
 
-  const revenueRows = revenue.data?.series ?? [];
-  const revenueMaxTotal = revenue.data?.total;
+  useEffect(() => {
+    if (!widgetsEnabled) {
+      setLastUpdated(null);
+      return;
+    }
+    if (!isRefreshing) setLastUpdated(new Date());
+  }, [widgetsEnabled, isRefreshing]);
+
+  const metrics = summary.data?.metrics;
+  const customerItems = topCustomers.data?.items ?? [];
+  const productItems = topProducts.data?.items ?? [];
+  const maxCustomerValue = Math.max(1, ...customerItems.map((item) => Number(item.totalValue) || 0));
+  const maxProductValue = Math.max(1, ...productItems.map((item) => Number(item.totalValue) || 0));
 
   return (
     <PageScaffold
       title="Tổng quan kinh doanh"
       subtitle="Số liệu doanh thu, tình trạng đơn hàng và công nợ bán hàng"
     >
-      {/* Shared date filter — one control drives every widget. */}
-      <Card>
-        <div className="flex flex-row flex-wrap items-end gap-3">
-          <Select
-            label="Khoảng thời gian"
-            options={PERIOD_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-            value={period}
-            onChange={(value) => {
-              if (value && isDashboardPeriod(value)) setPeriod(value);
-            }}
-            className="w-50"
-          />
-          {period === 'custom' && (
-            <>
-              <DateInput label="Từ ngày" value={fromDate} onChange={setFromDate} />
-              <DateInput label="Đến ngày" value={toDate} onChange={setToDate} />
-            </>
-          )}
-          <Button variant="primary" disabled={customRangeIncomplete} onClick={refreshAll}>
-            Làm mới
-          </Button>
+      {/* One filter drives every widget; the period change refetches by itself,
+          so the button is only an explicit re-run of the same queries. */}
+      <Card className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div role="group" aria-label="Bộ lọc thời gian" className="flex flex-wrap items-end gap-3">
+            <Select
+              label="Khoảng thời gian"
+              options={PERIOD_OPTIONS}
+              value={period}
+              onChange={(value) => {
+                if (value && isDashboardPeriod(value)) setPeriod(value);
+              }}
+              className="w-44"
+            />
+            {period === 'custom' && (
+              <>
+                <DateInput label="Từ ngày" value={fromDate} onChange={setFromDate} />
+                <DateInput label="Đến ngày" value={toDate} onChange={setToDate} />
+              </>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {lastUpdated && !isRefreshing ? (
+              <Text variant="supporting">Cập nhật lúc {formatClock(lastUpdated)}</Text>
+            ) : null}
+            <Button
+              variant="secondary"
+              icon={<RefreshCw size={16} />}
+              loading={isRefreshing}
+              disabled={customRangeIncomplete}
+              onClick={refreshAll}
+            >
+              Làm mới
+            </Button>
+          </div>
         </div>
+        {customRangeIncomplete && (
+          <Banner
+            status="warning"
+            title="Chọn đủ ngày bắt đầu và kết thúc để xem số liệu tùy chọn."
+          />
+        )}
       </Card>
 
-      {customRangeIncomplete && (
-        <Banner status="warning" title="Chọn đủ ngày bắt đầu và kết thúc để xem số liệu tùy chọn." />
-      )}
-
-      {/* KPI cards — role-scoped by the server; absent metrics are simply not rendered. */}
-      <Widget
-        title="Chỉ số chính"
-        loading={summary.loading}
-        error={summary.error}
-        isEmpty={!summary.data}
-        onRetry={summary.reload}
-        emptyMessage="Chưa có số liệu trong khoảng thời gian đã chọn."
-      >
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {metrics?.orderCount !== undefined && (
-            <Kpi label="Tổng số đơn" value={String(metrics.orderCount)} />
-          )}
-          {metrics?.totalOrderValue !== undefined && (
-            <Kpi label="Giá trị đơn hàng" value={formatCurrency(metrics.totalOrderValue)} />
-          )}
-          {metrics?.openReceivable !== undefined && (
-            <Kpi label="Công nợ phải thu" value={formatCurrency(metrics.openReceivable)} tone="info" />
-          )}
-          {metrics?.overdueReceivable !== undefined && (
-            <Kpi label="Công nợ quá hạn" value={formatCurrency(metrics.overdueReceivable)} tone="danger" />
-          )}
-          {metrics?.unpaidInvoiceCount !== undefined && (
-            <Kpi label="Hóa đơn chưa thu đủ" value={String(metrics.unpaidInvoiceCount)} />
-          )}
-          {metrics?.overdueInvoiceCount !== undefined && (
-            <Kpi label="Hóa đơn quá hạn" value={String(metrics.overdueInvoiceCount)} tone="danger" />
-          )}
-        </div>
-      </Widget>
-
-      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-        {canViewMoney && (
-          <Widget
-            title={revenue.data?.label ?? 'Doanh thu theo hóa đơn'}
-            loading={revenue.loading}
-            error={revenue.error}
-            isEmpty={!revenue.data || revenueRows.length === 0}
-            onRetry={revenue.reload}
-            emptyMessage="Chưa có hóa đơn nào trong khoảng thời gian đã chọn."
-          >
-            {revenue.data && (
-              <div className="flex flex-col gap-3">
-                <Text variant="supporting">
-                  Nguồn dữ liệu: <Text variant="code">{revenue.data.source}</Text> — tổng{' '}
-                  {formatCurrency(revenueMaxTotal)}
-                </Text>
-                <BarList
-                  rows={revenueRows.map((point) => ({
-                    key: point.period,
-                    label: `${point.period} (${point.invoiceCount} hóa đơn)`,
-                    value: Number(point.revenue) || 0,
-                    display: formatCurrency(point.revenue),
-                  }))}
-                />
-              </div>
-            )}
-          </Widget>
-        )}
-
-        <Widget
-          title="Tình trạng đơn hàng"
-          loading={status.loading}
-          error={status.error}
-          isEmpty={!status.data || status.data.statuses.length === 0}
-          onRetry={status.reload}
-          emptyMessage="Chưa có đơn hàng nào trong khoảng thời gian đã chọn."
+      <section aria-label="Chỉ số chính" className="flex flex-col gap-3">
+        <SectionHeading
+          title="Chỉ số chính"
+          supporting={`Số liệu trong ${PERIOD_LABEL[period]}${
+            period === 'custom' && fromDate && toDate ? ` từ ${fromDate} đến ${toDate}` : ''
+          }`}
+        />
+        <AsyncPanel
+          isLoading={summary.loading}
+          error={summary.error}
+          onRetry={summary.reload}
+          isEmpty={!summary.data}
+          emptyTitle="Chưa có dữ liệu"
+          emptyDescription="Chưa có số liệu trong khoảng thời gian đã chọn."
+          skeleton={KPI_SKELETON}
         >
-          <div className="flex flex-col gap-3">
-            {(status.data?.statuses ?? []).map((entry) => (
-              <div key={entry.status} className="flex flex-row items-center justify-between gap-2">
-                <StatusBadge status={entry.status} />
-                <Text variant="label" className="tabular-nums">
-                  {entry.count}
-                </Text>
-              </div>
-            ))}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {metrics?.orderCount !== undefined && (
+              <KpiCard
+                label="Tổng số đơn"
+                value={formatCount(metrics.orderCount)}
+                icon={ClipboardList}
+                tone="primary"
+                hint="Bao gồm cả đơn đã hủy"
+              />
+            )}
+            {metrics?.totalOrderValue !== undefined && (
+              <KpiCard
+                label="Giá trị đơn hàng"
+                value={formatCurrency(metrics.totalOrderValue)}
+                icon={Wallet}
+                tone="info"
+                hint="Không gồm đơn đã hủy"
+              />
+            )}
+            {metrics?.openReceivable !== undefined && (
+              <KpiCard
+                label="Công nợ phải thu"
+                value={formatCurrency(metrics.openReceivable)}
+                icon={CircleDollarSign}
+                tone="violet"
+                hint="Toàn bộ số công nợ phải thu, không theo kỳ đã chọn"
+              />
+            )}
+            {metrics?.overdueReceivable !== undefined && (
+              <KpiCard
+                label="Công nợ quá hạn"
+                value={formatCurrency(metrics.overdueReceivable)}
+                icon={AlertTriangle}
+                tone="danger"
+              />
+            )}
+            {metrics?.unpaidInvoiceCount !== undefined && (
+              <KpiCard
+                label="Hóa đơn chưa thu đủ"
+                value={formatCount(metrics.unpaidInvoiceCount)}
+                icon={ReceiptText}
+                tone="warning"
+                hint="Số lượng hóa đơn, không phải số tiền"
+              />
+            )}
+            {metrics?.overdueInvoiceCount !== undefined && (
+              <KpiCard
+                label="Hóa đơn quá hạn"
+                value={formatCount(metrics.overdueInvoiceCount)}
+                icon={Clock}
+                tone="danger"
+                hint="Đã qua ngày đáo hạn"
+              />
+            )}
           </div>
-        </Widget>
-      </div>
+        </AsyncPanel>
+      </section>
 
-      {/* Order value is aggregate-only; the breakdown chart covers all statuses. */}
-      {statusRows.length > 0 && (
-        <Text variant="supporting">
-          Tổng số đơn theo trạng thái: {statusTotal} (bao gồm đơn đã hủy).
-        </Text>
+      {/* The status breakdown is readable by every role, so only the
+          invoice-based revenue card is gated by money permission; without it
+          the grid collapses to one full-width card instead of two empty
+          columns. */}
+      <section aria-label="Hiệu suất bán hàng" className="flex flex-col gap-3">
+        <SectionHeading title="Hiệu suất bán hàng" />
+        <div className={canViewMoney ? 'grid gap-5 xl:grid-cols-3' : 'grid gap-5'}>
+          {canViewMoney && (
+            <Widget
+              className="xl:col-span-2"
+              title={revenue.data?.label ?? 'Doanh thu theo hóa đơn'}
+              description={
+                revenue.data ? (
+                  <>
+                    Nguồn dữ liệu: <Text variant="code">{revenue.data.source}</Text>
+                  </>
+                ) : null
+              }
+              action={
+                revenue.data ? (
+                  <div className="flex flex-col items-end">
+                    <Text variant="supporting">Tổng theo kỳ</Text>
+                    <Text className="font-medium tabular-nums">
+                      {formatCurrency(revenue.data.total)}
+                    </Text>
+                  </div>
+                ) : null
+              }
+              loading={revenue.loading}
+              error={revenue.error}
+              isEmpty={!revenue.data || revenue.data.series.length === 0}
+              onRetry={revenue.reload}
+              emptyMessage="Chưa có hóa đơn nào trong khoảng thời gian đã chọn."
+              skeleton={<TrendChartSkeleton height={260} />}
+            >
+              {revenue.data ? (
+                <TrendChart
+                  points={revenue.data.series.map((point) => ({
+                    key: point.period,
+                    label: formatMonthLabel(point.period),
+                    value: Number(point.revenue) || 0,
+                    caption: `${formatCount(point.invoiceCount)} hóa đơn`,
+                  }))}
+                  formatValue={formatCurrency}
+                  formatAxis={formatCurrencyCompact}
+                  ariaLabel={revenue.data.label}
+                  seriesLabel="Doanh thu"
+                  height={260}
+                />
+              ) : null}
+            </Widget>
+          )}
+          <Widget
+            title="Tình trạng đơn hàng"
+            description="Số đơn theo từng trạng thái, bao gồm đơn đã hủy"
+            action={
+              status.data ? (
+                <div className="flex flex-col items-end">
+                  <Text variant="supporting">Tổng số đơn</Text>
+                  <Text className="font-medium tabular-nums">
+                    {formatCount(status.data.total)} đơn
+                  </Text>
+                </div>
+              ) : null
+            }
+            loading={status.loading}
+            error={status.error}
+            isEmpty={!status.data || status.data.statuses.length === 0}
+            onRetry={status.reload}
+            emptyMessage="Chưa có đơn hàng nào trong khoảng thời gian đã chọn."
+            skeleton={<CategoryBarChartSkeleton height={220} />}
+          >
+            {status.data ? (
+              <CategoryBarChart
+                points={status.data.statuses.map((entry) => ({
+                  key: entry.status,
+                  label: statusLabel(entry.status),
+                  value: entry.count,
+                  color: statusColor(entry.status),
+                }))}
+                formatValue={formatCount}
+                formatAxis={formatCount}
+                ariaLabel="Tình trạng đơn hàng"
+                valueSuffix="đơn"
+                showShare
+                height={220}
+              />
+            ) : null}
+          </Widget>
+        </div>
+      </section>
+
+      {canViewMoney && (
+        <section aria-label="Xếp hạng" className="flex flex-col gap-3">
+          <SectionHeading title="Xếp hạng" />
+          <div className="grid gap-5 xl:grid-cols-2">
+            <Widget
+              title="Khách hàng mua nhiều nhất"
+              description="Xếp hạng theo tổng giá trị đơn hàng, không gồm đơn đã hủy"
+              action={
+                <TextLink to="/customers" weight="medium">
+                  Xem tất cả
+                </TextLink>
+              }
+              loading={topCustomers.loading}
+              error={topCustomers.error}
+              isEmpty={customerItems.length === 0}
+              onRetry={topCustomers.reload}
+              emptyMessage="Chưa có đơn hàng nào để xếp hạng khách hàng."
+            >
+              <Table<CustomerRankRow>
+                data={customerItems}
+                columns={customerColumns(maxCustomerValue)}
+                idKey="maKhachHang"
+                label="Khách hàng mua nhiều nhất"
+                density="balanced"
+              />
+            </Widget>
+            <Widget
+              title="Sản phẩm bán chạy"
+              description="Xếp hạng theo thành tiền chi tiết đơn hàng, không gồm đơn đã hủy"
+              action={
+                <TextLink to="/products" weight="medium">
+                  Xem tất cả
+                </TextLink>
+              }
+              loading={topProducts.loading}
+              error={topProducts.error}
+              isEmpty={productItems.length === 0}
+              onRetry={topProducts.reload}
+              emptyMessage="Chưa có chi tiết đơn hàng nào để xếp hạng sản phẩm."
+            >
+              <Table<ProductRankRow>
+                data={productItems}
+                columns={productColumns(maxProductValue)}
+                idKey="maSanPham"
+                label="Sản phẩm bán chạy"
+                density="balanced"
+              />
+            </Widget>
+          </div>
+        </section>
       )}
-
-      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(352px,1fr))]">
-        {canViewMoney && (
-          <Widget
-            title="Khách hàng mua nhiều nhất"
-            loading={topCustomers.loading}
-            error={topCustomers.error}
-            isEmpty={!topCustomers.data || topCustomers.data.items.length === 0}
-            onRetry={topCustomers.reload}
-            emptyMessage="Chưa có đơn hàng nào để xếp hạng khách hàng."
-          >
-            <Table<CustomerRankRow>
-              data={(topCustomers.data?.items ?? []).map((item) => ({
-                maKhachHang: item.maKhachHang,
-                maKhachHangCode: item.maKhachHangCode,
-                tenKhachHang: item.tenKhachHang,
-                orderCount: item.orderCount,
-                totalValue: item.totalValue,
-              }))}
-              columns={customerColumns}
-              idKey="maKhachHang"
-              density="compact"
-            />
-          </Widget>
-        )}
-
-        {canViewMoney && (
-          <Widget
-            title="Sản phẩm bán chạy"
-            loading={topProducts.loading}
-            error={topProducts.error}
-            isEmpty={!topProducts.data || topProducts.data.items.length === 0}
-            onRetry={topProducts.reload}
-            emptyMessage="Chưa có chi tiết đơn hàng nào để xếp hạng sản phẩm."
-          >
-            <Table<ProductRankRow>
-              data={(topProducts.data?.items ?? []).map((item) => ({
-                maSanPham: item.maSanPham,
-                maSanPhamCode: item.maSanPhamCode,
-                tenSanPham: item.tenSanPham,
-                quantity: item.quantity,
-                totalValue: item.totalValue,
-              }))}
-              columns={productColumns}
-              idKey="maSanPham"
-              density="compact"
-            />
-          </Widget>
-        )}
-      </div>
 
       {!canViewReceivables && (
-        <Text variant="supporting">
+        <Text variant="supporting" as="p">
           Chỉ số công nợ chi tiết được giới hạn cho quản trị viên và kế toán.
+        </Text>
+      )}
+      {!canViewMoney && (
+        <Text variant="supporting" as="p">
+          Tài khoản kho chỉ xem được số đơn và tình trạng đơn hàng; số liệu doanh thu và công nợ
+          được ẩn theo phân quyền.
         </Text>
       )}
     </PageScaffold>
   );
 };
-
-const Kpi: React.FC<{ label: string; value: string; tone?: 'info' | 'danger' }> = ({ label, value, tone }) => (
-  <Card variant={tone === 'danger' ? 'red' : tone === 'info' ? 'blue' : 'muted'} className="p-3">
-    <div className="flex flex-col gap-1">
-      <Text variant="supporting">{label}</Text>
-      <Text variant="label" className="tabular-nums">
-        {value}
-      </Text>
-    </div>
-  </Card>
-);
