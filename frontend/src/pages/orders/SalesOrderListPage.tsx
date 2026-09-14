@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { Text } from '../../components/ui/Typography.js';
 import { Button } from '../../components/ui/Button.js';
-import { Input } from '../../components/ui/Input.js';
 import { Select } from '../../components/ui/Select.js';
 import { TextLink } from '../../components/ui/TextLink.js';
 import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
 import { Order, OrderStatus } from '../../types/order.js';
 import { getOrders } from '../../services/orderService.js';
+import { formatCurrency, formatDate } from '../../lib/format.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { DataTableCard } from '../../components/common/DataTableCard.js';
+import { FilterBar } from '../../components/common/FilterBar.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
 
 /**
@@ -42,15 +43,6 @@ const STATUS_LABELS: Partial<Record<OrderStatus, string>> = {
   da_giao: 'Đã giao hàng',
 };
 
-const formatCurrency = (val: string | number) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
-};
-
-const formatDate = (dateStr: string | null) => {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('vi-VN');
-};
-
 const columns: TableColumn<OrderRow>[] = [
   {
     key: 'ma_don_ban',
@@ -66,9 +58,20 @@ const columns: TableColumn<OrderRow>[] = [
     key: 'ten_khach_hang',
     header: 'Khách hàng',
     width: proportional(2),
-    renderCell: (item) => (
-      <Text variant="label">{item.ten_khach_hang || `Khách #${item.ma_khach_hang}`}</Text>
-    ),
+    renderCell: (item) => {
+      const customer = item.ten_khach_hang || `Khách #${item.ma_khach_hang}`;
+      return (
+        <span className="block max-w-[280px] truncate font-medium" title={customer}>
+          {customer}
+        </span>
+      );
+    },
+  },
+  {
+    key: 'ten_nguoi_ban',
+    header: 'Người bán',
+    width: proportional(1),
+    renderCell: (item) => <Text variant="supporting">{item.ten_nguoi_ban || '—'}</Text>,
   },
   {
     key: 'ngay_dat_hang',
@@ -94,29 +97,12 @@ const columns: TableColumn<OrderRow>[] = [
     ),
   },
   {
-    key: 'ten_nguoi_ban',
-    header: 'Người bán',
-    width: proportional(1),
-    renderCell: (item) => <Text variant="supporting">{item.ten_nguoi_ban || '—'}</Text>,
-  },
-  {
     key: 'trang_thai',
     header: 'Trạng thái',
     width: pixel(150),
-    align: 'center',
+    align: 'start',
     renderCell: (item) => (
       <StatusBadge status={item.trang_thai} label={STATUS_LABELS[item.trang_thai]} />
-    ),
-  },
-  {
-    key: 'actions',
-    header: 'Thao tác',
-    width: pixel(110),
-    align: 'end',
-    renderCell: (item) => (
-      <TextLink to={`/sales-orders/${item.id}`} weight="medium">
-        Chi tiết
-      </TextLink>
     ),
   },
 ];
@@ -133,6 +119,12 @@ export const SalesOrderListPage: React.FC = () => {
   const [pageSize] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [total, setTotal] = useState<number>(0);
+
+  /**
+   * Bumped by "Xóa bộ lọc" so a reset that cleared a submit-triggered search
+   * alone still refetches, even when the page never left 1.
+   */
+  const [reloadToken, setReloadToken] = useState<number>(0);
 
   const fetchList = async () => {
     setLoading(true);
@@ -156,7 +148,7 @@ export const SalesOrderListPage: React.FC = () => {
 
   useEffect(() => {
     fetchList();
-  }, [page, trangThai]);
+  }, [page, trangThai, reloadToken]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,10 +163,10 @@ export const SalesOrderListPage: React.FC = () => {
       actions={
         <Button
           variant="primary"
-          icon={<Plus size={16} />}
+          icon={<Plus size={16} aria-hidden />}
           href="/sales-orders/new"
         >
-          Tạo đơn hàng mới
+          Tạo đơn bán hàng
         </Button>
       }
     >
@@ -191,30 +183,36 @@ export const SalesOrderListPage: React.FC = () => {
         pagination={{ page, totalPages, totalItems: total, pageSize, onChange: setPage }}
         rowIndexStart={(page - 1) * pageSize + 1}
         rowCount={total}
+        density="compact"
         toolbar={
-          <form onSubmit={handleSearchSubmit}>
-            <div className="flex flex-row flex-wrap items-end gap-2">
-              <Input
-                label="Tìm kiếm đơn hàng"
-                placeholder="Tìm theo mã đơn hàng hoặc tên khách..."
-                value={search}
-                onChange={setSearch}
-                className="w-80"
-              />
-              <Button type="submit" variant="secondary">Tìm kiếm</Button>
-            </div>
-          </form>
-        }
-        toolbarEnd={
-          <Select
-            label="Trạng thái"
-            options={TRANG_THAI_OPTIONS}
-            value={trangThai}
-            onChange={(value) => {
-              setTrangThai(value as OrderStatus | '');
-              setPage(1);
+          <FilterBar
+            label="Bộ lọc danh sách đơn bán hàng"
+            search={{
+              label: 'Tìm kiếm đơn hàng',
+              placeholder: 'Tìm theo mã đơn hàng hoặc tên khách...',
+              value: search,
+              onChange: setSearch,
             }}
-            className="w-48"
+            onSubmit={handleSearchSubmit}
+            filters={
+              <Select
+                label="Trạng thái"
+                options={TRANG_THAI_OPTIONS}
+                value={trangThai}
+                onChange={(value) => {
+                  setTrangThai(value as OrderStatus | '');
+                  setPage(1);
+                }}
+                className="w-full sm:w-48"
+              />
+            }
+            isFiltered={Boolean(search.trim() || trangThai)}
+            onReset={() => {
+              setSearch('');
+              setTrangThai('');
+              setPage(1);
+              setReloadToken((token) => token + 1);
+            }}
           />
         }
       />

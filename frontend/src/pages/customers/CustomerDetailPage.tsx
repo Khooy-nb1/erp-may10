@@ -9,7 +9,7 @@ import { getCustomerReceivables, getReceivableSummary } from '../../services/rec
 import { useAuth } from '../../context/AuthContext.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { AsyncPanel } from '../../components/common/AsyncPanel.js';
-import { StatusBadge } from '../../components/common/StatusBadge.js';
+import { StatusBadge, statusLabel } from '../../components/common/StatusBadge.js';
 import { EmptyState } from '../../components/common/EmptyState.js';
 import { AlertDialog } from '../../components/ui/AlertDialog.js';
 import { Banner } from '../../components/ui/Banner.js';
@@ -20,6 +20,7 @@ import { Table, proportional, type TableColumn } from '../../components/ui/Table
 import { Tab, TabList, TabPanel, Tabs } from '../../components/ui/Tabs.js';
 import { Text } from '../../components/ui/Typography.js';
 import { TextLink } from '../../components/ui/TextLink.js';
+import { formatCurrency, formatDate } from '../../lib/format.js';
 
 interface ReceivableRow extends Record<string, unknown> {
   id: number;
@@ -129,15 +130,6 @@ export const CustomerDetailPage: React.FC = () => {
       setUpdatingStatus(false);
       handleConfirmOpenChange(false);
     }
-  };
-
-  const formatCurrency = (val: string | number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('vi-VN');
   };
 
   const receivableColumns: TableColumn<ReceivableRow>[] = [
@@ -276,7 +268,7 @@ export const CustomerDetailPage: React.FC = () => {
           <div className="flex w-full flex-col gap-5">
             {/* Commercial Summary Cards */}
             {summary && (
-              <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Card>
                   <div className="flex flex-col gap-1">
                     <Text variant="supporting">Tổng số đơn hàng</Text>
@@ -314,7 +306,7 @@ export const CustomerDetailPage: React.FC = () => {
 
             {/* Tabs */}
             <Tabs value={activeTab} onChange={(value) => setActiveTab(value as DetailTab)}>
-              <TabList className="border-b border-border">
+              <TabList className="flex-nowrap overflow-x-auto whitespace-nowrap border-b border-border">
                 <Tab value="info" label="Thông tin chi tiết" />
                 <Tab value="orders" label="Đơn bán hàng" />
                 <Tab value="invoices" label="Hóa đơn" />
@@ -447,8 +439,8 @@ export const CustomerDetailPage: React.FC = () => {
       <AlertDialog
         isOpen={pendingStatus !== null}
         onOpenChange={handleConfirmOpenChange}
-        title="Xác nhận chuyển trạng thái"
-        description={`Bạn có chắc chắn muốn chuyển trạng thái khách hàng sang "${pendingStatus ?? ''}"?`}
+        title={`Chuyển trạng thái sang "${statusLabel(pendingStatus ?? '')}"`}
+        description={`Bạn có chắc chắn muốn chuyển trạng thái khách hàng sang "${statusLabel(pendingStatus ?? '')}"? Thao tác này có thể hoàn tác bằng cách chuyển lại trạng thái.`}
         actionLabel="Xác nhận"
         cancelLabel="Hủy"
         isActionLoading={updatingStatus}

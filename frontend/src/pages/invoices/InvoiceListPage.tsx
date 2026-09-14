@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Text } from '../../components/ui/Typography.js';
 import { Button } from '../../components/ui/Button.js';
-import { Input } from '../../components/ui/Input.js';
 import { Select } from '../../components/ui/Select.js';
 import { TextLink } from '../../components/ui/TextLink.js';
 import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
@@ -11,7 +11,10 @@ import { getInvoices } from '../../services/invoiceService.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { DataTableCard } from '../../components/common/DataTableCard.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
+import { FilterBar } from '../../components/common/FilterBar.js';
+import { InvoiceCreateDialog } from '../../components/invoices/InvoiceCreateDialog.js';
 import { useAuth } from '../../context/AuthContext.js';
+import { formatCurrency, formatDate } from '../../lib/format.js';
 
 /**
  * Columns this screen reads off `Invoice`. Declared as an object type alias so
@@ -39,15 +42,6 @@ const TRANG_THAI_OPTIONS = [
   { value: 'qua_han', label: 'Quá hạn' },
 ];
 
-const formatCurrency = (val: string | number) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
-};
-
-const formatDate = (dateStr: string | null) => {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('vi-VN');
-};
-
 const columns: TableColumn<InvoiceRow>[] = [
   {
     key: 'ma_hoa_don',
@@ -64,7 +58,7 @@ const columns: TableColumn<InvoiceRow>[] = [
     header: 'Đơn bán hàng',
     width: proportional(1),
     renderCell: (item) => (
-      <TextLink to={`/sales-orders/${item.ma_don_ban_hang}`}>
+      <TextLink to={`/sales-orders/${item.ma_don_ban_hang}`} weight="medium">
         {item.ma_don_ban || `Đơn #${item.ma_don_ban_hang}`}
       </TextLink>
     ),
@@ -73,7 +67,14 @@ const columns: TableColumn<InvoiceRow>[] = [
     key: 'ten_khach_hang',
     header: 'Khách hàng',
     width: proportional(2),
-    renderCell: (item) => <Text>{item.ten_khach_hang || `Mã #${item.ma_khach_hang}`}</Text>,
+    renderCell: (item) => (
+      <span
+        className="block max-w-[280px] truncate"
+        title={item.ten_khach_hang || `Mã #${item.ma_khach_hang}`}
+      >
+        {item.ten_khach_hang || `Mã #${item.ma_khach_hang}`}
+      </span>
+    ),
   },
   {
     key: 'ngay_xuat_hoa_don',
@@ -109,23 +110,14 @@ const columns: TableColumn<InvoiceRow>[] = [
     key: 'trang_thai',
     header: 'Trạng thái',
     width: pixel(150),
-    align: 'center',
+    align: 'start',
     renderCell: (item) => <StatusBadge status={item.trang_thai} />,
-  },
-  {
-    key: 'actions',
-    header: 'Thao tác',
-    width: pixel(110),
-    align: 'end',
-    renderCell: (item) => (
-      <TextLink to={`/invoices/${item.id}`} weight="medium">
-        Chi tiết
-      </TextLink>
-    ),
   },
 ];
 
 export const InvoiceListPage: React.FC = () => {
+  const navigate = useNavigate();
+
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +131,11 @@ export const InvoiceListPage: React.FC = () => {
   const [pageSize] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [total, setTotal] = useState<number>(0);
+  // The search term is submit-triggered, so it is not an effect dependency;
+  // this token lets "Xóa bộ lọc" refetch when it cleared the search alone.
+  const [reloadToken, setReloadToken] = useState<number>(0);
+
+  const [createOpen, setCreateOpen] = useState<boolean>(false);
 
   const fetchList = async () => {
     setLoading(true);
@@ -162,7 +159,7 @@ export const InvoiceListPage: React.FC = () => {
 
   useEffect(() => {
     fetchList();
-  }, [page, trangThai]);
+  }, [page, trangThai, reloadToken]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,7 +173,11 @@ export const InvoiceListPage: React.FC = () => {
       subtitle={`Theo dõi xuất hóa đơn và tình trạng thanh toán (${total} hóa đơn)`}
       actions={
         canCreateInvoice ? (
-          <Button variant="primary" icon={<Plus size={16} />} href="/invoices/new">
+          <Button
+            variant="primary"
+            icon={<Plus size={16} aria-hidden />}
+            onClick={() => setCreateOpen(true)}
+          >
             Xuất hóa đơn mới
           </Button>
         ) : undefined
@@ -187,6 +188,7 @@ export const InvoiceListPage: React.FC = () => {
         data={invoices}
         columns={columns}
         idKey="id"
+        density="compact"
         isLoading={loading}
         error={error}
         onRetry={fetchList}
@@ -196,32 +198,46 @@ export const InvoiceListPage: React.FC = () => {
         rowIndexStart={(page - 1) * pageSize + 1}
         rowCount={total}
         toolbar={
-          <form onSubmit={handleSearchSubmit}>
-            <div className="flex flex-row flex-wrap items-end gap-2">
-              <Input
-                label="Tìm kiếm hóa đơn"
-                placeholder="Tìm theo mã hóa đơn hoặc tên khách hàng..."
-                value={search}
-                onChange={setSearch}
-                className="w-80"
-              />
-              <Button type="submit" variant="secondary">Tìm kiếm</Button>
-            </div>
-          </form>
-        }
-        toolbarEnd={
-          <Select
-            label="Trạng thái"
-            options={TRANG_THAI_OPTIONS}
-            value={trangThai}
-            onChange={(value) => {
-              setTrangThai(value as InvoiceStatus | '');
-              setPage(1);
+          <FilterBar
+            label="Bộ lọc danh sách hóa đơn bán hàng"
+            search={{
+              label: 'Tìm kiếm hóa đơn',
+              placeholder: 'Tìm theo mã hóa đơn hoặc tên khách hàng...',
+              value: search,
+              onChange: setSearch,
+              widthClassName: 'w-full sm:w-80',
             }}
-            className="w-48"
+            onSubmit={handleSearchSubmit}
+            filters={
+              <Select
+                label="Trạng thái"
+                options={TRANG_THAI_OPTIONS}
+                value={trangThai}
+                onChange={(value) => {
+                  setTrangThai(value as InvoiceStatus | '');
+                  setPage(1);
+                }}
+                className="w-full sm:w-48"
+              />
+            }
+            isFiltered={Boolean(search.trim() || trangThai)}
+            onReset={() => {
+              setSearch('');
+              setTrangThai('');
+              setPage(1);
+              setReloadToken((token) => token + 1);
+            }}
           />
         }
       />
+
+      {canCreateInvoice && (
+        <InvoiceCreateDialog
+          isOpen={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={(id) => navigate(`/invoices/${id}`)}
+        />
+      )}
     </PageScaffold>
   );
 };

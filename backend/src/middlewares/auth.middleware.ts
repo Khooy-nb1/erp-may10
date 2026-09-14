@@ -32,7 +32,7 @@ export function createAuthMiddleware(userRepo: IUserRepository = userRepository)
 
       let payload: JwtPayload;
       try {
-        const decoded = jwt.verify(token, env.JWT_SECRET);
+        const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
         payload = decoded as JwtPayload;
       } catch {
         throw new UnauthorizedError();

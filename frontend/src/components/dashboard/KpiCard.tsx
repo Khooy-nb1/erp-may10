@@ -48,7 +48,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
 }) => {
   const toneStyles = KPI_TONES[tone];
   return (
-    <Card className={cn('flex min-w-0 flex-col gap-3', className)}>
+    <Card className={cn('flex min-w-0 flex-col gap-3 p-4', className)}>
       {/* Alerting tiles carry a coloured rule; calm tiles keep a clean top edge. */}
       {toneStyles.accent ? (
         <span aria-hidden className={cn('h-[3px] w-full rounded-full', toneStyles.accent)} />
@@ -87,7 +87,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
 
 /** Loading twin of `KpiCard`: same box, so the KPI grid never shifts on load. */
 export const KpiCardSkeleton: React.FC<{ className?: string }> = ({ className }) => (
-  <Card className={cn('flex min-w-0 flex-col gap-3', className)}>
+  <Card className={cn('flex min-w-0 flex-col gap-3 p-4', className)}>
     <div className="flex min-w-0 items-center gap-2.5">
       <Skeleton className="h-10 w-10 shrink-0" />
       <Skeleton className="h-5 w-3/5" />

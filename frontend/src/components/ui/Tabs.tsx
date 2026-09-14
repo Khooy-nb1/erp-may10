@@ -24,7 +24,7 @@ export interface TabListProps {
 }
 
 export const TabList: React.FC<TabListProps> = ({ children, label = 'Thẻ nội dung', className }) => (
-  <TabsPrimitive.List aria-label={label} className={cn('flex flex-wrap gap-1', className)}>
+  <TabsPrimitive.List aria-label={label} className={cn('flex flex-nowrap gap-1 overflow-x-auto', className)}>
     {children}
   </TabsPrimitive.List>
 );
@@ -39,7 +39,7 @@ export const Tab: React.FC<TabProps> = ({ value, label, className }) => (
   <TabsPrimitive.Trigger
     value={value}
     className={cn(
-      'inline-flex items-center gap-2 border-b-2 border-transparent px-3 pb-2.5 pt-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary',
+      'inline-flex items-center gap-2 whitespace-nowrap border-b-2 border-transparent px-3 pb-2.5 pt-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary',
       className
     )}
   >

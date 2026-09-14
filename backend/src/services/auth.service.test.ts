@@ -1,9 +1,12 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
+import jwt from 'jsonwebtoken';
 import { AuthService } from './auth.service.js';
+import { createAuthMiddleware } from '../middlewares/auth.middleware.js';
 import { IUserRepository } from '../repositories/user.repository.js';
 import { UserRecord } from '../models/user.model.js';
 import { InvalidCredentialsError, AccountInactiveError } from '../utils/errors.js';
+import { Request, Response } from 'express';
 
 describe('AuthService Unit Tests', () => {
   let knownHash: string;
@@ -111,5 +114,44 @@ describe('AuthService Unit Tests', () => {
         return true;
       }
     );
+  });
+
+  it('login returns a token signed with HS256 and applies expiry (exp > iat)', async () => {
+    const result = await authService.login({
+      email: 'sales@example.com',
+      password: validPassword,
+    });
+
+    const decoded = jwt.decode(result.token, { complete: true });
+    assert.ok(decoded, 'Issued token must decode to a JOSE header and payload');
+    assert.equal(decoded.header.alg, 'HS256', 'Token must be signed with HS256');
+
+    const { exp, iat } = decoded.payload as { exp: number; iat: number };
+    assert.equal(typeof exp, 'number', 'exp claim must be present (expiry is applied)');
+    assert.equal(typeof iat, 'number', 'iat claim must be present');
+    assert.ok(exp > iat, 'exp must be greater than iat');
+  });
+
+  it('login-issued token is accepted by createAuthMiddleware (issuer/verifier contract)', async () => {
+    const result = await authService.login({
+      email: 'sales@example.com',
+      password: validPassword,
+    });
+
+    const authenticate = createAuthMiddleware(mockUserRepo);
+    const req = { headers: { authorization: `Bearer ${result.token}` } } as Request;
+    let nextCalls = 0;
+    let caughtErr: unknown;
+
+    await authenticate(req, {} as Response, (err) => {
+      caughtErr = err;
+      nextCalls += 1;
+    });
+
+    assert.ifError(caughtErr);
+    assert.equal(nextCalls, 1, 'next() must be called exactly once');
+    assert.equal(req.userId, 1);
+    assert.ok(req.user);
+    assert.equal(req.user.vai_tro, 'ban_hang');
   });
 });

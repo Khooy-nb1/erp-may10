@@ -94,6 +94,7 @@ export const LoginPage: React.FC = () => {
         <div className="w-full max-w-[440px] rounded-card border border-border bg-surface p-6 shadow-card">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-1 text-center">
+              <Text variant="label">ERP Sales &amp; CRM</Text>
               <Heading level={1}>Đăng nhập Hệ thống</Heading>
               <Text variant="supporting" as="p">
                 Phân hệ Quản lý Bán hàng &amp; Khách hàng
@@ -107,7 +108,7 @@ export const LoginPage: React.FC = () => {
                 description={`[${errorCode}] ${errorMessage}`}
                 endContent={
                   <Button variant="secondary" size="sm" onClick={() => setErrorMessage(null)}>
-                    Thử lại
+                    Đóng
                   </Button>
                 }
               />

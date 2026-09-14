@@ -98,6 +98,35 @@ describe('Auth Middleware & RBAC Tests', () => {
     assert.equal(caughtErr.statusCode, 401);
   });
 
+  it('rejects tokens signed with an algorithm other than HS256 with 401', async () => {
+    const hs512Token = jwt.sign(
+      { id: 1, email: 'sales@example.com', vai_tro: 'ban_hang' },
+      env.JWT_SECRET,
+      { algorithm: 'HS512' }
+    );
+
+    let findByIdCalls = 0;
+    const spiedRepo: IUserRepository = {
+      ...mockUserRepo,
+      findById: async (id: number) => {
+        findByIdCalls += 1;
+        return mockUserRepo.findById(id);
+      },
+    };
+    const authenticateWithSpy = createAuthMiddleware(spiedRepo);
+
+    const req = { headers: { authorization: `Bearer ${hs512Token}` } } as Request;
+    let caughtErr: unknown;
+
+    await authenticateWithSpy(req, {} as Response, (err) => {
+      caughtErr = err;
+    });
+
+    assert.ok(caughtErr instanceof UnauthorizedError);
+    assert.equal(caughtErr.statusCode, 401);
+    assert.equal(findByIdCalls, 0, 'user repository must not be consulted for a non-HS256 token');
+  });
+
   it('rejects valid token if user account was subsequently locked or deactivated', async () => {
     const req = { headers: { authorization: `Bearer ${validTokenLocked}` } } as Request;
     let caughtErr: unknown;

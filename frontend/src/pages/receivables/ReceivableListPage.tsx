@@ -5,13 +5,14 @@ import { Banner } from '../../components/ui/Banner.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { Checkbox } from '../../components/ui/Checkbox.js';
-import { Input } from '../../components/ui/Input.js';
 import { Select } from '../../components/ui/Select.js';
 import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
 import { Receivable, ReceivableStatus, ReceivableSummary, AgingReport, AgingBucket } from '../../types/receivable.js';
 import { getReceivables, getReceivableSummary, getAgingReport } from '../../services/receivableService.js';
+import { formatCurrency, formatDate } from '../../lib/format.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { DataTableCard } from '../../components/common/DataTableCard.js';
+import { FilterBar } from '../../components/common/FilterBar.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
 import { useAuth } from '../../context/AuthContext.js';
 
@@ -51,15 +52,6 @@ const STATUS_OPTIONS = [
   { value: 'da_thanh_toan', label: 'Đã thanh toán' },
   { value: 'qua_han', label: 'Quá hạn' },
 ];
-
-const formatCurrency = (val: string | number) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
-};
-
-const formatDate = (dateStr: string | null) => {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('vi-VN');
-};
 
 const agingColumns: TableColumn<AgingRow>[] = [
   {
@@ -115,6 +107,9 @@ export const ReceivableListPage: React.FC = () => {
   const [pageSize] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [total, setTotal] = useState<number>(0);
+  // The search term is submit-triggered, so it is not an effect dependency;
+  // this token lets "Xóa bộ lọc" refetch when it cleared the search alone.
+  const [reloadToken, setReloadToken] = useState<number>(0);
 
   const fetchList = async () => {
     setLoading(true);
@@ -158,7 +153,7 @@ export const ReceivableListPage: React.FC = () => {
 
   useEffect(() => {
     fetchList();
-  }, [page, trangThai, overdueOnly, sortBy, sortOrder]);
+  }, [page, trangThai, overdueOnly, sortBy, sortOrder, reloadToken]);
 
   useEffect(() => {
     fetchOverview();
@@ -172,6 +167,8 @@ export const ReceivableListPage: React.FC = () => {
       fetchList();
     }
   };
+
+  const isFiltered = Boolean(search.trim() || trangThai || overdueOnly);
 
   const handleSort = (column: SortColumn) => {
     setPage(1);
@@ -210,7 +207,9 @@ export const ReceivableListPage: React.FC = () => {
       width: proportional(2),
       renderCell: (item) => (
         <div className="flex flex-col gap-0.5">
-          <Text className="font-medium">{item.ten_khach_hang || `Mã #${item.ma_khach_hang}`}</Text>
+          <span className="block max-w-[280px] truncate" title={item.ten_khach_hang}>
+            <Text className="font-medium">{item.ten_khach_hang || `Mã #${item.ma_khach_hang}`}</Text>
+          </span>
           {item.ma_khach_hang_code ? (
             <Text variant="code" className="text-muted-foreground">
               {item.ma_khach_hang_code}
@@ -269,7 +268,7 @@ export const ReceivableListPage: React.FC = () => {
       renderCell: (item) => {
         const daysOverdue = Number(item.daysOverdue) || 0;
         return daysOverdue > 0 ? (
-          <Text className="font-semibold">Quá hạn {daysOverdue} ngày</Text>
+          <Text className="font-semibold text-danger-strong">Quá hạn {daysOverdue} ngày</Text>
         ) : (
           <Text className="text-muted-foreground">—</Text>
         );
@@ -279,7 +278,7 @@ export const ReceivableListPage: React.FC = () => {
       key: 'trang_thai',
       header: 'Trạng thái',
       width: pixel(150),
-      align: 'center',
+      align: 'start',
       renderCell: (item) => <StatusBadge status={item.trang_thai} />,
     },
   ];
@@ -329,11 +328,11 @@ export const ReceivableListPage: React.FC = () => {
 
       {/* Summary KPI Cards */}
       {summary && (
-        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="p-4">
             <div className="flex flex-col gap-1">
               <Text variant="supporting">Tổng phát sinh</Text>
-              <Text variant="large" className="font-semibold">
+              <Text variant="large" className="font-semibold tabular-nums">
                 {formatCurrency(summary.totalOriginal)}
               </Text>
             </div>
@@ -341,7 +340,7 @@ export const ReceivableListPage: React.FC = () => {
           <Card className="p-4">
             <div className="flex flex-col gap-1">
               <Text variant="supporting">Đã thu</Text>
-              <Text variant="large" className="font-semibold">
+              <Text variant="large" className="font-semibold tabular-nums">
                 {formatCurrency(summary.totalPaid)}
               </Text>
             </div>
@@ -349,15 +348,15 @@ export const ReceivableListPage: React.FC = () => {
           <Card className="p-4">
             <div className="flex flex-col gap-1">
               <Text variant="supporting">Còn phải thu</Text>
-              <Text variant="large" className="font-semibold">
+              <Text variant="large" className="font-semibold tabular-nums">
                 {formatCurrency(summary.totalOutstanding)}
               </Text>
             </div>
           </Card>
-          <Card className="p-4">
+          <Card variant={Number(summary.totalOverdue) > 0 ? 'red' : 'default'} className="p-4">
             <div className="flex flex-col gap-1">
               <Text variant="supporting">Quá hạn</Text>
-              <Text variant="large" className="font-semibold">
+              <Text variant="large" className="font-semibold tabular-nums">
                 {formatCurrency(summary.totalOverdue)}
               </Text>
               <Text variant="supporting">{summary.overdueCount} khoản quá hạn</Text>
@@ -373,6 +372,7 @@ export const ReceivableListPage: React.FC = () => {
           data={agingRows}
           columns={agingColumns}
           idKey="id"
+          density="compact"
           toolbar={
             <div className="flex flex-col gap-0.5">
               <Heading level={3}>Báo cáo tuổi nợ</Heading>
@@ -390,6 +390,7 @@ export const ReceivableListPage: React.FC = () => {
         data={receivables}
         columns={columns}
         idKey="id"
+        density="compact"
         isLoading={loading}
         error={error}
         onRetry={fetchList}
@@ -399,40 +400,47 @@ export const ReceivableListPage: React.FC = () => {
         rowIndexStart={(page - 1) * pageSize + 1}
         rowCount={total}
         toolbar={
-          <form onSubmit={handleSearchSubmit}>
-            <div className="flex flex-row flex-wrap items-end gap-2">
-              <Input
-                label="Tìm kiếm công nợ"
-                placeholder="Tìm theo mã hóa đơn hoặc tên khách hàng..."
-                value={search}
-                onChange={setSearch}
-                className="w-80"
-              />
-              <Button type="submit" variant="secondary">Tìm kiếm</Button>
-            </div>
-          </form>
-        }
-        toolbarEnd={
-          <div className="flex flex-row flex-wrap items-end gap-3">
-            <Select
-              label="Trạng thái"
-              options={STATUS_OPTIONS}
-              value={trangThai}
-              onChange={(value) => {
-                setTrangThai(value as ReceivableStatus | '');
-                setPage(1);
-              }}
-              className="w-48"
-            />
-            <Checkbox
-              label="Chỉ công nợ quá hạn"
-              checked={overdueOnly}
-              onChange={(checked) => {
-                setOverdueOnly(checked);
-                setPage(1);
-              }}
-            />
-          </div>
+          <FilterBar
+            label="Bộ lọc danh sách công nợ phải thu"
+            search={{
+              label: 'Tìm kiếm công nợ',
+              placeholder: 'Tìm theo mã hóa đơn hoặc tên khách hàng...',
+              value: search,
+              onChange: setSearch,
+              widthClassName: 'w-full sm:w-80',
+            }}
+            onSubmit={handleSearchSubmit}
+            filters={
+              <>
+                <Select
+                  label="Trạng thái"
+                  options={STATUS_OPTIONS}
+                  value={trangThai}
+                  onChange={(value) => {
+                    setTrangThai(value as ReceivableStatus | '');
+                    setPage(1);
+                  }}
+                  className="w-full sm:w-48"
+                />
+                <Checkbox
+                  label="Chỉ công nợ quá hạn"
+                  checked={overdueOnly}
+                  onChange={(checked) => {
+                    setOverdueOnly(checked);
+                    setPage(1);
+                  }}
+                />
+              </>
+            }
+            isFiltered={isFiltered}
+            onReset={() => {
+              setSearch('');
+              setTrangThai('');
+              setOverdueOnly(false);
+              setPage(1);
+              setReloadToken((token) => token + 1);
+            }}
+          />
         }
       />
     </PageScaffold>

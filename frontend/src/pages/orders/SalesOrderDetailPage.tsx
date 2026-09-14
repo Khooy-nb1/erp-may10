@@ -1,23 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { ArrowLeft, Check, X } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Check, Truck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Order } from '../../types/order.js';
 import { getOrderById, confirmOrder, cancelOrder } from '../../services/orderService.js';
 import { useAuth } from '../../context/AuthContext.js';
 import { ApiError } from '../../services/api.js';
+import { formatCurrency, formatDate } from '../../lib/format.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { AsyncPanel } from '../../components/common/AsyncPanel.js';
-import { StatusBadge } from '../../components/common/StatusBadge.js';
+import { StatusBadge, statusLabel } from '../../components/common/StatusBadge.js';
 import { Banner } from '../../components/ui/Banner.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
-import { Dialog } from '../../components/ui/Dialog.js';
-import { Input } from '../../components/ui/Input.js';
 import { MetadataList, MetadataListItem } from '../../components/ui/MetadataList.js';
 import { Table, TableColumn, proportional } from '../../components/ui/Table.js';
 import { Heading, Text } from '../../components/ui/Typography.js';
 import { TextLink } from '../../components/ui/TextLink.js';
+import { ReasonDialog } from '../../components/ui/ReasonDialog.js';
+import { DeliveryCreateDialog } from '../../components/deliveries/DeliveryCreateDialog.js';
 
 type OrderLine = NonNullable<Order['lines']>[number];
 
@@ -40,6 +41,7 @@ interface OrderLineRow extends Record<string, unknown> {
 
 export const SalesOrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const orderId = Number(id);
   const { user } = useAuth();
 
@@ -51,6 +53,7 @@ export const SalesOrderDetailPage: React.FC = () => {
   const [creditWarning, setCreditWarning] = useState<string | null>(null);
   const [cancelOpen, setCancelOpen] = useState<boolean>(false);
   const [cancelReason, setCancelReason] = useState<string>('');
+  const [deliveryOpen, setDeliveryOpen] = useState<boolean>(false);
 
   const fetchOrder = async () => {
     setLoading(true);
@@ -110,15 +113,6 @@ export const SalesOrderDetailPage: React.FC = () => {
     }
   };
 
-  const formatCurrency = (val: string | number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('vi-VN');
-  };
-
   const isPending = order?.trang_thai === 'cho_xac_nhan';
   const isConfirmed = order?.trang_thai === 'da_xac_nhan';
   const isAdmin = user?.vai_tro === 'admin';
@@ -141,7 +135,7 @@ export const SalesOrderDetailPage: React.FC = () => {
       title={order ? `Đơn bán hàng: ${order.ma_don_ban}` : 'Đơn bán hàng'}
       subtitle={
         order
-          ? `Ngày đặt: ${formatDate(order.ngay_dat_hang)} • Trạng thái: ${order.trang_thai}`
+          ? `Ngày đặt: ${formatDate(order.ngay_dat_hang)} • Trạng thái: ${statusLabel(order.trang_thai)}`
           : undefined
       }
       breadcrumbs={[
@@ -157,11 +151,21 @@ export const SalesOrderDetailPage: React.FC = () => {
           >
             Danh sách đơn
           </Button>
+          {order && (
+            <Button
+              variant="secondary"
+              icon={<Truck size={16} aria-hidden />}
+              onClick={() => setDeliveryOpen(true)}
+            >
+              Lập đợt giao hàng
+            </Button>
+          )}
           {isSales && isPending && (
             <Button
               variant="primary"
               icon={<Check size={16} aria-hidden />}
-              disabled={actionLoading}
+              // The credit-limit Banner carries its own primary while it is open (G7).
+              disabled={actionLoading || Boolean(creditWarning)}
               onClick={() => handleConfirm(false)}
             >
               Xác nhận đơn hàng
@@ -217,173 +221,158 @@ export const SalesOrderDetailPage: React.FC = () => {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="sm:col-span-2">
-                <Card>
-                  <div className="flex flex-col gap-4">
-                    <Heading level={3}>Thông tin giao nhận &amp; Khách hàng</Heading>
-                    <MetadataList columns={2}>
-                      <MetadataListItem label="Khách hàng">
-                        <TextLink to={`/customers/${order.ma_khach_hang}`}>
-                          {order.ten_khach_hang || `Mã #${order.ma_khach_hang}`}
-                        </TextLink>
-                      </MetadataListItem>
-                      <MetadataListItem label="Trạng thái đơn">
-                        <StatusBadge status={order.trang_thai} label={STATUS_LABELS[order.trang_thai]} />
-                      </MetadataListItem>
-                      <MetadataListItem label="Địa chỉ giao hàng">
-                        {order.dia_chi_giao_hang}
-                      </MetadataListItem>
-                      <MetadataListItem label="Hạn giao hàng yêu cầu">
-                        {formatDate(order.ngay_giao_hang_yc)}
-                      </MetadataListItem>
-                      <MetadataListItem label="Ngày giao thực tế">
-                        {formatDate(order.ngay_giao_thuc_te)}
-                      </MetadataListItem>
-                      <MetadataListItem label="Nhân viên bán hàng">
-                        {order.ten_nguoi_ban || '—'}
-                      </MetadataListItem>
-                      <MetadataListItem label="Ghi chú">
-                        {order.ghi_chu || 'Không có ghi chú'}
-                      </MetadataListItem>
-                    </MetadataList>
-                  </div>
+                <Card className="flex flex-col gap-4">
+                  <Heading level={3}>Thông tin giao nhận &amp; Khách hàng</Heading>
+                  <MetadataList columns={2}>
+                    <MetadataListItem label="Khách hàng">
+                      <TextLink to={`/customers/${order.ma_khach_hang}`}>
+                        {order.ten_khach_hang || `Mã #${order.ma_khach_hang}`}
+                      </TextLink>
+                    </MetadataListItem>
+                    <MetadataListItem label="Trạng thái đơn">
+                      <StatusBadge status={order.trang_thai} label={STATUS_LABELS[order.trang_thai]} />
+                    </MetadataListItem>
+                    <MetadataListItem label="Địa chỉ giao hàng">
+                      {order.dia_chi_giao_hang}
+                    </MetadataListItem>
+                    <MetadataListItem label="Hạn giao hàng yêu cầu">
+                      {formatDate(order.ngay_giao_hang_yc)}
+                    </MetadataListItem>
+                    <MetadataListItem label="Ngày giao thực tế">
+                      {formatDate(order.ngay_giao_thuc_te)}
+                    </MetadataListItem>
+                    <MetadataListItem label="Nhân viên bán hàng">
+                      {order.ten_nguoi_ban || '—'}
+                    </MetadataListItem>
+                    <MetadataListItem label="Ghi chú">
+                      {order.ghi_chu || 'Không có ghi chú'}
+                    </MetadataListItem>
+                  </MetadataList>
                 </Card>
               </div>
 
-              <Card>
-                <div className="flex flex-col gap-4">
-                  <Heading level={3}>Tổng kết thanh toán</Heading>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex flex-row justify-between">
-                      <Text variant="supporting">Tiền hàng:</Text>
-                      <Text variant="body" className="tabular-nums">
-                        {formatCurrency(order.tong_tien_hang)}
-                      </Text>
-                    </div>
-                    <div className="flex flex-row justify-between">
-                      <Text variant="supporting">Giảm giá:</Text>
-                      <Text variant="body" className="tabular-nums">
-                        - {formatCurrency(order.tien_giam_gia)}
-                      </Text>
-                    </div>
-                    <div className="flex flex-row justify-between">
-                      <Text variant="supporting">Tiền thuế:</Text>
-                      <Text variant="body" className="tabular-nums">
-                        {formatCurrency(order.tien_thue)}
-                      </Text>
-                    </div>
-                  </div>
-                  <div className="flex flex-row items-center justify-between">
-                    <Text variant="label">Tổng thanh toán:</Text>
-                    <Text variant="label" className="tabular-nums">
-                      {formatCurrency(order.tong_thanh_toan)}
+              <Card className="flex flex-col gap-4">
+                <Heading level={3}>Tổng kết thanh toán</Heading>
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-row justify-between gap-4">
+                    <Text variant="supporting">Tiền hàng:</Text>
+                    <Text variant="body" className="tabular-nums">
+                      {formatCurrency(order.tong_tien_hang)}
                     </Text>
                   </div>
+                  <div className="flex flex-row justify-between gap-4">
+                    <Text variant="supporting">Giảm giá:</Text>
+                    <Text variant="body" className="tabular-nums">
+                      - {formatCurrency(order.tien_giam_gia)}
+                    </Text>
+                  </div>
+                  <div className="flex flex-row justify-between gap-4">
+                    <Text variant="supporting">Tiền thuế:</Text>
+                    <Text variant="body" className="tabular-nums">
+                      {formatCurrency(order.tien_thue)}
+                    </Text>
+                  </div>
+                </div>
+                <div className="flex flex-row items-center justify-between gap-4">
+                  <Text variant="label">Tổng thanh toán:</Text>
+                  <Text variant="label" className="tabular-nums">
+                    {formatCurrency(order.tong_thanh_toan)}
+                  </Text>
                 </div>
               </Card>
             </div>
 
-            <Card>
-              <div className="flex flex-col gap-4">
-                <Heading level={3}>
-                  Chi tiết sản phẩm đặt hàng ({order.lines?.length || 0} sản phẩm)
-                </Heading>
-                <AsyncPanel
-                  isLoading={false}
-                  isEmpty={lineRows.length === 0}
-                  emptyTitle="Không có dòng sản phẩm nào."
-                >
-                  <Table<OrderLineRow>
-                    data={lineRows}
-                    idKey="id"
-                    columns={[
-                      {
-                        key: 'ma_san_pham',
-                        header: 'Mã hàng',
-                        width: proportional(1),
-                        renderCell: (row) => row.ma_san_pham,
-                      },
-                      {
-                        key: 'ten_san_pham',
-                        header: 'Tên sản phẩm',
-                        width: proportional(2),
-                        renderCell: (row) => row.ten_san_pham,
-                      },
-                      {
-                        key: 'so_luong',
-                        header: 'Số lượng',
-                        width: proportional(1),
-                        align: 'center',
-                        renderCell: (row) => row.so_luong,
-                      },
-                      {
-                        key: 'don_gia',
-                        header: 'Đơn giá',
-                        width: proportional(1),
-                        align: 'end',
-                        renderCell: (row) => row.don_gia,
-                      },
-                      {
-                        key: 'giam_gia',
-                        header: 'Giảm giá',
-                        width: proportional(1),
-                        align: 'center',
-                        renderCell: (row) => row.giam_gia,
-                      },
-                      {
-                        key: 'thanh_tien',
-                        header: 'Thành tiền',
-                        width: proportional(1),
-                        align: 'end',
-                        renderCell: (row) => row.thanh_tien,
-                      },
-                      {
-                        key: 'trang_thai',
-                        header: 'Trạng thái giao',
-                        width: proportional(1),
-                        align: 'center',
-                        renderCell: (row) => <StatusBadge status={row.trang_thai} />,
-                      },
-                    ] satisfies TableColumn<OrderLineRow>[]}
-                  />
-                </AsyncPanel>
-              </div>
+            <Card className="flex flex-col gap-4">
+              <Heading level={3}>
+                Chi tiết sản phẩm đặt hàng ({order.lines?.length || 0} sản phẩm)
+              </Heading>
+              <AsyncPanel
+                isLoading={false}
+                isEmpty={lineRows.length === 0}
+                emptyTitle="Không có dòng sản phẩm nào."
+              >
+                <Table<OrderLineRow>
+                  data={lineRows}
+                  idKey="id"
+                  density="balanced"
+                  columns={[
+                    {
+                      key: 'ma_san_pham',
+                      header: 'Mã hàng',
+                      width: proportional(1),
+                      renderCell: (row) => row.ma_san_pham,
+                    },
+                    {
+                      key: 'ten_san_pham',
+                      header: 'Tên sản phẩm',
+                      width: proportional(2),
+                      renderCell: (row) => (
+                        <span className="block max-w-[280px] truncate" title={row.ten_san_pham}>
+                          {row.ten_san_pham}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: 'so_luong',
+                      header: 'Số lượng',
+                      width: proportional(1),
+                      align: 'end',
+                      renderCell: (row) => <Text className="tabular-nums">{row.so_luong}</Text>,
+                    },
+                    {
+                      key: 'don_gia',
+                      header: 'Đơn giá',
+                      width: proportional(1),
+                      align: 'end',
+                      renderCell: (row) => <Text className="tabular-nums">{row.don_gia}</Text>,
+                    },
+                    {
+                      key: 'giam_gia',
+                      header: 'Giảm giá',
+                      width: proportional(1),
+                      align: 'end',
+                      renderCell: (row) => <Text className="tabular-nums">{row.giam_gia}</Text>,
+                    },
+                    {
+                      key: 'thanh_tien',
+                      header: 'Thành tiền',
+                      width: proportional(1),
+                      align: 'end',
+                      renderCell: (row) => <Text className="tabular-nums">{row.thanh_tien}</Text>,
+                    },
+                    {
+                      key: 'trang_thai',
+                      header: 'Trạng thái giao',
+                      width: proportional(1),
+                      align: 'start',
+                      renderCell: (row) => <StatusBadge status={row.trang_thai} />,
+                    },
+                  ] satisfies TableColumn<OrderLineRow>[]}
+                />
+              </AsyncPanel>
             </Card>
           </div>
         )}
       </AsyncPanel>
 
-      <Dialog
+      <ReasonDialog
         isOpen={cancelOpen}
         onOpenChange={setCancelOpen}
-        purpose="form"
-        title="Hủy đơn hàng"
-      >
-        <div className="flex flex-col gap-4">
-          <Input
-            label="Nhập lý do hủy đơn hàng:"
-            value={cancelReason}
-            onChange={setCancelReason}
-            disabled={actionLoading}
-          />
-          <div className="flex flex-row justify-end gap-2">
-            <Button
-              variant="secondary"
-              disabled={actionLoading}
-              onClick={() => setCancelOpen(false)}
-            >
-              Đóng
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={!cancelReason.trim() || actionLoading}
-              loading={actionLoading}
-              onClick={() => handleCancel(cancelReason)}
-            >
-              Hủy đơn hàng
-            </Button>
-          </div>
-        </div>
-      </Dialog>
+        title="Hủy đơn bán hàng"
+        label="Lý do hủy"
+        value={cancelReason}
+        onChange={setCancelReason}
+        submitLabel="Xác nhận hủy"
+        isSubmitting={actionLoading}
+        onSubmit={() => handleCancel(cancelReason)}
+      />
+
+      <DeliveryCreateDialog
+        isOpen={deliveryOpen}
+        onOpenChange={setDeliveryOpen}
+        presetOrderId={order?.id ?? null}
+        onCreated={(deliveryId) => navigate(`/deliveries/${deliveryId}`)}
+      />
     </PageScaffold>
   );
 };

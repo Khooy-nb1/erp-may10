@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Text } from '../../components/ui/Typography.js';
-import { Button } from '../../components/ui/Button.js';
-import { Input } from '../../components/ui/Input.js';
 import { Select } from '../../components/ui/Select.js';
 import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
 import { Product, ProductStatus } from '../../types/product.js';
 import { getProducts } from '../../services/productService.js';
+import { formatCurrency } from '../../lib/format.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { DataTableCard } from '../../components/common/DataTableCard.js';
+import { FilterBar } from '../../components/common/FilterBar.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
 
 /**
@@ -48,10 +48,6 @@ const TRANG_THAI_OPTIONS = [
   { value: 'ngung_ban', label: 'Ngừng bán' },
 ];
 
-const formatCurrency = (val: string | number) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
-};
-
 const columns: TableColumn<ProductRow>[] = [
   {
     key: 'ma_san_pham',
@@ -63,7 +59,11 @@ const columns: TableColumn<ProductRow>[] = [
     key: 'ten_san_pham',
     header: 'Tên sản phẩm',
     width: proportional(2),
-    renderCell: (item) => <Text variant="label">{item.ten_san_pham}</Text>,
+    renderCell: (item) => (
+      <span className="block max-w-[280px] truncate" title={item.ten_san_pham}>
+        <Text variant="label">{item.ten_san_pham}</Text>
+      </span>
+    ),
   },
   { key: 'size', header: 'Kích cỡ', width: proportional(1), renderCell: (item) => item.size || '—' },
   { key: 'mau_sac', header: 'Màu sắc', width: proportional(1), renderCell: (item) => item.mau_sac || '—' },
@@ -88,7 +88,7 @@ const columns: TableColumn<ProductRow>[] = [
     key: 'trang_thai',
     header: 'Trạng thái',
     width: pixel(140),
-    align: 'center',
+    align: 'start',
     renderCell: (item) => <StatusBadge status={item.trang_thai} />,
   },
 ];
@@ -107,6 +107,9 @@ export const ProductListPage: React.FC = () => {
   const [pageSize] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [total, setTotal] = useState<number>(0);
+  // The search term is submit-triggered, so it is not an effect dependency;
+  // this token lets "Xóa bộ lọc" refetch when it cleared the search alone.
+  const [reloadToken, setReloadToken] = useState<number>(0);
 
   const fetchList = async () => {
     setLoading(true);
@@ -132,13 +135,17 @@ export const ProductListPage: React.FC = () => {
 
   useEffect(() => {
     fetchList();
-  }, [page, size, mauSac, trangThai]);
+  }, [page, size, mauSac, trangThai, reloadToken]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
     fetchList();
   };
+
+  // 'Đang bán' is this screen's default view, so resetting restores it rather
+  // than switching to every status.
+  const isFiltered = Boolean(search.trim() || size || mauSac || trangThai !== 'dang_ban');
 
   return (
     <PageScaffold
@@ -150,6 +157,7 @@ export const ProductListPage: React.FC = () => {
         data={products}
         columns={columns}
         idKey="id"
+        density="compact"
         isLoading={loading}
         error={error}
         onRetry={fetchList}
@@ -159,52 +167,60 @@ export const ProductListPage: React.FC = () => {
         rowIndexStart={(page - 1) * pageSize + 1}
         rowCount={total}
         toolbar={
-          <form onSubmit={handleSearchSubmit}>
-            <div className="flex flex-row flex-wrap items-end gap-2">
-              <Input
-                label="Tìm kiếm sản phẩm"
-                placeholder="Tìm theo mã sản phẩm hoặc tên hàng..."
-                value={search}
-                onChange={setSearch}
-                className="w-80"
-              />
-              <Button type="submit" variant="secondary">Tìm kiếm</Button>
-            </div>
-          </form>
-        }
-        toolbarEnd={
-          <div className="flex flex-row flex-wrap items-end gap-2">
-            <Select
-              label="Kích cỡ"
-              options={SIZE_OPTIONS}
-              value={size}
-              onChange={(value) => {
-                setSize(value);
-                setPage(1);
-              }}
-              className="w-40"
-            />
-            <Select
-              label="Màu sắc"
-              options={MAU_SAC_OPTIONS}
-              value={mauSac}
-              onChange={(value) => {
-                setMauSac(value);
-                setPage(1);
-              }}
-              className="w-[180px]"
-            />
-            <Select
-              label="Trạng thái"
-              options={TRANG_THAI_OPTIONS}
-              value={trangThai}
-              onChange={(value) => {
-                setTrangThai(value as ProductStatus | '');
-                setPage(1);
-              }}
-              className="w-[170px]"
-            />
-          </div>
+          <FilterBar
+            label="Bộ lọc danh mục sản phẩm"
+            search={{
+              label: 'Tìm kiếm sản phẩm',
+              placeholder: 'Tìm theo mã sản phẩm hoặc tên hàng...',
+              value: search,
+              onChange: setSearch,
+              widthClassName: 'w-full sm:w-80',
+            }}
+            onSubmit={handleSearchSubmit}
+            filters={
+              <>
+                <Select
+                  label="Kích cỡ"
+                  options={SIZE_OPTIONS}
+                  value={size}
+                  onChange={(value) => {
+                    setSize(value);
+                    setPage(1);
+                  }}
+                  className="w-full sm:w-48"
+                />
+                <Select
+                  label="Màu sắc"
+                  options={MAU_SAC_OPTIONS}
+                  value={mauSac}
+                  onChange={(value) => {
+                    setMauSac(value);
+                    setPage(1);
+                  }}
+                  className="w-full sm:w-48"
+                />
+                <Select
+                  label="Trạng thái"
+                  options={TRANG_THAI_OPTIONS}
+                  value={trangThai}
+                  onChange={(value) => {
+                    setTrangThai(value as ProductStatus | '');
+                    setPage(1);
+                  }}
+                  className="w-full sm:w-48"
+                />
+              </>
+            }
+            isFiltered={isFiltered}
+            onReset={() => {
+              setSearch('');
+              setSize('');
+              setMauSac('');
+              setTrangThai('dang_ban');
+              setPage(1);
+              setReloadToken((token) => token + 1);
+            }}
+          />
         }
       />
     </PageScaffold>

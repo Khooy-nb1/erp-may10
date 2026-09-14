@@ -12,6 +12,7 @@ import { Card } from '../../components/ui/Card.js';
 import { MetadataList, MetadataListItem } from '../../components/ui/MetadataList.js';
 import { Heading, Text } from '../../components/ui/Typography.js';
 import { TextLink } from '../../components/ui/TextLink.js';
+import { formatCurrency, formatDate } from '../../lib/format.js';
 
 /** `qua_han` reads "Quá hạn thanh toán" on this screen; the shared badge labels it "Quá hạn". */
 const STATUS_LABELS: Partial<Record<Invoice['trang_thai'], string>> = {
@@ -44,15 +45,6 @@ export const InvoiceDetailPage: React.FC = () => {
       fetchInvoice();
     }
   }, [invoiceId]);
-
-  const formatCurrency = (val: string | number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('vi-VN');
-  };
 
   const remainingDebt = invoice
     ? Math.max(0, Number(invoice.tong_tien_sau_thue) - Number(invoice.so_tien_da_thu))
@@ -101,11 +93,11 @@ export const InvoiceDetailPage: React.FC = () => {
             )}
 
             {/* Financial Summary Breakdown */}
-            <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               <Card>
                 <div className="flex flex-col gap-1">
                   <Text variant="supporting">Tiền trước thuế</Text>
-                  <Text variant="label" className="tabular-nums">
+                  <Text variant="large" className="tabular-nums">
                     {formatCurrency(invoice.tong_tien_truoc_thue)}
                   </Text>
                 </div>
@@ -113,7 +105,7 @@ export const InvoiceDetailPage: React.FC = () => {
               <Card>
                 <div className="flex flex-col gap-1">
                   <Text variant="supporting">Tiền thuế GTGT</Text>
-                  <Text variant="label" className="tabular-nums">
+                  <Text variant="large" className="tabular-nums">
                     {formatCurrency(invoice.tien_thue)}
                   </Text>
                 </div>
@@ -121,7 +113,7 @@ export const InvoiceDetailPage: React.FC = () => {
               <Card variant="blue">
                 <div className="flex flex-col gap-1">
                   <Text variant="supporting">Tổng tiền sau thuế</Text>
-                  <Text variant="label" className="tabular-nums">
+                  <Text variant="large" className="tabular-nums">
                     {formatCurrency(invoice.tong_tien_sau_thue)}
                   </Text>
                 </div>
@@ -129,7 +121,7 @@ export const InvoiceDetailPage: React.FC = () => {
               <Card variant="green">
                 <div className="flex flex-col gap-1">
                   <Text variant="supporting">Đã thu lũy kế</Text>
-                  <Text variant="label" className="tabular-nums">
+                  <Text variant="large" className="tabular-nums">
                     {formatCurrency(invoice.so_tien_da_thu)}
                   </Text>
                 </div>
@@ -137,7 +129,7 @@ export const InvoiceDetailPage: React.FC = () => {
               <Card variant={remainingDebt > 0 ? 'red' : 'green'}>
                 <div className="flex flex-col gap-1">
                   <Text variant="supporting">Còn phải thu</Text>
-                  <Text variant="label" className="tabular-nums">
+                  <Text variant="large" className="tabular-nums">
                     {formatCurrency(remainingDebt)}
                   </Text>
                 </div>

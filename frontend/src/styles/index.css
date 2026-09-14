@@ -79,4 +79,32 @@
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
   }
+
+  /* Tailwind v4's preflight leaves buttons and form controls on
+     `cursor: default`, so only the components that hardcoded `cursor-pointer`
+     showed the hand. These rules sit after the preflight inside `@layer base`
+     and win there; Tailwind's cursor utilities live in a later layer and still
+     override them. */
+  :where(
+    button,
+    select,
+    summary,
+    label[for],
+    input[type='checkbox'],
+    input[type='radio'],
+    input[type='file'],
+    [role='button'],
+    [role='tab'],
+    [role='menuitem'],
+    [role='option'],
+    [role='switch']
+  ):not(:disabled):not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+
+  /* A disabled control is not clickable — match Input's existing convention
+     instead of advertising a hand the click will not honour. */
+  :where(button, select, [role='button'], [role='tab'], [role='menuitem'], [role='option'], [role='switch']):is(:disabled, [aria-disabled='true']) {
+    cursor: not-allowed;
+  }
 }

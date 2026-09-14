@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { Text } from '../../components/ui/Typography.js';
 import { Button } from '../../components/ui/Button.js';
-import { Input } from '../../components/ui/Input.js';
 import { Select } from '../../components/ui/Select.js';
 import { TextLink } from '../../components/ui/TextLink.js';
 import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
@@ -10,7 +9,9 @@ import { Customer, CustomerType, CustomerStatus } from '../../types/customer.js'
 import { getCustomers } from '../../services/customerService.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { DataTableCard } from '../../components/common/DataTableCard.js';
+import { FilterBar } from '../../components/common/FilterBar.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
+import { formatCurrency } from '../../lib/format.js';
 
 /**
  * Columns this screen reads off `Customer`. Declared as an object type alias so
@@ -42,10 +43,6 @@ const TRANG_THAI_OPTIONS = [
   { value: 'ngung_giao_dich', label: 'Ngừng giao dịch' },
 ];
 
-const formatCurrency = (val: string | number) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val) || 0);
-};
-
 const columns: TableColumn<CustomerRow>[] = [
   {
     key: 'ma_khach_hang',
@@ -61,11 +58,24 @@ const columns: TableColumn<CustomerRow>[] = [
     key: 'ten_khach_hang',
     header: 'Tên khách hàng',
     width: proportional(2),
-    renderCell: (item) => <Text variant="label">{item.ten_khach_hang}</Text>,
+    renderCell: (item) => (
+      <span className="block max-w-[280px] truncate" title={item.ten_khach_hang}>
+        <Text variant="label">{item.ten_khach_hang}</Text>
+      </span>
+    ),
   },
   { key: 'loai_khach_hang', header: 'Loại', width: proportional(1) },
   { key: 'so_dien_thoai', header: 'Số điện thoại', width: proportional(1) },
-  { key: 'tinh_thanh_pho', header: 'Tỉnh/Thành', width: proportional(1) },
+  {
+    key: 'tinh_thanh_pho',
+    header: 'Tỉnh/Thành',
+    width: proportional(1),
+    renderCell: (item) => (
+      <span className="block max-w-[240px] truncate" title={item.tinh_thanh_pho}>
+        {item.tinh_thanh_pho}
+      </span>
+    ),
+  },
   {
     key: 'han_muc_cong_no',
     header: 'Hạn mức công nợ',
@@ -78,17 +88,6 @@ const columns: TableColumn<CustomerRow>[] = [
     header: 'Trạng thái',
     width: pixel(150),
     renderCell: (item) => <StatusBadge status={item.trang_thai} />,
-  },
-  {
-    key: 'actions',
-    header: 'Thao tác',
-    width: pixel(110),
-    align: 'end',
-    renderCell: (item) => (
-      <TextLink to={`/customers/${item.id}`} weight="medium">
-        Chi tiết
-      </TextLink>
-    ),
   },
 ];
 
@@ -105,6 +104,9 @@ export const CustomerListPage: React.FC = () => {
   const [pageSize] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [total, setTotal] = useState<number>(0);
+  // "Xóa bộ lọc" must refetch even when only the search text changed: search is
+  // submit-triggered and therefore not an effect dependency.
+  const [reloadToken, setReloadToken] = useState<number>(0);
 
   const fetchList = async () => {
     setLoading(true);
@@ -129,7 +131,7 @@ export const CustomerListPage: React.FC = () => {
 
   useEffect(() => {
     fetchList();
-  }, [page, loaiKhachHang, trangThai]);
+  }, [page, loaiKhachHang, trangThai, reloadToken]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,6 +158,7 @@ export const CustomerListPage: React.FC = () => {
         data={customers}
         columns={columns}
         idKey="id"
+        density="compact"
         isLoading={loading}
         error={error}
         onRetry={fetchList}
@@ -165,42 +168,49 @@ export const CustomerListPage: React.FC = () => {
         rowIndexStart={(page - 1) * pageSize + 1}
         rowCount={total}
         toolbar={
-          <form onSubmit={handleSearchSubmit}>
-            <div className="flex flex-row flex-wrap items-end gap-2">
-              <Input
-                label="Tìm kiếm khách hàng"
-                placeholder="Tìm theo mã, tên, số điện thoại, MST..."
-                value={search}
-                onChange={setSearch}
-                className="w-80"
-              />
-              <Button type="submit" variant="secondary">Tìm kiếm</Button>
-            </div>
-          </form>
-        }
-        toolbarEnd={
-          <div className="flex flex-row flex-wrap items-end gap-2">
-            <Select
-              label="Loại khách hàng"
-              options={LOAI_KHACH_OPTIONS}
-              value={loaiKhachHang}
-              onChange={(value) => {
-                setLoaiKhachHang(value as CustomerType | '');
-                setPage(1);
-              }}
-              className="w-48"
-            />
-            <Select
-              label="Trạng thái"
-              options={TRANG_THAI_OPTIONS}
-              value={trangThai}
-              onChange={(value) => {
-                setTrangThai(value as CustomerStatus | '');
-                setPage(1);
-              }}
-              className="w-48"
-            />
-          </div>
+          <FilterBar
+            label="Bộ lọc danh sách khách hàng"
+            search={{
+              label: 'Tìm kiếm khách hàng',
+              placeholder: 'Tìm theo mã, tên, số điện thoại, MST...',
+              value: search,
+              onChange: setSearch,
+              widthClassName: 'w-full sm:w-80',
+            }}
+            onSubmit={handleSearchSubmit}
+            filters={
+              <>
+                <Select
+                  label="Loại khách hàng"
+                  options={LOAI_KHACH_OPTIONS}
+                  value={loaiKhachHang}
+                  onChange={(value) => {
+                    setLoaiKhachHang(value as CustomerType | '');
+                    setPage(1);
+                  }}
+                  className="w-full sm:w-48"
+                />
+                <Select
+                  label="Trạng thái"
+                  options={TRANG_THAI_OPTIONS}
+                  value={trangThai}
+                  onChange={(value) => {
+                    setTrangThai(value as CustomerStatus | '');
+                    setPage(1);
+                  }}
+                  className="w-full sm:w-48"
+                />
+              </>
+            }
+            isFiltered={Boolean(search.trim() || loaiKhachHang || trangThai)}
+            onReset={() => {
+              setSearch('');
+              setLoaiKhachHang('');
+              setTrangThai('');
+              setPage(1);
+              setReloadToken((token) => token + 1);
+            }}
+          />
         }
       />
     </PageScaffold>

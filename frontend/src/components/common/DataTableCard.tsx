@@ -73,7 +73,7 @@ export function DataTableCard<T extends Record<string, unknown>>({
               aria-label={label}
               className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4"
             >
-              <div className="flex flex-wrap items-center gap-2">{toolbar}</div>
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{toolbar}</div>
               <div className="flex flex-wrap items-center gap-2">{toolbarEnd}</div>
             </div>
           ) : null}

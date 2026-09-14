@@ -16,6 +16,7 @@ import { Customer } from '../../types/customer.js';
 import { Product } from '../../types/product.js';
 import { getCustomers } from '../../services/customerService.js';
 import { createOrder } from '../../services/orderService.js';
+import { formatCurrency } from '../../lib/format.js';
 import { ProductSelector } from '../../components/products/ProductSelector.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { FormSection } from '../../components/common/FormSection.js';
@@ -104,10 +105,6 @@ export const SalesOrderCreatePage: React.FC = () => {
   );
   const netTotal = Math.max(0, grossTotal - discountTotal);
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCustomerId) {
@@ -161,7 +158,12 @@ export const SalesOrderCreatePage: React.FC = () => {
       width: proportional(1),
       renderCell: (row) => (
         <div className="flex flex-col gap-0.5">
-          <Text className="font-semibold">{row.line.product.ten_san_pham}</Text>
+          <span
+            className="block max-w-[280px] truncate font-semibold"
+            title={row.line.product.ten_san_pham}
+          >
+            {row.line.product.ten_san_pham}
+          </span>
           <Text variant="supporting">
             {`${row.line.product.ma_san_pham} • ĐVT: ${row.line.product.ten_don_vi || 'Cái'}`}
           </Text>
@@ -172,6 +174,7 @@ export const SalesOrderCreatePage: React.FC = () => {
       key: 'quantity',
       header: 'Số lượng',
       width: pixel(120),
+      align: 'end',
       renderCell: (row) => (
         <NumberInput
           label="Số lượng"
@@ -186,12 +189,17 @@ export const SalesOrderCreatePage: React.FC = () => {
       key: 'unitPrice',
       header: 'Đơn giá',
       align: 'end',
-      renderCell: (row) => <Text className="font-medium">{formatCurrency(Number(row.line.product.gia_ban))}</Text>,
+      renderCell: (row) => (
+        <Text className="font-medium tabular-nums">
+          {formatCurrency(Number(row.line.product.gia_ban))}
+        </Text>
+      ),
     },
     {
       key: 'discountRate',
       header: 'Giảm (%)',
       width: pixel(110),
+      align: 'end',
       renderCell: (row) => (
         <NumberInput
           label="Giảm (%)"
@@ -212,17 +220,19 @@ export const SalesOrderCreatePage: React.FC = () => {
       renderCell: (row) => {
         const gross = row.line.quantity * Number(row.line.product.gia_ban);
         const discount = (gross * row.line.discountRate) / 100;
-        return <Text className="font-semibold">{formatCurrency(gross - discount)}</Text>;
+        return (
+          <Text className="font-semibold tabular-nums">{formatCurrency(gross - discount)}</Text>
+        );
       },
     },
     {
       key: 'actions',
       header: '',
       width: pixel(56),
-      align: 'center',
+      align: 'end',
       renderCell: (row) => (
         <IconButton
-          icon={<Trash2 size={16} />}
+          icon={<Trash2 size={16} aria-hidden />}
           label="Xóa dòng sản phẩm"
           variant="ghost"
           size="sm"
@@ -250,8 +260,8 @@ export const SalesOrderCreatePage: React.FC = () => {
         </Button>
       }
     >
-      <form onSubmit={handleSubmit} noValidate>
-        <div className="flex w-full flex-col gap-5">
+      <div className="flex w-full max-w-[750px] flex-col gap-5">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
           {error ? (
             <Banner
               status="error"
@@ -266,118 +276,118 @@ export const SalesOrderCreatePage: React.FC = () => {
           ) : null}
 
           <FormSection title="1. Thông tin chung đơn hàng">
-            <div className="flex flex-col gap-4">
-              <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
-                <Select
-                  label="Khách hàng *"
-                  placeholder="-- Chọn khách hàng --"
-                  value={selectedCustomerId === '' ? undefined : String(selectedCustomerId)}
-                  onChange={(value) => handleCustomerChange(value ?? '')}
-                  options={customers.map((c) => ({
-                    value: String(c.id),
-                    label: `${c.ten_khach_hang} (${c.ma_khach_hang}) - ${c.tinh_thanh_pho}`,
-                  }))}
-                />
+            <Select
+              label="Khách hàng *"
+              placeholder="-- Chọn khách hàng --"
+              value={selectedCustomerId === '' ? undefined : String(selectedCustomerId)}
+              onChange={(value) => handleCustomerChange(value ?? '')}
+              options={customers.map((c) => ({
+                value: String(c.id),
+                label: `${c.ten_khach_hang} (${c.ma_khach_hang}) - ${c.tinh_thanh_pho}`,
+              }))}
+            />
 
-                <Input
-                  label="Địa chỉ giao hàng *"
-                  value={deliveryAddress}
-                  onChange={(value) => setDeliveryAddress(value)}
-                />
+            <Input
+              label="Địa chỉ giao hàng *"
+              value={deliveryAddress}
+              onChange={(value) => setDeliveryAddress(value)}
+            />
 
-                <DateInput
-                  label="Ngày đặt hàng *"
-                  value={orderDate as ISODateString}
-                  onChange={(value) => setOrderDate(value ?? '')}
-                />
+            <DateInput
+              label="Ngày đặt hàng *"
+              value={orderDate as ISODateString}
+              onChange={(value) => setOrderDate(value ?? '')}
+            />
 
-                <DateInput
-                  label="Ngày giao hàng yêu cầu *"
-                  value={requestedDeliveryDate as ISODateString}
-                  onChange={(value) => setRequestedDeliveryDate(value ?? '')}
-                />
-              </div>
+            <DateInput
+              label="Ngày giao hàng yêu cầu *"
+              value={requestedDeliveryDate as ISODateString}
+              onChange={(value) => setRequestedDeliveryDate(value ?? '')}
+            />
 
-              <Textarea label="Ghi chú đơn hàng" rows={2} value={notes} onChange={(value) => setNotes(value)} />
-            </div>
+            <Textarea
+              label="Ghi chú đơn hàng"
+              rows={2}
+              value={notes}
+              onChange={(value) => setNotes(value)}
+            />
           </FormSection>
 
           <FormSection
             title="2. Danh sách sản phẩm đặt mua"
             description="Giá niêm yết được áp dụng tự động từ máy chủ"
           >
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Text variant="label" as="label">
-                  Tra cứu &amp; thêm sản phẩm vào đơn:
-                </Text>
-                <ProductSelector onSelect={handleAddProduct} />
-              </div>
+            <div className="flex flex-col gap-2">
+              <Text variant="label" as="label">
+                Tra cứu &amp; thêm sản phẩm vào đơn:
+              </Text>
+              <ProductSelector onSelect={handleAddProduct} />
+            </div>
 
-              {lines.length === 0 ? (
-                <Card variant="muted" className="p-4">
-                  <div className="flex flex-row w-full justify-center">
-                    <Text variant="supporting" as="p">
-                      Chưa có sản phẩm nào được chọn. Hãy tra cứu sản phẩm ở trên để thêm vào đơn hàng.
-                    </Text>
-                  </div>
-                </Card>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <Table data={lineRows} columns={lineColumns} idKey="key" density="compact" />
+            {lines.length === 0 ? (
+              <Card variant="muted" className="p-4">
+                <div className="flex flex-row w-full justify-center">
+                  <Text variant="supporting" as="p">
+                    Chưa có sản phẩm nào được chọn. Hãy tra cứu sản phẩm ở trên để thêm vào đơn hàng.
+                  </Text>
+                </div>
+              </Card>
+            ) : (
+              <>
+                <Table data={lineRows} columns={lineColumns} idKey="key" density="balanced" />
 
-                  <div className="border-t border-border" />
+                <div className="border-t border-border" />
 
-                  <div className="flex flex-row w-full justify-end">
-                    <div className="flex w-85 flex-col gap-2">
-                      <div className="flex flex-row w-full justify-between">
-                        <Text variant="supporting" as="span">
-                          Tổng tiền hàng:
-                        </Text>
-                        <Text className="font-medium" as="span">
-                          {formatCurrency(grossTotal)}
-                        </Text>
-                      </div>
+                <div className="flex flex-row w-full justify-end">
+                  <div className="flex w-full flex-col gap-2 sm:w-80">
+                    <div className="flex flex-row w-full justify-between gap-4">
+                      <Text variant="supporting" as="span">
+                        Tổng tiền hàng:
+                      </Text>
+                      <Text className="font-medium tabular-nums" as="span">
+                        {formatCurrency(grossTotal)}
+                      </Text>
+                    </div>
 
-                      <div className="flex flex-row w-full justify-between">
-                        <Text variant="supporting" as="span">
-                          Tiền giảm giá:
-                        </Text>
-                        <Text as="span">{`- ${formatCurrency(discountTotal)}`}</Text>
-                      </div>
+                    <div className="flex flex-row w-full justify-between gap-4">
+                      <Text variant="supporting" as="span">
+                        Tiền giảm giá:
+                      </Text>
+                      <Text className="tabular-nums" as="span">{`- ${formatCurrency(discountTotal)}`}</Text>
+                    </div>
 
-                      <div className="border-t border-border" />
+                    <div className="border-t border-border" />
 
-                      <div className="flex flex-row w-full justify-between">
-                        <Text className="font-bold" as="span">
-                          Tổng thanh toán:
-                        </Text>
-                        <Text className="font-bold" as="span">
-                          {formatCurrency(netTotal)}
-                        </Text>
-                      </div>
+                    <div className="flex flex-row w-full justify-between gap-4">
+                      <Text className="font-bold" as="span">
+                        Tổng thanh toán:
+                      </Text>
+                      <Text className="font-bold tabular-nums" as="span">
+                        {formatCurrency(netTotal)}
+                      </Text>
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </FormSection>
 
-          <div className="flex flex-row items-center justify-end gap-3">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button variant="secondary" href="/sales-orders">
               Hủy
             </Button>
             <Button
               type="submit"
               variant="primary"
+              size="md"
               loading={isSubmitting}
               disabled={isSubmitting || lines.length === 0}
             >
               {isSubmitting ? 'Đang tạo đơn hàng...' : 'Lưu đơn bán hàng'}
             </Button>
           </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </PageScaffold>
   );
 };

@@ -50,7 +50,7 @@ const NavItems: React.FC<{ pathname: string; onNavigate?: () => void }> = ({ pat
             onClick={onNavigate}
             aria-current={isActive ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-3 rounded-control px-3 py-2.5 text-sm transition-colors',
+              'flex items-center gap-3 rounded-control px-3 py-2 text-sm transition-colors',
               isActive
                 ? 'bg-primary/10 font-medium text-primary'
                 : 'text-muted-foreground hover:bg-surface-muted hover:text-foreground'
@@ -111,6 +111,13 @@ export const AppShell: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* First tab stop: jumps the fixed sidebar and header on every route. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-control focus:border focus:border-border focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-medium"
+      >
+        Bỏ qua tới nội dung chính
+      </a>
       <DialogPrimitive.Root open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] flex-col border-r border-border bg-surface lg:flex">
           <div className="flex h-14 items-center gap-2 border-b border-border px-4">
@@ -135,6 +142,9 @@ export const AppShell: React.FC = () => {
                 <Text variant="label">ERP Sales &amp; CRM</Text>
                 <Text variant="supporting">Phiên bản MVP 1.0</Text>
               </DialogPrimitive.Title>
+              <DialogPrimitive.Description className="sr-only">
+                Danh sách phân hệ của hệ thống
+              </DialogPrimitive.Description>
               <DialogPrimitive.Close
                 aria-label="Đóng"
                 className="flex h-8 w-8 items-center justify-center rounded-full text-subtle-foreground hover:bg-surface-muted hover:text-foreground"
@@ -179,7 +189,7 @@ export const AppShell: React.FC = () => {
             </div>
           </header>
 
-          <main className="p-5 sm:p-6 lg:p-8">
+          <main id="main-content" tabIndex={-1} className="min-w-0 p-5 sm:p-6 lg:p-8">
             <Outlet />
           </main>
         </div>

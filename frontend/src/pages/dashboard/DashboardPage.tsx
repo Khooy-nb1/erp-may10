@@ -156,9 +156,16 @@ const PERIOD_LABEL: Record<DashboardPeriod, string> = {
 
 const PERIOD_OPTIONS = PERIOD_VALUES.map((value) => ({ value, label: PERIOD_LABEL[value] }));
 
+/**
+ * One column definition for the six tiles: `sm` pairs them, `lg` gives the row
+ * three across, and the grid never goes wider than three so a full VND figure
+ * and its label stay on one line.
+ */
+const KPI_GRID_CLASS = 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3';
+
 /** Six tiles: the grid keeps its height while the summary loads. */
 const KPI_SKELETON = (
-  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+  <div className={KPI_GRID_CLASS}>
     {Array.from({ length: 6 }, (_, index) => (
       <KpiCardSkeleton key={index} />
     ))}
@@ -167,7 +174,7 @@ const KPI_SKELETON = (
 
 const SectionHeading: React.FC<{ title: string; supporting?: string }> = ({ title, supporting }) => (
   <div className="flex flex-col gap-1">
-    <Heading level={2}>{title}</Heading>
+    <Heading level={3}>{title}</Heading>
     {supporting ? (
       <Text variant="supporting" as="p">
         {supporting}
@@ -435,9 +442,13 @@ export const DashboardPage: React.FC = () => {
     >
       {/* One filter drives every widget; the period change refetches by itself,
           so the button is only an explicit re-run of the same queries. */}
-      <Card className="flex flex-col gap-4">
+      <Card className="flex flex-col gap-4 p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div role="group" aria-label="Bộ lọc thời gian" className="flex flex-wrap items-end gap-3">
+          <div
+            role="group"
+            aria-label="Bộ lọc thời gian"
+            className="flex w-full flex-wrap items-end gap-3 sm:w-auto"
+          >
             <Select
               label="Khoảng thời gian"
               options={PERIOD_OPTIONS}
@@ -445,12 +456,22 @@ export const DashboardPage: React.FC = () => {
               onChange={(value) => {
                 if (value && isDashboardPeriod(value)) setPeriod(value);
               }}
-              className="w-44"
+              className="w-full sm:w-48"
             />
             {period === 'custom' && (
               <>
-                <DateInput label="Từ ngày" value={fromDate} onChange={setFromDate} />
-                <DateInput label="Đến ngày" value={toDate} onChange={setToDate} />
+                <DateInput
+                  label="Từ ngày"
+                  value={fromDate}
+                  onChange={setFromDate}
+                  className="w-full sm:w-48"
+                />
+                <DateInput
+                  label="Đến ngày"
+                  value={toDate}
+                  onChange={setToDate}
+                  className="w-full sm:w-48"
+                />
               </>
             )}
           </div>
@@ -477,7 +498,7 @@ export const DashboardPage: React.FC = () => {
         )}
       </Card>
 
-      <section aria-label="Chỉ số chính" className="flex flex-col gap-3">
+      <section aria-label="Chỉ số chính" className="flex flex-col gap-4">
         <SectionHeading
           title="Chỉ số chính"
           supporting={`Số liệu trong ${PERIOD_LABEL[period]}${
@@ -493,7 +514,7 @@ export const DashboardPage: React.FC = () => {
           emptyDescription="Chưa có số liệu trong khoảng thời gian đã chọn."
           skeleton={KPI_SKELETON}
         >
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className={KPI_GRID_CLASS}>
             {metrics?.orderCount !== undefined && (
               <KpiCard
                 label="Tổng số đơn"
@@ -555,7 +576,7 @@ export const DashboardPage: React.FC = () => {
           invoice-based revenue card is gated by money permission; without it
           the grid collapses to one full-width card instead of two empty
           columns. */}
-      <section aria-label="Hiệu suất bán hàng" className="flex flex-col gap-3">
+      <section aria-label="Hiệu suất bán hàng" className="flex flex-col gap-4">
         <SectionHeading title="Hiệu suất bán hàng" />
         <div className={canViewMoney ? 'grid gap-5 xl:grid-cols-3' : 'grid gap-5'}>
           {canViewMoney && (
@@ -644,7 +665,7 @@ export const DashboardPage: React.FC = () => {
       </section>
 
       {canViewMoney && (
-        <section aria-label="Xếp hạng" className="flex flex-col gap-3">
+        <section aria-label="Xếp hạng" className="flex flex-col gap-4">
           <SectionHeading title="Xếp hạng" />
           <div className="grid gap-5 xl:grid-cols-2">
             <Widget

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Text } from '../../components/ui/Typography.js';
 import { Banner } from '../../components/ui/Banner.js';
 import { Button } from '../../components/ui/Button.js';
-import { Input } from '../../components/ui/Input.js';
 import { Select } from '../../components/ui/Select.js';
 import { TextLink } from '../../components/ui/TextLink.js';
 import { proportional, pixel, type TableColumn } from '../../components/ui/Table.js';
@@ -12,6 +12,9 @@ import { getDeliveries } from '../../services/deliveryService.js';
 import { PageScaffold } from '../../components/common/PageScaffold.js';
 import { DataTableCard } from '../../components/common/DataTableCard.js';
 import { StatusBadge } from '../../components/common/StatusBadge.js';
+import { FilterBar } from '../../components/common/FilterBar.js';
+import { DeliveryCreateDialog } from '../../components/deliveries/DeliveryCreateDialog.js';
+import { formatDate } from '../../lib/format.js';
 
 /**
  * Columns this screen reads off `Delivery`. Declared as an object type alias so
@@ -40,11 +43,6 @@ const TRANG_THAI_OPTIONS = [
 /** `da_giao` reads "Đã giao thành công" on this screen; the shared badge labels it "Đã giao". */
 const STATUS_LABELS: Partial<Record<DeliveryStatus, string>> = {
   da_giao: 'Đã giao thành công',
-};
-
-const formatDate = (dateStr: string | null) => {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('vi-VN');
 };
 
 const columns: TableColumn<DeliveryRow>[] = [
@@ -84,31 +82,26 @@ const columns: TableColumn<DeliveryRow>[] = [
     key: 'ten_nguoi_nhan',
     header: 'Người nhận',
     width: proportional(1),
-    renderCell: (item) => <Text variant="label">{item.ten_nguoi_nhan}</Text>,
+    renderCell: (item) => (
+      <span className="block max-w-[280px] truncate" title={item.ten_nguoi_nhan}>
+        {item.ten_nguoi_nhan}
+      </span>
+    ),
   },
   {
     key: 'trang_thai',
     header: 'Trạng thái',
     width: pixel(160),
-    align: 'center',
+    align: 'start',
     renderCell: (item) => (
       <StatusBadge status={item.trang_thai} label={STATUS_LABELS[item.trang_thai]} />
-    ),
-  },
-  {
-    key: 'actions',
-    header: 'Thao tác',
-    width: pixel(110),
-    align: 'end',
-    renderCell: (item) => (
-      <TextLink to={`/deliveries/${item.id}`} weight="medium">
-        Chi tiết
-      </TextLink>
     ),
   },
 ];
 
 export const DeliveryListPage: React.FC = () => {
+  const navigate = useNavigate();
+
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +113,14 @@ export const DeliveryListPage: React.FC = () => {
   const [pageSize] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [total, setTotal] = useState<number>(0);
+  // The search term is submit-triggered, so it is not an effect dependency;
+  // this token lets "Xóa bộ lọc" refetch when it cleared the search alone.
+  const [reloadToken, setReloadToken] = useState<number>(0);
+
+  const [createOpen, setCreateOpen] = useState<boolean>(false);
+  // Set while a successful create hands off to the detail route, so the close
+  // that follows it does not refetch a list the page is leaving.
+  const createdRef = useRef<boolean>(false);
 
   const fetchList = async () => {
     setLoading(true);
@@ -143,11 +144,20 @@ export const DeliveryListPage: React.FC = () => {
 
   useEffect(() => {
     fetchList();
-  }, [page, trangThai]);
+  }, [page, trangThai, reloadToken]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
+    fetchList();
+  };
+
+  const handleCreateOpenChange = (isOpen: boolean) => {
+    setCreateOpen(isOpen);
+    if (isOpen || createdRef.current) {
+      createdRef.current = false;
+      return;
+    }
     fetchList();
   };
 
@@ -158,10 +168,10 @@ export const DeliveryListPage: React.FC = () => {
       actions={
         <Button
           variant="primary"
-          icon={<Plus size={16} />}
-          href="/deliveries/new"
+          icon={<Plus size={16} aria-hidden />}
+          onClick={() => setCreateOpen(true)}
         >
-          Lập đợt giao hàng
+          Tạo phiếu giao hàng
         </Button>
       }
     >
@@ -176,6 +186,7 @@ export const DeliveryListPage: React.FC = () => {
         data={deliveries}
         columns={columns}
         idKey="id"
+        density="compact"
         isLoading={loading}
         error={error}
         onRetry={fetchList}
@@ -185,31 +196,46 @@ export const DeliveryListPage: React.FC = () => {
         rowIndexStart={(page - 1) * pageSize + 1}
         rowCount={total}
         toolbar={
-          <form onSubmit={handleSearchSubmit}>
-            <div className="flex flex-row flex-wrap items-end gap-2">
-              <Input
-                label="Tìm kiếm đợt giao hàng"
-                placeholder="Tìm theo mã giao hàng hoặc người nhận..."
-                value={search}
-                onChange={setSearch}
-                className="w-80"
-              />
-              <Button type="submit" variant="secondary">Tìm kiếm</Button>
-            </div>
-          </form>
-        }
-        toolbarEnd={
-          <Select
-            label="Trạng thái"
-            options={TRANG_THAI_OPTIONS}
-            value={trangThai}
-            onChange={(value) => {
-              setTrangThai(value as DeliveryStatus | '');
-              setPage(1);
+          <FilterBar
+            label="Bộ lọc danh sách đợt giao hàng"
+            search={{
+              label: 'Tìm kiếm đợt giao hàng',
+              placeholder: 'Tìm theo mã giao hàng hoặc người nhận...',
+              value: search,
+              onChange: setSearch,
+              widthClassName: 'w-full sm:w-80',
             }}
-            className="w-48"
+            onSubmit={handleSearchSubmit}
+            filters={
+              <Select
+                label="Trạng thái"
+                options={TRANG_THAI_OPTIONS}
+                value={trangThai}
+                onChange={(value) => {
+                  setTrangThai(value as DeliveryStatus | '');
+                  setPage(1);
+                }}
+                className="w-full sm:w-48"
+              />
+            }
+            isFiltered={Boolean(search.trim() || trangThai)}
+            onReset={() => {
+              setSearch('');
+              setTrangThai('');
+              setPage(1);
+              setReloadToken((token) => token + 1);
+            }}
           />
         }
+      />
+
+      <DeliveryCreateDialog
+        isOpen={createOpen}
+        onOpenChange={handleCreateOpenChange}
+        onCreated={(id) => {
+          createdRef.current = true;
+          navigate(`/deliveries/${id}`);
+        }}
       />
     </PageScaffold>
   );

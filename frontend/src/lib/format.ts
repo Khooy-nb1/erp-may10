@@ -53,6 +53,12 @@ export function formatMonthLabel(period: string): string {
   return `T${Number(match[2])}/${match[1]}`;
 }
 
+/** Date-only label for the order, invoice and delivery fields; empty becomes `—`. */
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('vi-VN');
+}
+
 /** Local wall-clock label for the "last updated" line. */
 export function formatClock(date: Date): string {
   return CLOCK.format(date);
