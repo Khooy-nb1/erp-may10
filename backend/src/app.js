@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 
-const { authMiddleware } = require('./middlewares/auth');
+const { authMiddleware, requireRoles } = require('./middlewares/auth');
 const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler');
 
 const masterDataRoutes = require('./routes/masterDataRoutes');
@@ -13,7 +13,11 @@ const phieuNhapRoutes = require('./routes/phieuNhapRoutes');
 const phieuXuatRoutes = require('./routes/phieuXuatRoutes');
 const phieuChuyenRoutes = require('./routes/phieuChuyenRoutes');
 const phieuKiemKeRoutes = require('./routes/phieuKiemKeRoutes');
+const purchasingRoutes = require('./routes/purchasingRoutes');
+const productionRoutes = require('./routes/productionRoutes');
+const financeRoutes = require('./routes/financeRoutes');
 const portalRoutes = require('./routes/portalRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 
@@ -74,7 +78,15 @@ app.use('/api/v1/phieu-nhap', phieuNhapRoutes);
 app.use('/api/v1/phieu-xuat', phieuXuatRoutes);
 app.use('/api/v1/phieu-chuyen', phieuChuyenRoutes);
 app.use('/api/v1/phieu-kiem-ke', phieuKiemKeRoutes);
+app.use('/api/v1/purchasing', purchasingRoutes);
+app.use('/api/v1/production', productionRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/admin/users', userRoutes);
 app.use('/api/v1', portalRoutes);
+
+// Đăng ký các route nghiệp vụ PH5: Tài chính - Kế toán & Giá thành
+app.use('/api/v1/finance', authMiddleware, requireRoles('ke_toan', 'ke_toan_truong'), financeRoutes);
+app.use('/api', authMiddleware, requireRoles('ke_toan', 'ke_toan_truong'), financeRoutes);
 
 // Xử lý route không tồn tại và lỗi
 app.use(notFoundHandler);
