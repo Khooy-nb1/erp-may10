@@ -48,6 +48,19 @@ export default function Login() {
 
   const from = location.state?.from?.pathname || '/';
 
+  const formatErrorMessage = (err) => {
+    const rawMsg = err.response?.data?.message || err.message || '';
+    if (
+      rawMsg.includes('ECONNREFUSED') ||
+      rawMsg.includes('ENOTFOUND') ||
+      rawMsg.includes('ETIMEDOUT') ||
+      rawMsg.includes('Network Error')
+    ) {
+      return 'Không thể kết nối đến máy chủ cơ sở dữ liệu. Vui lòng kiểm tra lại dịch vụ ERP.';
+    }
+    return rawMsg || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -57,15 +70,20 @@ export default function Login() {
       await login(email, password);
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
+      setError(formatErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
   const handleQuickLogin = (acc) => {
-    switchRole(acc.code);
-    navigate(from, { replace: true });
+    try {
+      setError(null);
+      switchRole(acc.code);
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(formatErrorMessage(err));
+    }
   };
 
   return (

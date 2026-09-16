@@ -88,24 +88,21 @@ export const authService = {
             return result;
           }
         } else {
+          let errorMsg = 'Đăng nhập chuyển vai trò thất bại';
+          try {
+            const errData = JSON.parse(xhr.responseText);
+            if (errData && errData.message) errorMsg = errData.message;
+          } catch (_) {}
           console.error('[authService.switchRole] Đăng nhập backend trả về mã HTTP:', xhr.status, xhr.responseText);
+          throw new Error(errorMsg);
         }
       } catch (err) {
-        console.error('[authService.switchRole] Gọi đăng nhập backend qua XHR gặp lỗi:', err);
+        console.error('[authService.switchRole] Gọi đăng nhập backend gặp lỗi:', err);
+        throw err;
       }
     }
 
-    // 2. Fallback dự phòng nếu không có XMLHttpRequest (môi trường test/SSR)
-    const fallbackUser = {
-      id: roleInfo.defaultUserId,
-      ten_dang_nhap: roleInfo.code,
-      ho_ten: roleInfo.defaultFullName,
-      email: roleInfo.defaultEmail,
-      vai_tro: roleInfo.code,
-      phong_ban: roleInfo.department,
-    };
-    const permissions = ROLE_PERMISSIONS[roleCode] || [];
-    return { user: fallbackUser, role: roleCode, permissions };
+    throw new Error('Môi trường trình duyệt không hỗ trợ xác thực đồng bộ.');
   },
 
   /**

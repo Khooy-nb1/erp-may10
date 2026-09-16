@@ -53,9 +53,11 @@ const TOP_NAV_SECTIONS = [
     title: 'Mua hàng',
     path: '/purchasing',
     permission: 'purchasing.view',
+    badge: 'PH3',
     items: [
-      { title: 'Đơn mua hàng (PO)', path: '/purchasing' },
-      { title: 'Quản lý Nhà cung cấp', path: '/purchasing' },
+      { title: 'Tổng quan', path: '/purchasing' },
+      { title: 'Đơn mua hàng (PO)', path: '/purchasing/purchase-orders' },
+      { title: 'Quản lý Nhà cung cấp', path: '/purchasing/suppliers' },
     ],
   },
   {
@@ -486,7 +488,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
                     Thông báo vận hành ({notifications.length})
                   </span>
                   <Link
-                    to="/warehouse?tab=ton-kho"
+                    to={hasPermission('warehouse.view') ? '/warehouse?tab=ton-kho' : '/'}
                     onClick={() => setShowNotifMenu(false)}
                     className="text-[11px] text-[#0F5FAF] hover:underline font-medium"
                   >

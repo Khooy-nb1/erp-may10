@@ -23,7 +23,11 @@ api.interceptors.request.use((config) => {
 
 // Master Data APIs
 export const getDanhSachKho = () => api.get('/master-data/kho').then((res) => res.data.data);
-export const getDanhSachVatTu = () => api.get('/master-data/vat-tu').then((res) => res.data.data);
+export const getDanhSachVatTu = (params) => api.get('/master-data/vat-tu', { params }).then((res) => res.data.data);
+export const getChiTietVatTu = (id) => api.get(`/master-data/vat-tu/${id}`).then((res) => res.data.data);
+export const createVatTu = (data) => api.post('/master-data/vat-tu', data).then((res) => res.data);
+export const updateVatTu = (id, data) => api.put(`/master-data/vat-tu/${id}`, data).then((res) => res.data);
+export const deactivateVatTu = (id, trang_thai) => api.patch(`/master-data/vat-tu/${id}/trang-thai`, { trang_thai }).then((res) => res.data);
 export const getDanhSachDVT = () => api.get('/master-data/don-vi-tinh').then((res) => res.data.data);
 export const getDanhSachNCC = () => api.get('/master-data/nha-cung-cap').then((res) => res.data.data);
 export const getCrossModule = () => api.get('/master-data/cross-module').then((res) => res.data.data);

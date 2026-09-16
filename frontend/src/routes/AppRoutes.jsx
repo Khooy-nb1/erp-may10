@@ -13,6 +13,9 @@ import Login from '../pages/Login';
 import Forbidden from '../pages/Forbidden';
 import NotFound from '../pages/NotFound';
 import WarehouseModule from '../pages/WarehouseModule';
+import PurchasingModule from '../pages/PurchasingModule';
+import ProductionModule from '../pages/ProductionModule';
+import FinanceRoutes from '../finance/FinanceRoutes';
 import PlaceholderModule from '../pages/PlaceholderModule';
 
 // Admin Pages
@@ -67,44 +70,44 @@ export default function AppRoutes() {
           }
         />
 
-        {/* PH2: Sản xuất */}
+        {/* PH2: Sản xuất & Hoạch định nguyên liệu */}
         <Route
-          path="production"
+          path="production/*"
           element={
             <PermissionGuard
               permission="production.view"
               redirect={true}
               fallback={<Forbidden />}
             >
-              <PlaceholderModule />
+              <ProductionModule />
             </PermissionGuard>
           }
         />
 
         {/* PH3: Mua hàng */}
         <Route
-          path="purchasing"
+          path="purchasing/*"
           element={
             <PermissionGuard
               permission="purchasing.view"
               redirect={true}
               fallback={<Forbidden />}
             >
-              <PlaceholderModule />
+              <PurchasingModule />
             </PermissionGuard>
           }
         />
 
         {/* PH5: Kế toán */}
         <Route
-          path="accounting"
+          path="accounting/*"
           element={
             <PermissionGuard
               permission="accounting.view"
               redirect={true}
               fallback={<Forbidden />}
             >
-              <PlaceholderModule />
+              <FinanceRoutes />
             </PermissionGuard>
           }
         />

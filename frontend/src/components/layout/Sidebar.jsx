@@ -16,12 +16,19 @@ import {
   ArrowUpRight,
   RefreshCw,
   ClipboardCheck,
+  ClipboardList,
+  Scale,
+  Truck,
+  BarChart3,
   Calculator,
   CreditCard,
   DollarSign,
   ShieldCheck,
   ArrowLeft,
   ChevronRight,
+  Cpu,
+  FileText,
+  BookOpen,
 } from 'lucide-react';
 import { useAuth } from '../rbac/AuthContext';
 import { ENTERPRISE_MENU } from '../../config/menu';
@@ -42,10 +49,17 @@ const ICON_MAP = {
   ArrowUpRight,
   RefreshCw,
   ClipboardCheck,
+  ClipboardList,
+  Scale,
+  Truck,
+  BarChart3,
   Calculator,
   CreditCard,
   DollarSign,
   ShieldCheck,
+  Cpu,
+  FileText,
+  BookOpen,
 };
 
 const getActiveModuleMeta = (pathname) => {
@@ -183,9 +197,11 @@ export default function Sidebar({ isOpen, onClose }) {
                   {permittedItems.map((item) => {
                     const IconComponent = ICON_MAP[item.icon] || LayoutDashboard;
                     
-                    const isMatch = item.path.includes('?tab=')
-                      ? location.pathname + location.search === item.path
-                      : location.pathname === item.path;
+                    const isMatch = (item.path === '/purchasing' || item.path === '/production' || item.path === '/accounting')
+                      ? (location.pathname === item.path || location.pathname === item.path + '/')
+                      : (item.path.includes('?tab=')
+                          ? location.pathname + location.search === item.path
+                          : (location.pathname === item.path || location.pathname.startsWith(item.path + '/')));
 
                     return (
                       <NavLink

@@ -56,6 +56,8 @@ const ROLE_MAPPING = {
   // Phân hệ PH5: Tài chính - Kế toán
   'ke_toan': 'ke_toan',
   'KE_TOAN': 'ke_toan',
+  'ke_toan_truong': 'ke_toan',
+  'KE_TOAN_TRUONG': 'ke_toan',
   'accounting': 'ke_toan',
   'ACCOUNTING': 'ke_toan',
 };
@@ -94,8 +96,6 @@ const SALES_PERMISSIONS = [
   'sales.create',
   'sales.update',
   'sales.approve',
-  'kho.view',
-  'warehouse.view',
 ];
 
 const PRODUCTION_PERMISSIONS = [
@@ -104,8 +104,6 @@ const PRODUCTION_PERMISSIONS = [
   'production.create',
   'production.update',
   'production.approve',
-  'kho.view',
-  'warehouse.view',
 ];
 
 const PURCHASING_PERMISSIONS = [
@@ -114,8 +112,6 @@ const PURCHASING_PERMISSIONS = [
   'purchasing.create',
   'purchasing.update',
   'purchasing.approve',
-  'kho.view',
-  'warehouse.view',
 ];
 
 const ACCOUNTING_PERMISSIONS = [
@@ -125,8 +121,6 @@ const ACCOUNTING_PERMISSIONS = [
   'accounting.receivable',
   'accounting.payable',
   'accounting.cost',
-  'kho.view',
-  'warehouse.view',
 ];
 
 const ADMIN_PERMISSIONS = [
