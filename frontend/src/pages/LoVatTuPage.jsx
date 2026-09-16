@@ -20,6 +20,9 @@ export default function LoVatTuPage({ showToast }) {
     ma_lo: '',
     ma_vat_tu: '',
     ma_nha_cung_cap: '',
+    mau_sac: '',
+    kho_vai: '',
+    chieu_dai: '',
     ngay_san_xuat: '',
     han_su_dung: '',
     so_luong_nhap: '',
@@ -59,6 +62,9 @@ export default function LoVatTuPage({ showToast }) {
         ...formData,
         so_luong_nhap: parseFloat(formData.so_luong_nhap),
         don_gia_nhap: parseFloat(formData.don_gia_nhap),
+        chieu_dai: formData.chieu_dai ? parseFloat(formData.chieu_dai) : undefined,
+        mau_sac: formData.mau_sac ? formData.mau_sac.trim() : undefined,
+        kho_vai: formData.kho_vai ? formData.kho_vai.trim() : undefined,
         ma_nha_cung_cap: formData.ma_nha_cung_cap || undefined,
         ma_vi_tri_kho: formData.ma_vi_tri_kho || undefined,
       });
@@ -68,6 +74,9 @@ export default function LoVatTuPage({ showToast }) {
         ma_lo: '',
         ma_vat_tu: '',
         ma_nha_cung_cap: '',
+        mau_sac: '',
+        kho_vai: '',
+        chieu_dai: '',
         ngay_san_xuat: '',
         han_su_dung: '',
         so_luong_nhap: '',
@@ -179,6 +188,25 @@ export default function LoVatTuPage({ showToast }) {
                     <td className="py-3 px-4">
                       <p className="font-semibold text-[#172033]">{row.ten_vat_tu}</p>
                       <p className="text-[11px] text-[#8DA0B3] font-mono">{row.ma_vat_tu_code}</p>
+                      {(row.mau_sac || row.kho_vai || row.chieu_dai) && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[#5F6F82]">
+                          {row.mau_sac && (
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                              Màu: <strong className="text-[#172033]">{row.mau_sac}</strong>
+                            </span>
+                          )}
+                          {row.kho_vai && (
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                              Khổ: <strong className="text-[#172033]">{row.kho_vai}</strong>
+                            </span>
+                          )}
+                          {row.chieu_dai && (
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                              Dài: <strong className="text-[#172033]">{formatNumber(row.chieu_dai)}m</strong>
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-[#5F6F82] text-xs">{row.ten_ncc || '-'}</td>
                     <td className="py-3 px-4 text-right text-[#5F6F82]">
@@ -297,6 +325,45 @@ export default function LoVatTuPage({ showToast }) {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Thông số cây vải (FR-03) */}
+              <div className="p-3 bg-[#F7FAFC] rounded-xl border border-[#E2EDF5] space-y-2.5">
+                <p className="text-xs font-bold text-[#172033]">Thông số cây vải / cuộn vải (FR-03)</p>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#5F6F82] mb-0.5">Màu sắc</label>
+                    <input
+                      type="text"
+                      placeholder="VD: Trắng Sữa"
+                      value={formData.mau_sac}
+                      onChange={(e) => setFormData({ ...formData, mau_sac: e.target.value })}
+                      className="w-full border border-[#DCEAF4] rounded-xl px-2.5 py-1.5 text-xs outline-none focus:border-[#0F5FAF] focus:ring-1 focus:ring-[#0F5FAF]/15 text-[#172033] bg-white transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#5F6F82] mb-0.5">Khổ vải</label>
+                    <input
+                      type="text"
+                      placeholder="VD: 1.6m"
+                      value={formData.kho_vai}
+                      onChange={(e) => setFormData({ ...formData, kho_vai: e.target.value })}
+                      className="w-full border border-[#DCEAF4] rounded-xl px-2.5 py-1.5 text-xs outline-none focus:border-[#0F5FAF] focus:ring-1 focus:ring-[#0F5FAF]/15 text-[#172033] bg-white transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#5F6F82] mb-0.5">Chiều dài (m)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      placeholder="VD: 120"
+                      value={formData.chieu_dai}
+                      onChange={(e) => setFormData({ ...formData, chieu_dai: e.target.value })}
+                      className="w-full border border-[#DCEAF4] rounded-xl px-2.5 py-1.5 text-xs outline-none focus:border-[#0F5FAF] focus:ring-1 focus:ring-[#0F5FAF]/15 text-[#172033] bg-white transition-all"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
