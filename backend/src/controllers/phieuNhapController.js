@@ -274,6 +274,44 @@ async function createPhieuNhap(req, res, next) {
       }
     }
 
+    // 5. Nếu nhập kho từ đơn mua hàng PH3, đồng bộ tiến độ nhận hàng và trạng thái PO
+    if (ma_don_mua_hang) {
+      for (const item of chiTiet) {
+        const sl = parseFloat(item.so_luong_nhap) || 0;
+        await client.query(
+          `UPDATE chi_tiet_don_mua
+           SET so_luong_da_nhap = so_luong_da_nhap + $1,
+               ngay_cap_nhat = NOW()
+           WHERE ma_don_mua_hang = $2 AND ma_vat_tu = $3`,
+          [sl, ma_don_mua_hang, item.ma_vat_tu]
+        );
+      }
+
+      const sumRes = await client.query(
+        `SELECT SUM(so_luong_dat) AS tong_dat,
+                SUM(so_luong_da_nhap) AS tong_da_nhap
+         FROM chi_tiet_don_mua
+         WHERE ma_don_mua_hang = $1`,
+        [ma_don_mua_hang]
+      );
+
+      if (sumRes.rows.length > 0) {
+        const tDat = parseFloat(sumRes.rows[0].tong_dat) || 0;
+        const tDaNhap = parseFloat(sumRes.rows[0].tong_da_nhap) || 0;
+        const isComplete = tDaNhap >= tDat && tDat > 0;
+        const newPoStatus = isComplete ? 'da_nhap_kho' : (tDaNhap > 0 ? 'dang_giao' : 'da_gui_ncc');
+
+        await client.query(
+          `UPDATE don_mua_hang
+           SET trang_thai = $1,
+               nguoi_cap_nhat = $2,
+               ngay_cap_nhat = NOW()
+           WHERE id = $3`,
+          [newPoStatus, nguoiTao, ma_don_mua_hang]
+        );
+      }
+    }
+
     await client.query('COMMIT');
 
     res.status(201).json({

@@ -54,8 +54,10 @@ export default function WarehouseModule() {
         return <ViTriKhoPage key={refreshKey} showToast={showToast} />;
       case 'lo-vat-tu':
         return <LoVatTuPage key={refreshKey} showToast={showToast} />;
+      case 'cho-nhap':
+        return <PhieuNhapPage key={refreshKey} initialView="cho-nhap" showToast={showToast} />;
       case 'phieu-nhap':
-        return <PhieuNhapPage key={refreshKey} showToast={showToast} />;
+        return <PhieuNhapPage key={refreshKey} initialView="phieu-nhap" showToast={showToast} />;
       case 'phieu-xuat':
         return <PhieuXuatPage key={refreshKey} showToast={showToast} />;
       case 'phieu-chuyen':

@@ -172,6 +172,13 @@ export const ENTERPRISE_MENU = [
         permission: 'warehouse.view',
       },
       {
+        id: 'wh-cho-nhap',
+        title: 'Chờ nhập kho',
+        path: '/warehouse?tab=cho-nhap',
+        icon: 'Truck',
+        permission: 'warehouse.receipt',
+      },
+      {
         id: 'wh-phieu-nhap',
         title: 'Phiếu nhập kho',
         path: '/warehouse?tab=phieu-nhap',

@@ -53,6 +53,7 @@ export const getTheKho = (maKho, maVatTu) =>
 export const getPhieuNhap = (params) => api.get('/phieu-nhap', { params }).then((res) => res.data.data);
 export const getChiTietPhieuNhap = (id) => api.get(`/phieu-nhap/${id}`).then((res) => res.data.data);
 export const createPhieuNhap = (data) => api.post('/phieu-nhap', data).then((res) => res.data);
+export const getReceivingOrders = () => api.get('/purchasing/receiving').then((res) => res.data.data);
 
 // Phiếu Xuất kho APIs
 export const getPhieuXuat = (params) => api.get('/phieu-xuat', { params }).then((res) => res.data.data);
