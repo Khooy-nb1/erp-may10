@@ -56,10 +56,10 @@ async function getBaoCaoTonKho(req, res, next) {
   }
 }
 
-// Thẻ kho: Tra cứu lịch sử nhập xuất của một vật tư tại một kho
+// Thẻ kho: Tra cứu lịch sử nhập xuất, luân chuyển và kiểm kê của một vật tư tại một kho (FR-11)
 async function getTheKho(req, res, next) {
   try {
-    const { ma_kho, ma_vat_tu } = req.query;
+    const { ma_kho, ma_vat_tu, tu_ngay, den_ngay, loai_bien_dong, movement_type, ma_lo } = req.query;
 
     if (!ma_kho || !ma_vat_tu) {
       return res.status(400).json({
@@ -72,68 +72,240 @@ async function getTheKho(req, res, next) {
     // Lấy thông tin kho và vật tư
     const [infoRes, tonRes] = await Promise.all([
       db.query(
-        `SELECT k.ten_kho, vt.ten_vat_tu, vt.ma_vat_tu, dvt.ten_don_vi AS ten_dvt
+        `SELECT k.ten_kho, k.ma_kho AS ma_kho_code, vt.ten_vat_tu, vt.ma_vat_tu, dvt.ten_don_vi AS ten_dvt
          FROM kho k, vat_tu vt
          LEFT JOIN don_vi_tinh dvt ON vt.ma_don_vi_tinh = dvt.id
          WHERE k.id = $1 AND vt.id = $2`,
         [ma_kho, ma_vat_tu]
       ),
-      db.query(`SELECT so_luong_ton, gia_tri_ton_kho FROM ton_kho WHERE ma_kho = $1 AND ma_vat_tu = $2`, [
-        ma_kho,
-        ma_vat_tu,
-      ]),
+      db.query(
+        `SELECT so_luong_ton, gia_tri_ton_kho FROM ton_kho WHERE ma_kho = $1 AND ma_vat_tu = $2`,
+        [ma_kho, ma_vat_tu]
+      ),
     ]);
 
-    // Lấy tất cả biến động Nhập kho
-    const nhapQuery = `
-      SELECT pnk.ngay_nhap AS thoi_gian,
-             pnk.ma_phieu_nhap AS ma_chung_tu,
-             'nhap_kho' AS loai_bien_dong,
-             pnk.loai_nhap AS dien_giai,
-             ct.so_luong_nhap AS so_luong,
-             ct.don_gia_nhap AS don_gia,
-             ct.thanh_tien,
-             l.ma_lo,
-             vtk.ma_vi_tri
-      FROM chi_tiet_phieu_nhap ct
-      JOIN phieu_nhap_kho pnk ON ct.ma_phieu_nhap_kho = pnk.id
-      LEFT JOIN lo_vat_tu l ON ct.ma_lo_vat_tu = l.id
-      LEFT JOIN vi_tri_kho vtk ON ct.ma_vi_tri_kho = vtk.id
-      WHERE pnk.ma_kho_nhap = $1 AND ct.ma_vat_tu = $2 AND pnk.trang_thai = 'da_nhap'
+    const currentStock = parseFloat(tonRes.rows[0]?.so_luong_ton || 0);
+
+    // Hợp nhất 5 nguồn biến động kho (FR-11):
+    // 1. Nhập kho (RECEIPT: +qty)
+    // 2. Xuất kho (ISSUE: -qty)
+    // 3. Chuyển kho xuất (TRANSFER_OUT: -qty)
+    // 4. Chuyển kho nhập (TRANSFER_IN: +qty)
+    // 5. Điều chỉnh kiểm kê (STOCKTAKE_ADJUSTMENT: actual - system)
+    const sql = `
+      WITH all_moves AS (
+        -- 1. Nhập kho
+        SELECT
+          pnk.id AS doc_id,
+          ct.id AS detail_id,
+          pnk.ngay_nhap AS thoi_gian,
+          pnk.ma_phieu_nhap AS ma_chung_tu,
+          'RECEIPT' AS movement_type,
+          'nhap_kho' AS loai_bien_dong,
+          COALESCE(pnk.loai_nhap, 'Nhập kho') AS dien_giai,
+          ct.so_luong_nhap::numeric AS quantity_change,
+          ct.so_luong_nhap::numeric AS so_luong,
+          'tang' AS huong_bien_dong,
+          COALESCE(ct.don_gia_nhap, 0)::numeric AS don_gia,
+          COALESCE(ct.thanh_tien, ct.so_luong_nhap * COALESCE(ct.don_gia_nhap, 0))::numeric AS thanh_tien,
+          l.ma_lo,
+          vtk.ma_vi_tri,
+          pnk.ma_phieu_nhap AS reference
+        FROM chi_tiet_phieu_nhap ct
+        JOIN phieu_nhap_kho pnk ON ct.ma_phieu_nhap_kho = pnk.id
+        LEFT JOIN lo_vat_tu l ON ct.ma_lo_vat_tu = l.id
+        LEFT JOIN vi_tri_kho vtk ON ct.ma_vi_tri_kho = vtk.id
+        WHERE pnk.ma_kho_nhap = $1 AND ct.ma_vat_tu = $2 AND pnk.trang_thai = 'da_nhap'
+
+        UNION ALL
+
+        -- 2. Xuất kho
+        SELECT
+          pxk.id AS doc_id,
+          ct.id AS detail_id,
+          pxk.ngay_xuat AS thoi_gian,
+          pxk.ma_phieu_xuat AS ma_chung_tu,
+          'ISSUE' AS movement_type,
+          'xuat_kho' AS loai_bien_dong,
+          COALESCE(pxk.loai_xuat, 'Xuất kho') AS dien_giai,
+          (-ct.so_luong_xuat)::numeric AS quantity_change,
+          ct.so_luong_xuat::numeric AS so_luong,
+          'giam' AS huong_bien_dong,
+          COALESCE(ct.don_gia_xuat, 0)::numeric AS don_gia,
+          COALESCE(ct.thanh_tien, ct.so_luong_xuat * COALESCE(ct.don_gia_xuat, 0))::numeric AS thanh_tien,
+          l.ma_lo,
+          NULL::varchar AS ma_vi_tri,
+          pxk.ma_phieu_xuat AS reference
+        FROM chi_tiet_phieu_xuat ct
+        JOIN phieu_xuat_kho pxk ON ct.ma_phieu_xuat_kho = pxk.id
+        LEFT JOIN lo_vat_tu l ON ct.ma_lo_vat_tu = l.id
+        WHERE pxk.ma_kho_xuat = $1 AND ct.ma_vat_tu = $2 AND pxk.trang_thai = 'da_xuat'
+
+        UNION ALL
+
+        -- 3. Chuyển kho xuất
+        SELECT
+          pck.id AS doc_id,
+          ct.id AS detail_id,
+          pck.ngay_chuyen AS thoi_gian,
+          pck.ma_phieu_chuyen AS ma_chung_tu,
+          'TRANSFER_OUT' AS movement_type,
+          'chuyen_kho_xuat' AS loai_bien_dong,
+          CONCAT('Xuất chuyển sang ', COALESCE(kn.ten_kho, CONCAT('Kho ID ', pck.ma_kho_nhap)), CASE WHEN pck.ly_do IS NOT NULL AND pck.ly_do <> '' THEN CONCAT(' - ', pck.ly_do) ELSE '' END) AS dien_giai,
+          (-ct.so_luong_chuyen)::numeric AS quantity_change,
+          ct.so_luong_chuyen::numeric AS so_luong,
+          'giam' AS huong_bien_dong,
+          COALESCE(ct.don_gia, 0)::numeric AS don_gia,
+          (ct.so_luong_chuyen * COALESCE(ct.don_gia, 0))::numeric AS thanh_tien,
+          NULL::varchar AS ma_lo,
+          NULL::varchar AS ma_vi_tri,
+          pck.ma_phieu_chuyen AS reference
+        FROM chi_tiet_chuyen_kho ct
+        JOIN phieu_chuyen_kho pck ON ct.ma_phieu_chuyen_kho = pck.id
+        LEFT JOIN kho kn ON pck.ma_kho_nhap = kn.id
+        WHERE pck.ma_kho_xuat = $1 AND ct.ma_vat_tu = $2 AND pck.trang_thai = 'da_chuyen'
+
+        UNION ALL
+
+        -- 4. Chuyển kho nhập
+        SELECT
+          pck.id AS doc_id,
+          ct.id AS detail_id,
+          pck.ngay_chuyen AS thoi_gian,
+          pck.ma_phieu_chuyen AS ma_chung_tu,
+          'TRANSFER_IN' AS movement_type,
+          'chuyen_kho_nhap' AS loai_bien_dong,
+          CONCAT('Nhận chuyển từ ', COALESCE(kx.ten_kho, CONCAT('Kho ID ', pck.ma_kho_xuat)), CASE WHEN pck.ly_do IS NOT NULL AND pck.ly_do <> '' THEN CONCAT(' - ', pck.ly_do) ELSE '' END) AS dien_giai,
+          ct.so_luong_chuyen::numeric AS quantity_change,
+          ct.so_luong_chuyen::numeric AS so_luong,
+          'tang' AS huong_bien_dong,
+          COALESCE(ct.don_gia, 0)::numeric AS don_gia,
+          (ct.so_luong_chuyen * COALESCE(ct.don_gia, 0))::numeric AS thanh_tien,
+          NULL::varchar AS ma_lo,
+          NULL::varchar AS ma_vi_tri,
+          pck.ma_phieu_chuyen AS reference
+        FROM chi_tiet_chuyen_kho ct
+        JOIN phieu_chuyen_kho pck ON ct.ma_phieu_chuyen_kho = pck.id
+        LEFT JOIN kho kx ON pck.ma_kho_xuat = kx.id
+        WHERE pck.ma_kho_nhap = $1 AND ct.ma_vat_tu = $2 AND pck.trang_thai = 'da_chuyen'
+
+        UNION ALL
+
+        -- 5. Điều chỉnh kiểm kê
+        SELECT
+          pkk.id AS doc_id,
+          ct.id AS detail_id,
+          pkk.ngay_kiem_ke AS thoi_gian,
+          pkk.ma_phieu_kiem_ke AS ma_chung_tu,
+          'STOCKTAKE_ADJUSTMENT' AS movement_type,
+          'dieu_chinh_kiem_ke' AS loai_bien_dong,
+          CONCAT('Kiểm kê ', COALESCE(pkk.ky_kiem_ke, ''), ' (Sổ: ', ct.so_luong_so_sach, ' -> Thực: ', ct.so_luong_thuc_te, ')') AS dien_giai,
+          (ct.so_luong_thuc_te - ct.so_luong_so_sach)::numeric AS quantity_change,
+          ABS(ct.so_luong_thuc_te - ct.so_luong_so_sach)::numeric AS so_luong,
+          CASE WHEN (ct.so_luong_thuc_te - ct.so_luong_so_sach) >= 0 THEN 'tang' ELSE 'giam' END AS huong_bien_dong,
+          COALESCE(vt.gia_nhap_trung_binh, 0)::numeric AS don_gia,
+          COALESCE(ct.gia_tri_chenh_lech, ABS(ct.so_luong_thuc_te - ct.so_luong_so_sach) * COALESCE(vt.gia_nhap_trung_binh, 0))::numeric AS thanh_tien,
+          NULL::varchar AS ma_lo,
+          NULL::varchar AS ma_vi_tri,
+          pkk.ma_phieu_kiem_ke AS reference
+        FROM chi_tiet_kiem_ke ct
+        JOIN phieu_kiem_ke pkk ON ct.ma_phieu_kiem_ke = pkk.id
+        JOIN vat_tu vt ON ct.ma_vat_tu = vt.id
+        WHERE pkk.ma_kho = $1 AND ct.ma_vat_tu = $2
+          AND (pkk.trang_thai = 'da_dieu_chinh' OR ct.da_dieu_chinh = 'da_dieu_chinh')
+      ),
+      totals AS (
+        SELECT COALESCE(SUM(quantity_change), 0) AS total_delta FROM all_moves
+      ),
+      calculated AS (
+        SELECT
+          m.*,
+          -- Running balance: (currentStock - total_delta) + cumulative quantity_change
+          (($3 - t.total_delta) + SUM(m.quantity_change) OVER (
+            ORDER BY m.thoi_gian ASC,
+                     CASE m.movement_type
+                       WHEN 'RECEIPT' THEN 1
+                       WHEN 'TRANSFER_IN' THEN 2
+                       WHEN 'ISSUE' THEN 3
+                       WHEN 'TRANSFER_OUT' THEN 4
+                       WHEN 'STOCKTAKE_ADJUSTMENT' THEN 5
+                       ELSE 6
+                     END,
+                     m.doc_id ASC,
+                     m.detail_id ASC
+          ))::numeric AS running_balance,
+          ($3 - t.total_delta)::numeric AS opening_balance
+        FROM all_moves m
+        CROSS JOIN totals t
+      )
+      SELECT * FROM calculated
+      WHERE 1=1
+        AND ($4::timestamptz IS NULL OR thoi_gian >= $4::timestamptz)
+        AND ($5::timestamptz IS NULL OR thoi_gian <= $5::timestamptz)
+        AND ($6::varchar IS NULL OR loai_bien_dong = $6::varchar)
+        AND ($7::varchar IS NULL OR movement_type = $7::varchar)
+        AND ($8::varchar IS NULL OR ma_lo = $8::varchar)
+      ORDER BY thoi_gian ASC,
+               CASE movement_type
+                 WHEN 'RECEIPT' THEN 1
+                 WHEN 'TRANSFER_IN' THEN 2
+                 WHEN 'ISSUE' THEN 3
+                 WHEN 'TRANSFER_OUT' THEN 4
+                 WHEN 'STOCKTAKE_ADJUSTMENT' THEN 5
+                 ELSE 6
+               END,
+               doc_id ASC,
+               detail_id ASC
     `;
 
-    // Lấy tất cả biến động Xuất kho
-    const xuatQuery = `
-      SELECT pxk.ngay_xuat AS thoi_gian,
-             pxk.ma_phieu_xuat AS ma_chung_tu,
-             'xuat_kho' AS loai_bien_dong,
-             pxk.loai_xuat AS dien_giai,
-             ct.so_luong_xuat AS so_luong,
-             ct.don_gia_xuat AS don_gia,
-             ct.thanh_tien,
-             l.ma_lo,
-             NULL AS ma_vi_tri
-      FROM chi_tiet_phieu_xuat ct
-      JOIN phieu_xuat_kho pxk ON ct.ma_phieu_xuat_kho = pxk.id
-      LEFT JOIN lo_vat_tu l ON ct.ma_lo_vat_tu = l.id
-      WHERE pxk.ma_kho_xuat = $1 AND ct.ma_vat_tu = $2 AND pxk.trang_thai = 'da_xuat'
-    `;
-
-    const [nhapRes, xuatRes] = await Promise.all([
-      db.query(nhapQuery, [ma_kho, ma_vat_tu]),
-      db.query(xuatQuery, [ma_kho, ma_vat_tu]),
+    const result = await db.query(sql, [
+      ma_kho,
+      ma_vat_tu,
+      currentStock,
+      tu_ngay || null,
+      den_ngay || null,
+      loai_bien_dong || null,
+      movement_type || null,
+      ma_lo || null,
     ]);
 
-    // Hợp nhất và sắp xếp theo thời gian tăng dần
-    const transactions = [...nhapRes.rows, ...xuatRes.rows].sort(
-      (a, b) => new Date(a.thoi_gian).getTime() - new Date(b.thoi_gian).getTime()
-    );
+    const transactions = result.rows.map((row) => {
+      const qtyChange = parseFloat(row.quantity_change);
+      const runBal = parseFloat(row.running_balance);
+      const donGia = parseFloat(row.don_gia) || 0;
+      const thanhTien = parseFloat(row.thanh_tien) || 0;
+
+      return {
+        doc_id: row.doc_id,
+        detail_id: row.detail_id,
+        thoi_gian: row.thoi_gian,
+        transaction_time: row.thoi_gian,
+        ma_chung_tu: row.ma_chung_tu,
+        document_code: row.ma_chung_tu,
+        movement_type: row.movement_type,
+        loai_bien_dong: row.loai_bien_dong,
+        dien_giai: row.dien_giai,
+        quantity_change: qtyChange,
+        so_luong: Math.abs(qtyChange),
+        huong_bien_dong: row.huong_bien_dong,
+        don_gia: donGia,
+        thanh_tien: thanhTien,
+        ma_lo: row.ma_lo,
+        ma_vi_tri: row.ma_vi_tri,
+        reference: row.reference,
+        running_balance: runBal,
+        so_du_luy_ke: runBal,
+      };
+    });
 
     res.json({
       success: true,
       data: {
         thongTinChung: infoRes.rows[0] || {},
         tonHienTai: tonRes.rows[0] || { so_luong_ton: 0, gia_tri_ton_kho: 0 },
+        soDuDauKy: result.rows.length > 0 ? parseFloat(result.rows[0].opening_balance) : currentStock,
+        soDuCuoiKy: currentStock,
+        tongSoPhatSinh: transactions.length,
         nhatKyBienDong: transactions,
       },
     });
