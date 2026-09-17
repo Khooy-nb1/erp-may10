@@ -15,6 +15,7 @@ const phieuChuyenRoutes = require('./routes/phieuChuyenRoutes');
 const phieuKiemKeRoutes = require('./routes/phieuKiemKeRoutes');
 const portalRoutes = require('./routes/portalRoutes');
 const financeRoutes = require('./routes/financeRoutes');
+const salesRoutes = require('./routes/salesRoutes');
 
 const app = express();
 
@@ -76,6 +77,9 @@ app.use('/api/v1/phieu-xuat', phieuXuatRoutes);
 app.use('/api/v1/phieu-chuyen', phieuChuyenRoutes);
 app.use('/api/v1/phieu-kiem-ke', phieuKiemKeRoutes);
 app.use('/api/v1', portalRoutes);
+
+// Đăng ký phân hệ PH1 — Bán hàng & Khách hàng (mount trước khối '/api' của PH5)
+app.use('/api/v1/sales', salesRoutes);
 app.use('/api', authMiddleware, requireRoles('ke_toan', 'ke_toan_truong'), financeRoutes);
 
 // Xử lý route không tồn tại và lỗi
