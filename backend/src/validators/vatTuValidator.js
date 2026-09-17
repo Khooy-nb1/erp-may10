@@ -11,6 +11,7 @@ const VALID_LOAI_VAT_TU = [
   'phu_lieu',
   'bao_bi',
   'hoa_chat',
+  'thanh_pham',
 ];
 
 const VALID_STATUSES = ['dang_su_dung', 'ngung_su_dung'];

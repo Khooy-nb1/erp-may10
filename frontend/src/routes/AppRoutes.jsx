@@ -16,6 +16,7 @@ import WarehouseModule from '../pages/WarehouseModule';
 import PurchasingModule from '../pages/PurchasingModule';
 import ProductionModule from '../pages/ProductionModule';
 import FinanceRoutes from '../finance/FinanceRoutes';
+import SalesRoutes from '../sales/SalesRoutes';
 import PlaceholderModule from '../pages/PlaceholderModule';
 
 // Admin Pages
@@ -58,14 +59,14 @@ export default function AppRoutes() {
 
         {/* PH1: Bán hàng */}
         <Route
-          path="sales"
+          path="sales/*"
           element={
             <PermissionGuard
-              permission="sales.view"
+              permissions={['sales.view', 'kho.view', 'kho.xuat']}
               redirect={true}
               fallback={<Forbidden />}
             >
-              <PlaceholderModule />
+              <SalesRoutes />
             </PermissionGuard>
           }
         />

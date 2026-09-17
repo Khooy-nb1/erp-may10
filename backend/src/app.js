@@ -18,6 +18,7 @@ const productionRoutes = require('./routes/productionRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const portalRoutes = require('./routes/portalRoutes');
 const userRoutes = require('./routes/userRoutes');
+const salesRoutes = require('./routes/salesRoutes');
 
 const app = express();
 
@@ -83,6 +84,7 @@ app.use('/api/v1/production', productionRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/admin/users', userRoutes);
 app.use('/api/v1', portalRoutes);
+app.use('/api/v1/sales', salesRoutes);
 
 // Đăng ký các route nghiệp vụ PH5: Tài chính - Kế toán & Giá thành
 app.use('/api/v1/finance', authMiddleware, requireRoles('ke_toan', 'ke_toan_truong'), financeRoutes);
