@@ -209,92 +209,101 @@ export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
         {serverError ? <ErrorState message={serverError} onRetry={() => setServerError(null)} /> : null}
 
         <FormSection title="Thông tin định danh">
-          <Input
-            label="Tên khách hàng / Đơn vị *"
-            value={values.ten_khach_hang}
-            onChange={(value) => setField('ten_khach_hang', value)}
-            status={statusOf('ten_khach_hang')}
-          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              className="sm:col-span-2"
+              label="Tên khách hàng / Đơn vị *"
+              value={values.ten_khach_hang}
+              onChange={(value) => setField('ten_khach_hang', value)}
+              status={statusOf('ten_khach_hang')}
+            />
 
-          <Select
-            label="Loại khách hàng *"
-            options={LOAI_KHACH_HANG_OPTIONS.map((option) => ({
-              value: option.value,
-              label: option.label,
-            }))}
-            value={values.loai_khach_hang}
-            onChange={(value) => {
-              if (isCustomerType(value)) setField('loai_khach_hang', value);
-            }}
-            className="w-full"
-          />
+            <Select
+              label="Loại khách hàng *"
+              options={LOAI_KHACH_HANG_OPTIONS.map((option) => ({
+                value: option.value,
+                label: option.label,
+              }))}
+              value={values.loai_khach_hang}
+              onChange={(value) => {
+                if (isCustomerType(value)) setField('loai_khach_hang', value);
+              }}
+              className="w-full"
+            />
 
-          <Input
-            label="Mã số thuế"
-            value={values.ma_so_thue ?? ''}
-            onChange={(value) => setField('ma_so_thue', value)}
-          />
+            <Input
+              label="Mã số thuế"
+              value={values.ma_so_thue ?? ''}
+              onChange={(value) => setField('ma_so_thue', value)}
+            />
 
-          <Input
-            label="Số điện thoại liên hệ *"
-            value={values.so_dien_thoai}
-            onChange={(value) => setField('so_dien_thoai', value)}
-            status={statusOf('so_dien_thoai')}
-          />
+            <Input
+              label="Số điện thoại liên hệ *"
+              value={values.so_dien_thoai}
+              onChange={(value) => setField('so_dien_thoai', value)}
+              status={statusOf('so_dien_thoai')}
+            />
 
-          <Input
-            label="Địa chỉ Email"
-            type="email"
-            value={values.email ?? ''}
-            onChange={(value) => setField('email', value)}
-            status={statusOf('email')}
-          />
+            <Input
+              label="Địa chỉ Email"
+              type="email"
+              value={values.email ?? ''}
+              onChange={(value) => setField('email', value)}
+              status={statusOf('email')}
+            />
+          </div>
         </FormSection>
 
         <FormSection title="Liên hệ &amp; địa chỉ">
-          <Input
-            label="Địa chỉ trụ sở / nhận hàng *"
-            value={values.dia_chi}
-            onChange={(value) => setField('dia_chi', value)}
-            status={statusOf('dia_chi')}
-          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              className="sm:col-span-2"
+              label="Địa chỉ trụ sở / nhận hàng *"
+              value={values.dia_chi}
+              onChange={(value) => setField('dia_chi', value)}
+              status={statusOf('dia_chi')}
+            />
 
-          <Input
-            label="Tỉnh / Thành phố *"
-            value={values.tinh_thanh_pho}
-            onChange={(value) => setField('tinh_thanh_pho', value)}
-            status={statusOf('tinh_thanh_pho')}
-          />
+            <Input
+              label="Tỉnh / Thành phố *"
+              value={values.tinh_thanh_pho}
+              onChange={(value) => setField('tinh_thanh_pho', value)}
+              status={statusOf('tinh_thanh_pho')}
+            />
 
-          <Input
-            label="Người liên hệ đại diện"
-            value={values.nguoi_lien_he ?? ''}
-            onChange={(value) => setField('nguoi_lien_he', value)}
-          />
+            <Input
+              label="Người liên hệ đại diện"
+              value={values.nguoi_lien_he ?? ''}
+              onChange={(value) => setField('nguoi_lien_he', value)}
+            />
+          </div>
         </FormSection>
 
         <FormSection title="Điều khoản thanh toán">
-          <NumberInput
-            label="Hạn mức công nợ (VNĐ)"
-            value={values.han_muc_cong_no}
-            onChange={(value) => setField('han_muc_cong_no', value)}
-            hasClear
-            status={statusOf('han_muc_cong_no')}
-          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <NumberInput
+              label="Hạn mức công nợ (VNĐ)"
+              value={values.han_muc_cong_no}
+              onChange={(value) => setField('han_muc_cong_no', value)}
+              hasClear
+              status={statusOf('han_muc_cong_no')}
+            />
 
-          <NumberInput
-            label="Số ngày được nợ (ngày)"
-            value={values.so_ngay_cong_no}
-            onChange={(value) => setField('so_ngay_cong_no', value)}
-            hasClear
-            status={statusOf('so_ngay_cong_no')}
-          />
+            <NumberInput
+              label="Số ngày được nợ (ngày)"
+              value={values.so_ngay_cong_no}
+              onChange={(value) => setField('so_ngay_cong_no', value)}
+              hasClear
+              status={statusOf('so_ngay_cong_no')}
+            />
 
-          <Textarea
-            label="Ghi chú"
-            value={values.ghi_chu ?? ''}
-            onChange={(value) => setField('ghi_chu', value)}
-          />
+            <Textarea
+              className="sm:col-span-2"
+              label="Ghi chú"
+              value={values.ghi_chu ?? ''}
+              onChange={(value) => setField('ghi_chu', value)}
+            />
+          </div>
         </FormSection>
       </form>
     </Dialog>

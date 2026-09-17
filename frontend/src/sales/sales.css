@@ -6,20 +6,23 @@
  * (\`@layer base\`): the brand focus ring and the pointer/not-allowed cursors on
  * interactive controls. PH1's component class strings deliberately carry no
  * \`focus-\`/\`cursor-\` utilities, so porting the components is not enough.
- * Core's \`index.css\` has no such rules, and editing it would restyle frozen
+ * Core's `index.css` has no such rules, and editing it would restyle frozen
  * PH4/PH5 surfaces, so the rules are scoped to this module's root element and
- * written at zero specificity (\`:where()\`) so any utility class still wins —
+ * written at zero specificity (`:where()`) so any utility class still wins —
  * exactly the precedence PH1's base layer had.
+ *
+ * `Dialog`/`AlertDialog` portal their panels to `document.body`, i.e. outside
+ * that root, so the panels carry `sales-overlay-root` and share the same scope.
  *
  * The ring colour is PH1's \`--color-ring\` (#2563eb) mapped to Core's corporate
  * token \`brand-primary\` (#0F5FAF), per docs/ph1-remediation/FRONTEND_TOKEN_MAP.md.
  */
-:where(.sales-module-content) :where(:focus-visible) {
+:where(.sales-module-content, .sales-overlay-root) :where(:focus-visible) {
   outline: 2px solid #0f5faf;
   outline-offset: 2px;
 }
 
-:where(.sales-module-content)
+:where(.sales-module-content, .sales-overlay-root)
   :where(
     button,
     select,
@@ -37,7 +40,7 @@
   cursor: pointer;
 }
 
-:where(.sales-module-content)
+:where(.sales-module-content, .sales-overlay-root)
   :where(
     button,
     select,
@@ -52,7 +55,7 @@
     [role='option'],
     [role='switch']
   ):where(:disabled),
-:where(.sales-module-content)
+:where(.sales-module-content, .sales-overlay-root)
   :where(
     button,
     select,
