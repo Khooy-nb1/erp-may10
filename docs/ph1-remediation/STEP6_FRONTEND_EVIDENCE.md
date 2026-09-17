@@ -128,6 +128,22 @@ Measured at 900×1000 (tablet) and 390×844 (mobile) on `/sales`, `/sales/custom
 | `kho` (userId 5) on `/sales`, `/sales/deliveries` | blocked by the module-level `sales.view` guard → `/403`; see **G-7** |
 | `ke_toan` (userId 6), `san_xuat` (userId 4) on `/sales`, `/sales/receivables` | `/403` (measured — `sales.view` is held by `admin` and `ban_hang` only) |
 
+### 3.5 Validation parity, local rules and dialog error surfaces (2026-09-17)
+
+| Check | Command / method | Result |
+|---|---|---|
+| Local rule suite | `frontend $ npm test` | **9 passed / 0 failed** |
+| Build | `frontend $ npm run build` | exit 0 |
+| Message parity | 60 payloads against the running backend, local message vs API `details[].message` per field (check order: blank/short/long phone, blank and `'1e999'` numerics, cleared invoice date, unselected customer `0`; null/cleared semantics: cleared amounts and discounts, cleared/absent line quantity, whitespace/null email, non-string date) | **60 exact / 0 mismatches**; the run answers `422` throughout and inserts nothing (`khach_hang` row count unchanged) (`BUSINESS_RULES.md` §9.7, `TEST_REPORT.md` §5) |
+| Dialog behaviour (browser, admin session) | `/sales/customers`: blank submit answered with `Tên khách hàng không được để trống`, `Địa chỉ không được để trống`; `1234567` as phone answered with `Số điện thoại phải từ 8 ký tự` (the API's length message, not the pattern one); `abcdefgh` answered with `Số điện thoại không đúng định dạng.`; `/sales/orders`: blank submit → `Vui lòng chọn khách hàng` + `Địa chỉ giao hàng không được để trống`, customer+address without lines → toast `Đơn hàng phải có ít nhất một dòng sản phẩm`; `/sales/deliveries`: blank submit → `Mã đơn hàng là bắt buộc`; `/sales/invoices`: cleared issue date answered with `Ngày xuất hóa đơn không đúng định dạng (YYYY-MM-DD)` | request interception showed **no write request** left the browser in any of these cases; 0 console errors |
+| Cleared numeric fields (browser, admin session) | `CustomerCreateDialog` with both numeric fields cleared: the submit passes the local rules and the payload carries `han_muc_cong_no: 0`, `so_ngay_cong_no: 0` (intercepted); a real create of that shape stored `han_muc_cong_no 0.00`, `so_ngay_cong_no 0`; the probe rows were deleted again afterwards (customers back to 35). A whitespace-only email cannot reach the state at all — `type=email` sanitises `'   '` to `''`, which the schema accepts | no false local error for a cleared field |
+| Portal scope, ring and dismissal (browser, admin session) | `Dialog` and `AlertDialog` panels are portaled to `document.body` (`parentIsBody: true`, outside `.sales-module-content`) and carry `sales-overlay-root`, so `sales.css` still styles them: a keyboard-focused control inside each panel matches `:focus-visible` with `outline: 2px solid rgb(15, 95, 175)`, offset 2px (screenshots: create customer dialog → the focus ring on the *Loại khách hàng* select; status prompt → the ring on *Hủy*), cursor rules apply (`select`/`button` → `pointer`), the create panel measures 672 px (`max-w-2xl` via its `className`) and the prompt 448 px, both centred (`dx = 0`), `Esc` closes both (`alertdialog` panel removed, customer status untouched) | layout, ring and dismissal verified in both portals |
+| Regression found and fixed during this pass | `LOAI_KHACH_HANG_OPTIONS` was dropped from `CustomerCreateDialog.jsx` while the rules were being moved, which threw during render and blanked `/sales/customers` (root unmounted, no console error) | restored; page and dialog re-verified in the browser afterwards |
+
+The module's toast host (`components/ui/toast.jsx`, `durationMs = 4500`, single slot, manual dismiss) is what the
+dialogs use for submit failures and for the order-lines rule; the in-modal `ErrorState` banners that PH1's dialogs
+rendered are no longer used by the module.
+
 ---
 
 ## 4. Decisions and deviations
@@ -137,9 +153,9 @@ Measured at 900×1000 (tablet) and 390×844 (mobile) on `/sales`, `/sales/custom
 3. **Service naming.** PH1's `services/dashboardService.getDashboardSummary` is `sales/services/overviewService.getOverviewSummary` here (the module's overview endpoints); all other service names match PH1, except `getCustomerReceivables`, which lives in `customerService.js` (it is a customer sub-resource in the ported backend).
 4. **Errors.** PH1's `ApiError` is re-implemented in `sales/services/client.js` over Core's flat failure envelope (`{ success:false, message, errorCode, details }`); `.code`, `.errorCode`, `.statusCode`, `.details` are preserved so the order detail page's `CUSTOMER_CREDIT_LIMIT_EXCEEDED` recovery path works unchanged.
 5. **Toasts.** PH1's `sonner` is replaced by `sales/components/ui/toast.jsx` (imperative `toast.success/error/conflict` over Core's presentational `Toast`). PH1 only used `toast.error`, in 3 pages.
-6. **Radix / rhf / zod removed.** Dialogs (`Dialog`, `AlertDialog`, `ReasonDialog`), `Combobox`, `Tabs`, `NumberInput` and the forms are hand-rolled with the same props, same Vietnamese copy and same validation rules; `CustomerCreatePage`, `DeliveryCreateDialog`, `InvoiceCreateDialog` carry explicit `validate()` functions reproducing PH1's messages.
+6. **Radix / rhf / zod removed.** Dialogs (`Dialog`, `AlertDialog`, `ReasonDialog`), `Combobox`, `Tabs`, `NumberInput` and the forms are hand-rolled with the same props, same Vietnamese copy and same validation rules. The rules themselves live in `lib/validation.js` with the **API's** message literals (not PH1's zod wording) so a value that passes the form cannot fail on the server with a different sentence; the four create dialogs call it on submit and place `details[].field` messages on the matching control. See §3.5 and `PH1_HANDOVER/BUSINESS_RULES.md` §9.7.
 7. **Charts.** `recharts` was never used; PH1's SVG geometry is preserved with literal hex colours (`AXIS_COLOR #CBD5E1`, `GRID_COLOR #EEF2F7`, series `#0F5FAF`).
-8. **Module base layer.** `sales.css` restores PH1's focus ring and cursors inside the module only (a global rule would restyle frozen PH4/PH5 surfaces).
+8. **Module base layer.** `sales.css` restores PH1's focus ring and cursors inside the module only (a global rule would restyle frozen PH4/PH5 surfaces). Portal panels (`Dialog`, `AlertDialog`, the toast host) carry `sales-overlay-root` so they stay inside that scope after being portaled to `document.body`; both dialogs also honour `Esc`, matching PH1's Radix `AlertDialog` (which removed backdrop-click dismissal only — the port's original "no keyboard dismissal" note was wrong and is corrected).
 
 ---
 

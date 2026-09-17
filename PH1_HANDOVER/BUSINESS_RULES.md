@@ -282,53 +282,137 @@ The status enum is `['dang_ban', 'ngung_ban', 'mau_moi']` (`product.service.js`)
 
 ## 9. Validation rules
 
-The module validates with a local zod-parity validator (`backend/src/utils/sales/validate.js`; `v.string/number/boolean/enum/literal/array/object` + `coerce.*`, modifiers `optional/nullable/default/min/max/int/positive/email/partial/or/refine/superRefine/transform`). Contract kept from zod: unknown object keys are stripped, `.default()` fills missing `undefined`, `.optional()` allows `undefined`, numbers coerce via `Number(value)`, `safeParse` → `{ success, data }` or `{ success:false, error:{ errors:[{path,message}] } }` (`validate.js` header). Generic messages: `required = 'Trường này là bắt buộc.'`, `enum = 'Giá trị không nằm trong danh sách cho phép.'`, etc.
+The module validates with a local zod-parity validator (`backend/src/utils/sales/validate.js`; `v.string/number/boolean/enum/literal/array/object` + `coerce.*`, modifiers `optional/nullable/default/min/max/int/positive/email/phone/dateISO/partial/or/refine/superRefine/transform`). Contract kept from zod: unknown object keys are stripped, `.default()` fills missing `undefined`, `.optional()` allows `undefined`, numbers coerce via `Number(value)`, `safeParse` → `{ success, data }` or `{ success:false, error:{ errors:[{path,message}] } }` (`validate.js` header). Generic messages: `required = 'Trường này là bắt buộc.'`, `enum = 'Giá trị không nằm trong danh sách cho phép.'`, etc.
 
-### 9.1 Order create (`order.service.js:34-53`)
+Cross-cutting rules — path ids, alias conflicts, date rules, boolean flags, unknown keys and sort allow-lists — are
+listed in `PH1_HANDOVER/API_SPEC.md` §1.6; the helpers live in `backend/src/utils/sales/request.js`
+(`parseIdParam`, `assertNoAliasConflict`, `fieldIssues`, `INVALID_BODY_MESSAGE`, `INVALID_QUERY_MESSAGE`).
+
+### 9.1 Order create (`order.service.js::orderLineInputSchema`, `::createOrderSchema`)
 | Field | Rule | Vietnamese message |
 |---|---|---|
 | `ma_khach_hang` | int, positive | `Vui lòng chọn khách hàng` |
-| `ngay_dat_hang` | string, min 1 | `Ngày đặt hàng là bắt buộc` |
-| `ngay_giao_hang_yc` | string, min 1 | `Ngày giao hàng yêu cầu là bắt buộc` |
-| `dia_chi_giao_hang` | string, min 1 | `Địa chỉ giao hàng không được để trống` |
-| `lines` | array, min 1 | `Đơn hàng phải có ít nhất một dòng sản phẩm` |
-| cross-field refine | `new Date(ngay_giao_hang_yc) >= new Date(ngay_dat_hang)` | `Ngày giao hàng yêu cầu không được trước ngày đặt hàng` (path `ngay_giao_hang_yc`) |
+| `ngay_dat_hang` | non-empty `YYYY-MM-DD` naming a real day | `Ngày đặt hàng là bắt buộc` / `Ngày đặt hàng không hợp lệ (YYYY-MM-DD)` |
+| `ngay_giao_hang_yc` | non-empty `YYYY-MM-DD` naming a real day | `Ngày giao hàng yêu cầu là bắt buộc` / `Ngày giao hàng yêu cầu không hợp lệ (YYYY-MM-DD)` |
+| `dia_chi_giao_hang` | string 1..500 | `Địa chỉ giao hàng không được để trống` / `Địa chỉ giao hàng tối đa 500 ký tự` |
+| `lines` | array 1..200 | `Đơn hàng phải có ít nhất một dòng sản phẩm` / `Đơn hàng tối đa 200 dòng sản phẩm` |
+| `ghi_chu` | optional/nullable string ≤2000 | `Ghi chú tối đa 2000 ký tự` |
+| cross-field | `ngay_giao_hang_yc >= ngay_dat_hang` (ISO day comparison; skipped when either date is invalid so the format message stays the only one per field) | `Ngày giao hàng yêu cầu không được trước ngày đặt hàng` (path `ngay_giao_hang_yc`) |
 
-Order line (`:28-30`): `ma_san_pham` int positive → `Mã sản phẩm không hợp lệ`; `so_luong` positive → `Số lượng đặt phải lớn hơn 0`; `ty_le_giam_gia` `0..100` default 0 → `Chiết khấu không được âm` / `Chiết khấu tối đa 100%`.
+Order line (`::orderLineInputSchema`): `ma_san_pham` int positive → `Mã sản phẩm không hợp lệ`; `so_luong` positive, ≤1e6 → `Số lượng đặt phải lớn hơn 0` / `Số lượng đặt quá lớn`; `ty_le_giam_gia` `0..100` default 0 → `Chiết khấu không được âm` / `Chiết khấu tối đa 100%`; `ghi_chu` string ≤500/null.
 
-### 9.2 Order cancel / confirm
-- `cancelOrderSchema`: `ly_do` string min 1 → `Lý do hủy đơn hàng là bắt buộc` (`order.service.js:67`).
-- `confirmOrderSchema`: `acknowledgeCreditLimit` boolean, default `false` (`:64-66`).
+### 9.2 Order update / cancel / confirm
+- `updateOrderSchema` (`::updateOrderSchema`): optional `ngay_giao_hang_yc` (real `YYYY-MM-DD` → `Ngày giao hàng yêu cầu không hợp lệ (YYYY-MM-DD)`), `dia_chi_giao_hang` 1..500, `ghi_chu` ≤2000/null, `lines` 1..200.
+- `cancelOrderSchema`: `ly_do` string 1..500 → `Lý do hủy đơn hàng là bắt buộc` (`order.service.js::cancelOrderSchema`).
+- `confirmOrderSchema`: `acknowledgeCreditLimit` strict boolean default `false` — a non-boolean value is a `422`, a missing field keeps the default (`::confirmOrderSchema`).
+
+Query (`::orderQuerySchema`): `page ≥ 1`, `1 ≤ pageSize ≤ 100`, `search ≤ 100`, `trang_thai` in `ORDER_STATUSES`, `nguoi_ban` int>0, `fromDate`/`toDate` real days with `fromDate <= toDate`, `sortBy` free string resolved by the repository allow-list, `sortOrder ∈ {ASC,DESC}`. Unknown query keys are ignored; validation failures answer `422 INVALID_QUERY_MESSAGE` (`Tham số truy vấn không hợp lệ.`) with per-field details.
 
 Service-level checks (beyond the schema), each an error code:
-- `CUSTOMER_NOT_FOUND` (404) / `CUSTOMER_INACTIVE` (422) on create and confirm — `order.service.js:113-124, 278-284`.
-- `PRODUCT_NOT_FOUND` (404) / `PRODUCT_NOT_SELLABLE` (422) — `:128-141, 216-229`.
-- `ORDER_NOT_FOUND` (404), `ORDER_INVALID_STATE` (422), `DATABASE_CONFLICT` (409, code-generation exhaustion) — `:96-99, 195-200, 268-272, 324-339`.
-- Unknown query params on list fail with `Validation failed for one or more query parameters.` + per-field details (`listOrders`, `:79-88`).
+- `CUSTOMER_NOT_FOUND` (404) / `CUSTOMER_INACTIVE` (422) on create and confirm — `order.service.js::createOrder`, `::confirmOrder`.
+- `PRODUCT_NOT_FOUND` (404) / `PRODUCT_NOT_SELLABLE` (422) — `::createOrder`, `::updateOrder`.
+- `ORDER_NOT_FOUND` (404), `ORDER_INVALID_STATE` (422), `DATABASE_CONFLICT` (409, code-generation exhaustion) — `::getOrderById`, `::updateOrder`, `::confirmOrder`, `::cancelOrder`.
 
-### 9.3 Customer (`customer.service.js:20-39`)
+### 9.3 Customer (`customer.service.js::createCustomerSchema`)
 | Field | Rule | Message |
 |---|---|---|
 | `ten_khach_hang` | string 1..200 | `Tên khách hàng không được để trống` |
-| `so_dien_thoai` | string 8..20 | `Số điện thoại phải từ 8 ký tự` |
-| `email` | email or `''`, optional/nullable | `Email không đúng định dạng` |
-| `dia_chi` | string min 1 | `Địa chỉ không được để trống` |
-| `tinh_thanh_pho` | string min 1 | `Tỉnh/thành phố không được để trống` |
-| `han_muc_cong_no` | number ≥ 0, default 0 | `Hạn mức công nợ phải lớn hơn hoặc bằng 0` |
-| `so_ngay_cong_no` | int ≥ 0, default 0 | `Số ngày công nợ phải lớn hơn hoặc bằng 0` |
-| `loai_khach_hang` | enum | — (generic enum message) |
-| `ma_so_thue` | string max 20 | — |
-| `nguoi_lien_he` | string max 150 | — |
+| `loai_khach_hang` | enum `ca_nhan\|to_chuc\|dai_ly\|xuat_khau` | — (generic enum message) |
+| `so_dien_thoai` | required, trim → length 8..20 → `^[0-9+\-(). ]{8,20}$` | `Số điện thoại phải từ 8 ký tự` / `Số điện thoại tối đa 20 ký tự` / `Số điện thoại không đúng định dạng.` — `parseString` runs length before the pattern, so a blank, short or long value gets the length message and only an 8..20-character value reaches the regex |
+| `email` | email ≤100 or `''`, optional/nullable | `Email không đúng định dạng` |
+| `dia_chi` | string 1..500 | `Địa chỉ không được để trống` |
+| `tinh_thanh_pho` | string 1..100 | `Tỉnh/thành phố không được để trống` |
+| `ma_so_thue` | string ≤20, optional/nullable | `Mã số thuế tối đa 20 ký tự` |
+| `nguoi_lien_he` | string ≤150, optional/nullable | `Người liên hệ tối đa 150 ký tự` |
+| `han_muc_cong_no` | number 0..1e15, default 0 | number check first (blank/`NaN` → `Giá trị phải là số.`, non-finite → `Giá trị phải là số hữu hạn.`), then `Hạn mức công nợ phải lớn hơn hoặc bằng 0` / `Hạn mức công nợ quá lớn` |
+| `so_ngay_cong_no` | int 0..3650, default 0 | number check first (blank/`NaN` → `Giá trị phải là số.`), then `Số ngày công nợ phải là số nguyên`, then `Số ngày công nợ phải lớn hơn hoặc bằng 0` / `Số ngày công nợ tối đa 3650 ngày` |
+| `ghi_chu` | string ≤2000, optional/nullable | `Ghi chú tối đa 2000 ký tự` |
 
-Validation failures raise 422 `VALIDATION_ERROR` with field details via `validationDetails` (`{ field, message }`), `customer.service.js:52-58`.
+`updateCustomerSchema = createCustomerSchema.partial()`; `updateCustomerStatusSchema` requires `trang_thai` in
+`hoat_dong\|tam_khoa\|ngung_giao_dich` plus optional `ly_do ≤ 500`. Validation failures raise 422
+`VALIDATION_ERROR` with field details `[{ field, message }]` (`utils/sales/request.js::fieldIssues`).
 
-### 9.4 Delivery (`delivery.service.js:22-88`)
-Alias-aware (`ma_don_ban_hang`|`orderId`, `ma_kho`|`warehouseId`, `ngay_giao`|`deliveryDate`, `ten_nguoi_nhan`|`receiverName`, `dia_chi_giao`|`deliveryAddress`, etc.). Required-after-alias: `Mã đơn hàng là bắt buộc`, `Kho xuất hàng là bắt buộc`, `Ngày giao hàng là bắt buộc` (+ `Ngày giao hàng không hợp lệ` when unparseable), `Tên người nhận là bắt buộc`, `Địa chỉ giao hàng là bắt buộc`. `failDeliverySchema` requires `ly_do`/`reason` → `Lý do giao hàng thất bại là bắt buộc`. `deliveredLines` present → 422 `DELIVERY_LINES_UNSUPPORTED`.
+### 9.4 Delivery (`delivery.service.js::createDeliverySchema`)
+Alias-aware (`ma_don_ban_hang`|`orderId`, `ma_kho`|`warehouseId`, `ngay_giao`|`deliveryDate`, `ten_nguoi_nhan`|`receiverName`, `dia_chi_giao`|`deliveryAddress`, `phuong_tien_van_chuyen`|`transportMethod`, `nguoi_giao_hang`|`deliveryPersonId`, `ghi_chu`|`notes`); the two spellings of a pair may not carry different values (`assertNoAliasConflict` → `Chỉ gửi một trong hai trường <a> hoặc <b>.`). Required-after-alias: `Mã đơn hàng là bắt buộc`, `Kho xuất hàng là bắt buộc`, `Ngày giao hàng là bắt buộc` (+ `Ngày giao hàng không hợp lệ (YYYY-MM-DD)` when it is not a plain calendar day — a timestamp is rejected, so no timezone can move the day), `Tên người nhận là bắt buộc`, `Địa chỉ giao hàng là bắt buộc`. Bounds: `ten_nguoi_nhan` ≤150, `dia_chi_giao` ≤500, `phuong_tien_van_chuyen` ≤100, `ghi_chu` ≤2000. `failDeliverySchema` requires `ly_do`/`reason` (1..500) → `Lý do giao hàng thất bại là bắt buộc`. `deliveredLines` present → 422 `DELIVERY_LINES_UNSUPPORTED`.
 
-### 9.5 Invoice (`invoice.service.js:23-48`)
-`ma_don_ban_hang`/`orderId` required → `Mã đơn hàng là bắt buộc`; optional `ngay_xuat_hoa_don`/`issueDate` must parse → `Ngày xuất hóa đơn không hợp lệ`; `so_tien_da_thu`/`paidAmount` ≥ 0 → `Số tiền đã thu không được âm`; default issue date = `new Date().toISOString()` when neither supplied. Service-level errors: `ORDER_NOT_FOUND`, `INVOICE_ALREADY_EXISTS`, `DATABASE_CONFLICT`, `VALIDATION_ERROR`, and atomic-path `INVOICE_INVALID_ORDER` / `INVOICE_CUSTOMER_MISMATCH` (§6).
+### 9.5 Invoice (`invoice.service.js::createInvoiceSchema`)
+`ma_don_ban_hang`/`orderId` required → `Mã đơn hàng là bắt buộc`; optional `ngay_xuat_hoa_don`/`issueDate` is validated by
+`v.dateISO(message)`, which answers in two tiers — a wrong shape → `Ngày xuất hóa đơn không đúng định dạng (YYYY-MM-DD)`,
+a well-shaped day that does not exist (`2026-02-30`) → `Ngày không tồn tại.` (`MESSAGES.dateInvalid`), the same tiering the
+query date filters use; only an **omitted** key is optional — a cleared input is a submitted empty string and answers the
+format message; `so_tien_da_thu`/`paidAmount` ≥ 0 →
+`Số tiền đã thu không được âm`; `ghi_chu`/`notes` ≤2000; the pair `so_tien_da_thu`/`paidAmount` may not disagree.
+Default issue date = the current date (`new Date().toISOString().split('T')[0]`) when neither is supplied.
+Service-level errors: `ORDER_NOT_FOUND`, `INVOICE_ALREADY_EXISTS`, `DATABASE_CONFLICT`, `VALIDATION_ERROR` (with
+`field: 'so_tien_da_thu'` for the over-payment branch), and atomic-path `INVOICE_INVALID_ORDER` /
+`INVOICE_CUSTOMER_MISMATCH` (§6).
 
 ### 9.6 Shared conventions
-- Query schemas bound `page ≥ 1`, `1 ≤ pageSize ≤ 100`, `sortOrder ∈ {ASC,DESC}`; `sortBy` is whitelisted per repository (`ALLOWED_*_SORT_COLUMNS`) and never interpolated raw.
-- Error envelopes carry both `statusCode` and `errorCode` (`utils/sales/errors.js`); `details` (field-level) is rendered by Core's handler only under `NODE_ENV=development` (`errors.js` header). Rendered by the module error boundary at `utils/sales/errorBoundary.js`, registered last in `salesRoutes.js`.
-- Booleans are coerced with JavaScript `Boolean()`, so the string `"false"` coerces to `true` — a preserved PH1 quirk (`validate.js` `v.coerce.boolean`).
+- A schema runs its checks in the order they were chained, and `parseString`/`parseNumber` enforce the framework's
+  order between kinds: string → type, trim, `min`, `max`, pattern, email, `dateISO`; number (coerced) — a blank
+  string or `NaN` → `Giá trị phải là số.`, a non-finite value (`Infinity`, `'1e999'`) → `Giá trị phải là số hữu hạn.`,
+  then `int`, `positive`, `min`, `max`. `.default()`/`.optional()` apply to an absent key only, never to `''`.
+- Path parameters are parsed by `parseIdParam` (`utils/sales/request.js`): plain decimal digits only, `422`
+  `details[{field:'id'}]` otherwise — `Number('abc')` used to reach a `BIGINT` comparison and answer 500.
+- Query schemas bound `page ≥ 1`, `1 ≤ pageSize ≤ 100`, `sortOrder ∈ {ASC,DESC}`; `sortBy` is a free string
+  resolved against the repository's `ALLOWED_*_SORT_COLUMNS` (an unlisted column falls back to the default order)
+  and is never interpolated raw.
+- Booleans are parsed explicitly (`true`/`false`/`1`/`0`, trimmed, case-insensitive; anything else is a `422`),
+  which replaces PH1's `Boolean()` coercion (`KNOWN_GAPS.md` G-3).
+- Unknown body/query keys are stripped, never applied (PH1/zod parity; `KNOWN_GAPS.md` G-9); unknown values for an
+  enum field are a `422`.
+- Error envelopes carry both `statusCode` and `errorCode` (`utils/sales/errors.js`); `details` (field-level) is
+  rendered by the module error boundary at `utils/sales/errorBoundary.js`, registered last in `salesRoutes.js`.
+- Body/query failures share `INVALID_BODY_MESSAGE` / `INVALID_QUERY_MESSAGE` (`utils/sales/request.js`); the ported
+  English zod defaults no longer appear.
+
+### 9.7 Local (frontend) rule parity
+
+The dialogs never send a request just to read a message back. `frontend/src/sales/lib/validation.js` restates the
+rules above and the four create dialogs (`components/customers/`, `components/orders/`, `components/deliveries/`,
+`components/invoices/`) call it on submit; the message the user sees is therefore identical whether the check ran in
+the form or on the server.
+
+| Local export | Mirrors | Notes |
+|---|---|---|
+| `customerFieldErrors(values)` / `customerFieldError(values, name)` | `createCustomerSchema` | one message per field; absent/blank optional fields pass (`ma_so_thue`, `email`, `nguoi_lien_he`, `ghi_chu`), numeric fields fall back to the schema default 0 |
+| `orderFieldErrors(state)` | `createOrderSchema` + `orderLineInputSchema` | includes the cross-field `ngay_giao_hang_yc >= ngay_dat_hang`; line errors key as `lines.<i>.<field>` so they land inside the row's own control |
+| `deliveryFieldErrors(state)` | alias-resolved `createDeliverySchema` | order id, warehouse, date, receiver, address, transport method, notes |
+| `invoiceFieldErrors(state)` | `createInvoiceSchema` | issue date optional; two-tier date messages (see §9.5) |
+| `isoDateError(value, formatMessage)` | `v.dateISO(message)` | the two tiers in one helper |
+| `serverFieldErrors(error, knownFields)` | `422` envelope `details[]` | reduces nested paths (`lines.0.so_luong` → `lines`) and drops fields the form does not render; first message per field wins |
+| `firstFieldError(map)`, `fieldStatus(map, field)` | — | ordering and control-status helpers |
+
+**No local message diverges from the API for the payloads the dialogs send** — a 60-case live run with 0
+mismatches over all four create endpoints (every accepted-value case carries a failing sibling field, so the run
+answers `422` throughout and inserts nothing). The rules read the dialog's *state* and map it through the **same
+exported normalisers the submit payload uses**, so a rule and the wire value cannot drift:
+
+| Export | Formula | Used by |
+|---|---|---|
+| `toWireAmount(value)` | `Number(value) || 0` | customer credit limit / payment term, order-line discount, invoice paid amount |
+| `toWireQuantity(value)` | `Number(value)` (no default) | order-line quantity |
+
+That is why a *cleared* field is not a number error: the value the schema sees is the default the dialog sends.
+
+| Dialog state | Wire value | Answer on both sides |
+|---|---|---|
+| cleared credit limit, payment term, paid amount or discount | `0` | accepted (schema default) — verified end-to-end: a create with both customer numeric fields cleared stored `han_muc_cong_no 0.00`, `so_ngay_cong_no 0` |
+| cleared order-line quantity | `0` | `Số lượng đặt phải lớn hơn 0` |
+| absent order-line quantity | `null` | `Giá trị phải là số.` |
+| `'1e999'` in an amount field | `null` (JSON cannot carry `Infinity`) | `Giá trị phải là số.` |
+| omitted field key | — | generic `Trường này là bắt buộc.`; no dialog omits a key, and a line is only created from a picked product |
+| whitespace-only email | the `type=email` control sanitises it away; if sent, `'   '` | `Email không đúng định dạng` (`.or(v.literal(''))` accepts an exact empty string only) |
+
+`coerceNumberError` mirrors `parseNumber` for a value that reaches it (`undefined` is the caller's case; `null`,
+blank and `NaN` → `Giá trị phải là số.`; non-finite → `Giá trị phải là số hữu hạn.`), and `isoDateError` mirrors
+`v.dateISO(message)` exactly: `undefined` is the only optional value, `null` and non-strings answer
+`Giá trị phải là chuỗi ký tự.`, while `''`, whitespace or a wrong shape answer the format message (a cleared date
+input emits `''`, so the gate the user sees is the format message; a well-shaped impossible day still answers
+`Ngày không tồn tại.`).
+
+Coverage: `frontend/src/sales/lib/validation.test.js` (`npm test` in `frontend/`, 9 tests) asserts each message
+literal plus the boundaries (`2024-02-29`, `2026-02-30`, `2026-2-3`, 200/201-character name, quantity 0/1e6/2e6,
+discount 100/101, 20/21-character tax code, 7/8/21-character and blank phone, blank/`NaN`/`'1e999'` numeric input,
+3650/3651 days, 1e15/1e16 credit limit, cleared invoice date). The literals themselves were checked field by field
+against the running backend — see `PH1_HANDOVER/TEST_REPORT.md` §5.

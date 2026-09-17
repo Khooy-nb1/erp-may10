@@ -5,6 +5,7 @@ const { requireRoles, requirePermission } = require('../../middlewares/auth');
 const { customerService } = require('../../services/sales/customer.service');
 const { receivableService } = require('../../services/sales/receivable.service');
 const { sendSuccess, sendPaginated } = require('../../utils/sales/response');
+const { parseIdParam } = require('../../utils/sales/request');
 
 /**
  * Customer routes - mounted at `/api/v1/sales/khach-hang` from `salesRoutes.js`.
@@ -53,7 +54,7 @@ function createCustomerRoutes(service = customerService, recService = receivable
   // 3. Get customer detail
   router.get('/:id', requireRoles('admin', 'ban_hang', 'ke_toan'), async (req, res, next) => {
     try {
-      const customer = await service.getCustomerById(Number(req.params.id));
+      const customer = await service.getCustomerById(parseIdParam(req.params.id, 'id', 'Mã khách hàng'));
       sendSuccess(res, customer);
     } catch (err) {
       next(err);
@@ -63,7 +64,7 @@ function createCustomerRoutes(service = customerService, recService = receivable
   // 4. Update customer general info
   router.patch('/:id', requirePermission('sales.update'), async (req, res, next) => {
     try {
-      const updated = await service.updateCustomer(Number(req.params.id), req.body, req.user ? req.user.id : null);
+      const updated = await service.updateCustomer(parseIdParam(req.params.id, 'id', 'Mã khách hàng'), req.body, req.user ? req.user.id : null);
       sendSuccess(res, updated, 'Cập nhật thông tin khách hàng thành công.');
     } catch (err) {
       next(err);
@@ -73,7 +74,7 @@ function createCustomerRoutes(service = customerService, recService = receivable
   // 5. Update customer status (Admin only)
   router.patch('/:id/status', requireRoles('admin'), async (req, res, next) => {
     try {
-      const updated = await service.updateCustomerStatus(Number(req.params.id), req.body, req.user ? req.user.id : null);
+      const updated = await service.updateCustomerStatus(parseIdParam(req.params.id, 'id', 'Mã khách hàng'), req.body, req.user ? req.user.id : null);
       sendSuccess(res, updated, 'Cập nhật trạng thái khách hàng thành công.');
     } catch (err) {
       next(err);
@@ -83,7 +84,7 @@ function createCustomerRoutes(service = customerService, recService = receivable
   // 6. Get commercial summary
   router.get('/:id/summary', requireRoles('admin', 'ban_hang', 'ke_toan'), async (req, res, next) => {
     try {
-      const summary = await service.getCustomerSummary(Number(req.params.id));
+      const summary = await service.getCustomerSummary(parseIdParam(req.params.id, 'id', 'Mã khách hàng'));
       sendSuccess(res, summary);
     } catch (err) {
       next(err);
@@ -93,7 +94,7 @@ function createCustomerRoutes(service = customerService, recService = receivable
   // 7. Get customer specific receivables (ruling R-2: sales permission holders)
   router.get('/:id/receivables', requirePermission('sales.view'), async (req, res, next) => {
     try {
-      const result = await recService.getCustomerReceivables(Number(req.params.id), req.query);
+      const result = await recService.getCustomerReceivables(parseIdParam(req.params.id, 'id', 'Mã khách hàng'), req.query);
       sendPaginated(
         res,
         result.receivables,

@@ -11,7 +11,8 @@ import { NumberInput } from '../ui/NumberInput.jsx';
 import { Textarea } from '../ui/Textarea.jsx';
 import { Select } from '../ui/Select.jsx';
 import { DateInput } from '../ui/DateInput.jsx';
-import { ErrorState } from '../common/ErrorState.jsx';
+import { toast } from '../ui/toast.jsx';
+import { fieldStatus, firstFieldError, orderFieldErrors, serverFieldErrors, toWireAmount, toWireQuantity } from '../../lib/validation.js';
 import { FormSection } from '../common/FormSection.jsx';
 import { LoadingState } from '../common/LoadingState.jsx';
 import { getCustomers } from '../../services/customerService.js';
@@ -56,7 +57,7 @@ export function SalesOrderCreateDialog({ isOpen, onOpenChange, onCreated }) {
 
   const [lines, setLines] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Each open starts from a clean form and reloads the active customer catalogue.
   useEffect(() => {
@@ -70,7 +71,7 @@ export function SalesOrderCreateDialog({ isOpen, onOpenChange, onCreated }) {
     setNotes('');
     setLines([]);
     setIsSubmitting(false);
-    setError(null);
+    setFieldErrors({});
     setLoadingCustomers(true);
 
     let cancelled = false;
@@ -79,7 +80,7 @@ export function SalesOrderCreateDialog({ isOpen, onOpenChange, onCreated }) {
         const res = await getCustomers({ pageSize: CUSTOMER_PAGE_SIZE, trang_thai: 'hoat_dong' });
         if (!cancelled) setCustomers(res.customers);
       } catch {
-        if (!cancelled) setError('Không thể tải danh sách khách hàng');
+        if (!cancelled) toast.error('Không thể tải danh sách khách hàng.');
       } finally {
         if (!cancelled) setLoadingCustomers(false);
       }
@@ -132,21 +133,24 @@ export function SalesOrderCreateDialog({ isOpen, onOpenChange, onCreated }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedCustomerId) {
-      setError('Vui lòng chọn khách hàng.');
-      return;
-    }
-    if (lines.length === 0) {
-      setError('Đơn hàng phải có ít nhất một dòng sản phẩm.');
-      return;
-    }
-    if (!deliveryAddress.trim()) {
-      setError('Địa chỉ giao hàng không được để trống.');
+    // Same rules and messages as `createOrderSchema`; the server re-checks anyway.
+    const localErrors = orderFieldErrors({
+      customerId: selectedCustomerId,
+      orderDate,
+      requestedDeliveryDate,
+      deliveryAddress,
+      notes,
+      lines,
+    });
+    const firstError = firstFieldError(localErrors);
+    if (firstError) {
+      if (firstError.field === 'lines') toast.error(firstError.message);
+      setFieldErrors(localErrors);
       return;
     }
 
     setIsSubmitting(true);
-    setError(null);
+    setFieldErrors({});
 
     try {
       const created = await createOrder({
@@ -157,15 +161,25 @@ export function SalesOrderCreateDialog({ isOpen, onOpenChange, onCreated }) {
         ghi_chu: notes.trim() || undefined,
         lines: lines.map((l) => ({
           ma_san_pham: l.product.id,
-          so_luong: Number(l.quantity),
-          ty_le_giam_gia: Number(l.discountRate) || 0,
+          so_luong: toWireQuantity(l.quantity),
+          ty_le_giam_gia: toWireAmount(l.discountRate),
         })),
       });
 
       if (onCreated) onCreated(created.id);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể tạo đơn hàng.');
+      setFieldErrors(
+        serverFieldErrors(err, [
+          'ma_khach_hang',
+          'ngay_dat_hang',
+          'ngay_giao_hang_yc',
+          'dia_chi_giao_hang',
+          'ghi_chu',
+          'lines',
+        ])
+      );
+      toast.error(err instanceof Error ? err : 'Không thể tạo đơn hàng.');
     } finally {
       setIsSubmitting(false);
     }
@@ -296,8 +310,6 @@ export function SalesOrderCreateDialog({ isOpen, onOpenChange, onCreated }) {
         noValidate
         className="flex max-h-[65vh] flex-col gap-5 overflow-y-auto pr-1"
       >
-        {error ? <ErrorState message={error} onRetry={() => setError(null)} /> : null}
-
         {loadingCustomers ? (
           <LoadingState message="Đang nạp danh mục khách hàng..." />
         ) : (
@@ -312,24 +324,28 @@ export function SalesOrderCreateDialog({ isOpen, onOpenChange, onCreated }) {
                   value: String(c.id),
                   label: c.ten_khach_hang + ' (' + c.ma_khach_hang + ') - ' + c.tinh_thanh_pho,
                 }))}
+                status={fieldStatus(fieldErrors, 'ma_khach_hang')}
               />
 
               <Input
                 label="Địa chỉ giao hàng *"
                 value={deliveryAddress}
                 onChange={(value) => setDeliveryAddress(value)}
+                status={fieldStatus(fieldErrors, 'dia_chi_giao_hang')}
               />
 
               <DateInput
                 label="Ngày đặt hàng *"
                 value={orderDate}
                 onChange={(value) => setOrderDate(value ?? '')}
+                status={fieldStatus(fieldErrors, 'ngay_dat_hang')}
               />
 
               <DateInput
                 label="Ngày giao hàng yêu cầu *"
                 value={requestedDeliveryDate}
                 onChange={(value) => setRequestedDeliveryDate(value ?? '')}
+                status={fieldStatus(fieldErrors, 'ngay_giao_hang_yc')}
               />
 
               <Textarea
@@ -337,6 +353,7 @@ export function SalesOrderCreateDialog({ isOpen, onOpenChange, onCreated }) {
                 rows={2}
                 value={notes}
                 onChange={(value) => setNotes(value)}
+                status={fieldStatus(fieldErrors, 'ghi_chu')}
               />
             </FormSection>
 

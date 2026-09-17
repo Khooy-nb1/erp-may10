@@ -4,6 +4,7 @@ const express = require('express');
 const { requireRoles } = require('../../middlewares/auth');
 const { deliveryService } = require('../../services/sales/delivery.service');
 const { sendSuccess, sendPaginated } = require('../../utils/sales/response');
+const { parseIdParam } = require('../../utils/sales/request');
 
 /**
  * Delivery routes - mounted at `/giao-hang` in sales routes.
@@ -54,7 +55,7 @@ function createDeliveryRoutes(service = deliveryService) {
   // 3. Get delivery detail
   router.get('/:id', requireRoles('admin', 'ban_hang', 'kho'), async (req, res, next) => {
     try {
-      const delivery = await service.getDeliveryById(Number(req.params.id));
+      const delivery = await service.getDeliveryById(parseIdParam(req.params.id, 'id', 'Mã đơn giao hàng'));
       sendSuccess(res, delivery);
     } catch (err) {
       next(err);
@@ -65,7 +66,7 @@ function createDeliveryRoutes(service = deliveryService) {
   router.post('/:id/start', requireRoles('admin', 'kho'), async (req, res, next) => {
     try {
       const userId = (req.user && req.user.id) || 1;
-      const updated = await service.startDelivery(Number(req.params.id), userId);
+      const updated = await service.startDelivery(parseIdParam(req.params.id, 'id', 'Mã đơn giao hàng'), userId);
       sendSuccess(res, updated, 'Bắt đầu vận chuyển đợt giao hàng thành công.');
     } catch (err) {
       next(err);
@@ -76,7 +77,7 @@ function createDeliveryRoutes(service = deliveryService) {
   router.post('/:id/complete', requireRoles('admin', 'kho'), async (req, res, next) => {
     try {
       const userId = (req.user && req.user.id) || 1;
-      const updated = await service.completeDelivery(Number(req.params.id), userId);
+      const updated = await service.completeDelivery(parseIdParam(req.params.id, 'id', 'Mã đơn giao hàng'), userId);
       sendSuccess(res, updated, 'Hoàn thành đợt giao hàng thành công.');
     } catch (err) {
       next(err);
@@ -87,7 +88,7 @@ function createDeliveryRoutes(service = deliveryService) {
   router.post('/:id/fail', requireRoles('admin', 'kho'), async (req, res, next) => {
     try {
       const userId = (req.user && req.user.id) || 1;
-      const updated = await service.failDelivery(Number(req.params.id), req.body, userId);
+      const updated = await service.failDelivery(parseIdParam(req.params.id, 'id', 'Mã đơn giao hàng'), req.body, userId);
       sendSuccess(res, updated, 'Đã cập nhật trạng thái giao hàng thất bại.');
     } catch (err) {
       next(err);

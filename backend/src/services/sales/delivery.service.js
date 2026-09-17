@@ -1,12 +1,18 @@
 'use strict';
 
-const { v } = require('../../utils/sales/validate');
+const { v, isRealDate } = require('../../utils/sales/validate');
 const {
   NotFoundError,
   ValidationError,
   ConflictError,
   AppError,
 } = require('../../utils/sales/errors');
+const {
+  INVALID_BODY_MESSAGE,
+  INVALID_QUERY_MESSAGE,
+  assertNoAliasConflict,
+  fieldIssues,
+} = require('../../utils/sales/request');
 const deliveryRepository = require('../../repositories/sales/delivery.repository');
 
 /**
@@ -21,22 +27,32 @@ const deliveryStatusEnum = v.enum(['cho_giao', 'dang_giao', 'da_giao', 'that_bai
 
 const createDeliverySchema = v
   .object({
-    ma_don_ban_hang: v.coerce.number().int().positive().optional(),
-    orderId: v.coerce.number().int().positive().optional(),
-    ma_kho: v.coerce.number().int().positive().optional(),
-    warehouseId: v.coerce.number().int().positive().optional(),
-    ngay_giao: v.string().optional(),
-    deliveryDate: v.string().optional(),
-    ten_nguoi_nhan: v.string().max(150).optional(),
-    receiverName: v.string().max(150).optional(),
-    dia_chi_giao: v.string().optional(),
-    deliveryAddress: v.string().optional(),
-    phuong_tien_van_chuyen: v.string().optional().nullable(),
-    transportMethod: v.string().optional().nullable(),
-    nguoi_giao_hang: v.coerce.number().int().positive().optional().nullable(),
-    deliveryPersonId: v.coerce.number().int().positive().optional().nullable(),
-    ghi_chu: v.string().optional().nullable(),
-    notes: v.string().optional().nullable(),
+    ma_don_ban_hang: v.coerce.number().int().positive('Mã đơn hàng không hợp lệ').optional(),
+    orderId: v.coerce.number().int().positive('Mã đơn hàng không hợp lệ').optional(),
+    ma_kho: v.coerce.number().int().positive('Mã kho không hợp lệ').optional(),
+    warehouseId: v.coerce.number().int().positive('Mã kho không hợp lệ').optional(),
+    ngay_giao: v.string().trim().max(40, 'Ngày giao hàng không hợp lệ').optional(),
+    deliveryDate: v.string().trim().max(40, 'Ngày giao hàng không hợp lệ').optional(),
+    ten_nguoi_nhan: v.string().trim().max(150, 'Tên người nhận tối đa 150 ký tự').optional(),
+    receiverName: v.string().trim().max(150, 'Tên người nhận tối đa 150 ký tự').optional(),
+    dia_chi_giao: v.string().trim().max(500, 'Địa chỉ giao hàng tối đa 500 ký tự').optional(),
+    deliveryAddress: v.string().trim().max(500, 'Địa chỉ giao hàng tối đa 500 ký tự').optional(),
+    phuong_tien_van_chuyen: v
+      .string()
+      .trim()
+      .max(100, 'Phương tiện vận chuyển tối đa 100 ký tự')
+      .optional()
+      .nullable(),
+    transportMethod: v
+      .string()
+      .trim()
+      .max(100, 'Phương tiện vận chuyển tối đa 100 ký tự')
+      .optional()
+      .nullable(),
+    nguoi_giao_hang: v.coerce.number().int().positive('Người giao hàng không hợp lệ').optional().nullable(),
+    deliveryPersonId: v.coerce.number().int().positive('Người giao hàng không hợp lệ').optional().nullable(),
+    ghi_chu: v.string().trim().max(2000, 'Ghi chú tối đa 2000 ký tự').optional().nullable(),
+    notes: v.string().trim().max(2000, 'Ghi chú tối đa 2000 ký tự').optional().nullable(),
   })
   .superRefine((data, ctx) => {
     const orderId = data.ma_don_ban_hang || data.orderId;
@@ -50,11 +66,10 @@ const createDeliverySchema = v
     const dateStr = data.ngay_giao || data.deliveryDate;
     if (!dateStr || dateStr.trim().length === 0) {
       ctx.addIssue({ message: 'Ngày giao hàng là bắt buộc', path: ['ngay_giao'] });
-    } else {
-      const parsedDate = new Date(dateStr);
-      if (isNaN(parsedDate.getTime())) {
-        ctx.addIssue({ message: 'Ngày giao hàng không hợp lệ', path: ['ngay_giao'] });
-      }
+    } else if (!isRealDate(dateStr.trim())) {
+      // A plain calendar day only: a timestamp would silently pick a day in a
+      // timezone nobody agreed on, so the client must send `YYYY-MM-DD`.
+      ctx.addIssue({ message: 'Ngày giao hàng không hợp lệ (YYYY-MM-DD)', path: ['ngay_giao'] });
     }
     const receiver = data.ten_nguoi_nhan || data.receiverName;
     if (!receiver || receiver.trim().length === 0) {
@@ -78,8 +93,8 @@ const createDeliverySchema = v
 
 const failDeliverySchema = v
   .object({
-    ly_do: v.string().optional(),
-    reason: v.string().optional(),
+    ly_do: v.string().trim().max(500, 'Lý do tối đa 500 ký tự').optional(),
+    reason: v.string().trim().max(500, 'Lý do tối đa 500 ký tự').optional(),
   })
   .superRefine((data, ctx) => {
     const reason = data.ly_do || data.reason;
@@ -91,29 +106,28 @@ const failDeliverySchema = v
     ly_do: data.ly_do || data.reason,
   }));
 
-const deliveryQuerySchema = v.object({
-  page: v.coerce.number().int().min(1).default(1),
-  pageSize: v.coerce.number().int().min(1).max(100).default(20),
-  search: v.string().optional(),
-  ma_don_ban_hang: v.coerce.number().int().positive().optional(),
-  ma_kho: v.coerce.number().int().positive().optional(),
-  trang_thai: deliveryStatusEnum.optional(),
-  sortBy: v.string().optional(),
-  sortOrder: v.enum(['ASC', 'DESC']).default('DESC'),
-});
-
-function validationDetails(issues) {
-  return issues.map((e) => ({ field: e.path.join('.'), message: e.message }));
-}
+const deliveryQuerySchema = v
+  .object({
+    page: v.coerce.number().int('Số trang phải là số nguyên').min(1, 'Số trang tối thiểu là 1').default(1),
+    pageSize: v.coerce
+      .number()
+      .int('Kích thước trang phải là số nguyên')
+      .min(1, 'Kích thước trang tối thiểu là 1')
+      .max(100, 'Kích thước trang tối đa là 100')
+      .default(20),
+    search: v.string().trim().max(100, 'Từ khóa tìm kiếm tối đa 100 ký tự').optional(),
+    ma_don_ban_hang: v.coerce.number().int().positive('Mã đơn hàng không hợp lệ').optional(),
+    ma_kho: v.coerce.number().int().positive('Mã kho không hợp lệ').optional(),
+    trang_thai: deliveryStatusEnum.optional(),
+    sortBy: v.string().trim().max(64, 'Cột sắp xếp không hợp lệ').optional(),
+    sortOrder: v.enum(['ASC', 'DESC'], 'Thứ tự sắp xếp không hợp lệ').default('DESC'),
+  })
 
 function createDeliveryService(repository = deliveryRepository) {
   async function listDeliveries(queryFilters = {}) {
     const parseResult = deliveryQuerySchema.safeParse(queryFilters);
     if (!parseResult.success) {
-      throw new ValidationError(
-        'Validation failed for one or more query parameters.',
-        validationDetails(parseResult.error.errors)
-      );
+      throw new ValidationError(INVALID_QUERY_MESSAGE, fieldIssues(parseResult.error.errors));
     }
     return repository.list(parseResult.data);
   }
@@ -136,12 +150,20 @@ function createDeliveryService(repository = deliveryRepository) {
       );
     }
 
+    assertNoAliasConflict(rawInput, [
+      ['ma_don_ban_hang', 'orderId'],
+      ['ma_kho', 'warehouseId'],
+      ['ngay_giao', 'deliveryDate'],
+      ['ten_nguoi_nhan', 'receiverName'],
+      ['dia_chi_giao', 'deliveryAddress'],
+      ['phuong_tien_van_chuyen', 'transportMethod'],
+      ['nguoi_giao_hang', 'deliveryPersonId'],
+      ['ghi_chu', 'notes'],
+    ]);
+
     const parseResult = createDeliverySchema.safeParse(rawInput);
     if (!parseResult.success) {
-      throw new ValidationError(
-        'Validation failed for one or more request fields.',
-        validationDetails(parseResult.error.errors)
-      );
+      throw new ValidationError(INVALID_BODY_MESSAGE, fieldIssues(parseResult.error.errors));
     }
     const input = parseResult.data;
 
@@ -241,12 +263,11 @@ function createDeliveryService(repository = deliveryRepository) {
   }
 
   async function failDelivery(id, rawInput, updaterId) {
+    assertNoAliasConflict(rawInput, [['ly_do', 'reason']]);
+
     const parseResult = failDeliverySchema.safeParse(rawInput);
     if (!parseResult.success) {
-      throw new ValidationError(
-        'Validation failed for one or more request fields.',
-        validationDetails(parseResult.error.errors)
-      );
+      throw new ValidationError(INVALID_BODY_MESSAGE, fieldIssues(parseResult.error.errors));
     }
     const { ly_do } = parseResult.data;
 

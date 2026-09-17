@@ -6,7 +6,8 @@ import { Input } from '../ui/Input.jsx';
 import { NumberInput } from '../ui/NumberInput.jsx';
 import { Textarea } from '../ui/Textarea.jsx';
 import { Select } from '../ui/Select.jsx';
-import { ErrorState } from '../common/ErrorState.jsx';
+import { toast } from '../ui/toast.jsx';
+import { CUSTOMER_TYPES, customerFieldError, customerFieldErrors, serverFieldErrors, toWireAmount } from '../../lib/validation.js';
 import { FormSection } from '../common/FormSection.jsx';
 
 /**
@@ -15,9 +16,9 @@ import { FormSection } from '../common/FormSection.jsx';
  * (Form fields and rules ported 1:1 from PH1 `pages/customers/CustomerCreatePage.tsx`.)
  *
  * PH1 used `react-hook-form` + `zod`; Core carries neither, so the same rules live in
- * `validateField(values)` below with PH1's exact messages, and the `reValidateMode: 'onChange'`
- * behaviour is reproduced by `setField` re-checking a field that already shows an error once
- * the form has been submitted (same as rhf after the first submit).
+ * `lib/validation.js` (`customerFieldErrors`) with the backend's exact messages, and the
+ * `reValidateMode: 'onChange'` behaviour is reproduced by `setField` re-checking a field that
+ * already shows an error once the form has been submitted (same as rhf after the first submit).
  *
  * @param {object} props
  * @param {boolean} props.isOpen
@@ -25,20 +26,13 @@ import { FormSection } from '../common/FormSection.jsx';
  * @param {(customerId: number | string) => void} [props.onCreated] Receives the new customer id once the API accepts it; the caller decides where to go next.
  */
 
-const CUSTOMER_TYPES = ['to_chuc', 'ca_nhan', 'dai_ly', 'xuat_khau'];
-
+/** PH1's customer types, in the order the create form listed them. */
 const LOAI_KHACH_HANG_OPTIONS = [
   { value: 'to_chuc', label: 'Tổ chức / Doanh nghiệp' },
   { value: 'ca_nhan', label: 'Cá nhân' },
   { value: 'dai_ly', label: 'Đại lý phân phối' },
   { value: 'xuat_khau', label: 'Khách xuất khẩu' },
 ];
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function isCustomerType(value) {
-  return value !== null && CUSTOMER_TYPES.includes(value);
-}
 
 const EMPTY_FORM = {
   ten_khach_hang: '',
@@ -54,52 +48,8 @@ const EMPTY_FORM = {
   ghi_chu: '',
 };
 
-/** Field-level rules mirroring PH1's zod schema (same messages, same coercion). */
-function validateField(name, values) {
-  switch (name) {
-    case 'ten_khach_hang':
-      return values.ten_khach_hang.trim() === '' ? 'Tên khách hàng không được để trống' : null;
-    case 'loai_khach_hang':
-      return isCustomerType(values.loai_khach_hang) ? null : 'Loại khách hàng không hợp lệ';
-    case 'so_dien_thoai':
-      return values.so_dien_thoai.trim().length < 8 ? 'Số điện thoại từ 8 ký tự' : null;
-    case 'email': {
-      const email = values.email.trim();
-      if (email === '') return null;
-      return EMAIL_PATTERN.test(email) ? null : 'Email không đúng định dạng';
-    }
-    case 'dia_chi':
-      return values.dia_chi.trim() === '' ? 'Địa chỉ không được để trống' : null;
-    case 'tinh_thanh_pho':
-      return values.tinh_thanh_pho.trim() === '' ? 'Tỉnh/thành phố không được để trống' : null;
-    case 'han_muc_cong_no':
-      return Number(values.han_muc_cong_no) < 0 ? 'Hạn mức không được âm' : null;
-    case 'so_ngay_cong_no':
-      return Number(values.so_ngay_cong_no) < 0 ? 'Số ngày không được âm' : null;
-    default:
-      return null;
-  }
-}
-
-const VALIDATED_FIELDS = [
-  'ten_khach_hang',
-  'loai_khach_hang',
-  'so_dien_thoai',
-  'email',
-  'dia_chi',
-  'tinh_thanh_pho',
-  'han_muc_cong_no',
-  'so_ngay_cong_no',
-];
-
-function validateAll(values) {
-  const next = {};
-  for (const field of VALIDATED_FIELDS) {
-    const message = validateField(field, values);
-    if (message) next[field] = message;
-  }
-  return next;
-}
+/** Every field the form can send; used to place the server's field messages. */
+const FORM_FIELDS = Object.keys(EMPTY_FORM);
 
 export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
   const formId = 'customer-create-form';
@@ -108,7 +58,6 @@ export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
   const [errors, setErrors] = useState({});
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [serverError, setServerError] = useState(null);
 
   // Each open starts from a clean form.
   useEffect(() => {
@@ -117,7 +66,6 @@ export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
     setErrors({});
     setHasSubmitted(false);
     setIsSubmitting(false);
-    setServerError(null);
   }, [isOpen]);
 
   /** rhf's post-submit behaviour: an edited field re-checks itself immediately. */
@@ -126,7 +74,7 @@ export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
       const next = { ...current, [name]: value };
       if (hasSubmitted) {
         setErrors((currentErrors) => {
-          const message = validateField(name, next);
+          const message = customerFieldError(next, name);
           const nextErrors = { ...currentErrors };
           if (message) nextErrors[name] = message;
           else delete nextErrors[name];
@@ -141,10 +89,9 @@ export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
 
   const onSubmit = async (event) => {
     event.preventDefault();
-    setServerError(null);
     setHasSubmitted(true);
 
-    const nextErrors = validateAll(values);
+    const nextErrors = customerFieldErrors(values);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -159,15 +106,20 @@ export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
         dia_chi: values.dia_chi,
         tinh_thanh_pho: values.tinh_thanh_pho,
         nguoi_lien_he: values.nguoi_lien_he,
-        han_muc_cong_no: Number(values.han_muc_cong_no) || 0,
-        so_ngay_cong_no: Number(values.so_ngay_cong_no) || 0,
+        han_muc_cong_no: toWireAmount(values.han_muc_cong_no),
+        so_ngay_cong_no: toWireAmount(values.so_ngay_cong_no),
         ghi_chu: values.ghi_chu,
       });
 
       onCreated?.(created.id);
       onOpenChange(false);
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Không thể tạo khách hàng.');
+      const fieldErrors = serverFieldErrors(err, FORM_FIELDS);
+      if (Object.keys(fieldErrors).length > 0) {
+        setHasSubmitted(true);
+        setErrors((currentErrors) => ({ ...currentErrors, ...fieldErrors }));
+      }
+      toast.error(err instanceof Error ? err : 'Không thể tạo khách hàng.');
     } finally {
       setIsSubmitting(false);
     }
@@ -206,8 +158,6 @@ export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
         noValidate
         className="flex max-h-[65vh] flex-col gap-5 overflow-y-auto pr-1"
       >
-        {serverError ? <ErrorState message={serverError} onRetry={() => setServerError(null)} /> : null}
-
         <FormSection title="Thông tin định danh">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
@@ -226,8 +176,9 @@ export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
               }))}
               value={values.loai_khach_hang}
               onChange={(value) => {
-                if (isCustomerType(value)) setField('loai_khach_hang', value);
+                if (CUSTOMER_TYPES.includes(value)) setField('loai_khach_hang', value);
               }}
+              status={statusOf('loai_khach_hang')}
               className="w-full"
             />
 
@@ -235,6 +186,7 @@ export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
               label="Mã số thuế"
               value={values.ma_so_thue ?? ''}
               onChange={(value) => setField('ma_so_thue', value)}
+              status={statusOf('ma_so_thue')}
             />
 
             <Input
@@ -275,6 +227,7 @@ export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
               label="Người liên hệ đại diện"
               value={values.nguoi_lien_he ?? ''}
               onChange={(value) => setField('nguoi_lien_he', value)}
+              status={statusOf('nguoi_lien_he')}
             />
           </div>
         </FormSection>
@@ -302,6 +255,7 @@ export function CustomerCreateDialog({ isOpen, onOpenChange, onCreated }) {
               label="Ghi chú"
               value={values.ghi_chu ?? ''}
               onChange={(value) => setField('ghi_chu', value)}
+              status={statusOf('ghi_chu')}
             />
           </div>
         </FormSection>

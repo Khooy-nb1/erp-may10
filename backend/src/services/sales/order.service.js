@@ -1,6 +1,6 @@
 'use strict';
 
-const { v } = require('../../utils/sales/validate');
+const { v, isRealDate } = require('../../utils/sales/validate');
 const { salesConfig } = require('../../config/sales');
 const {
   AppError,
@@ -9,7 +9,13 @@ const {
   ConflictError,
   ForbiddenError,
 } = require('../../utils/sales/errors');
+const {
+  INVALID_BODY_MESSAGE,
+  INVALID_QUERY_MESSAGE,
+  fieldIssues,
+} = require('../../utils/sales/request');
 const orderRepository = require('../../repositories/sales/order.repository');
+
 const customerRepository = require('../../repositories/sales/customer.repository');
 const productRepository = require('../../repositories/sales/product.repository');
 const { calculateOrderTotals } = require('../../utils/sales/pricing');
@@ -24,68 +30,123 @@ const { calculateOrderTotals } = require('../../utils/sales/pricing');
 
 const ORDER_STATUSES = ['cho_xac_nhan', 'da_xac_nhan', 'dang_san_xuat', 'da_giao', 'huy'];
 
-const orderLineInputSchema = v.object({
-  ma_san_pham: v.coerce.number().int().positive('Mã sản phẩm không hợp lệ'),
-  so_luong: v.coerce.number().positive('Số lượng đặt phải lớn hơn 0'),
-  ty_le_giam_gia: v.coerce.number().min(0, 'Chiết khấu không được âm').max(100, 'Chiết khấu tối đa 100%').default(0),
-  ghi_chu: v.string().optional().nullable(),
-});
+const orderLineInputSchema = v
+  .object({
+    ma_san_pham: v.coerce.number().int('Mã sản phẩm không hợp lệ').positive('Mã sản phẩm không hợp lệ'),
+    so_luong: v.coerce
+      .number()
+      .positive('Số lượng đặt phải lớn hơn 0')
+      .max(1e6, 'Số lượng đặt quá lớn'),
+    ty_le_giam_gia: v.coerce
+      .number()
+      .min(0, 'Chiết khấu không được âm')
+      .max(100, 'Chiết khấu tối đa 100%')
+      .default(0),
+    ghi_chu: v.string().trim().max(500, 'Ghi chú dòng hàng tối đa 500 ký tự').optional().nullable(),
+  })
 
 const createOrderSchema = v
   .object({
-    ma_khach_hang: v.coerce.number().int().positive('Vui lòng chọn khách hàng'),
-    ngay_dat_hang: v.string().min(1, 'Ngày đặt hàng là bắt buộc'),
-    ngay_giao_hang_yc: v.string().min(1, 'Ngày giao hàng yêu cầu là bắt buộc'),
-    dia_chi_giao_hang: v.string().min(1, 'Địa chỉ giao hàng không được để trống'),
-    ghi_chu: v.string().optional().nullable(),
-    lines: v.array(orderLineInputSchema).min(1, 'Đơn hàng phải có ít nhất một dòng sản phẩm'),
+    ma_khach_hang: v.coerce.number().int('Vui lòng chọn khách hàng').positive('Vui lòng chọn khách hàng'),
+    ngay_dat_hang: v.string().trim().min(1, 'Ngày đặt hàng là bắt buộc'),
+    ngay_giao_hang_yc: v.string().trim().min(1, 'Ngày giao hàng yêu cầu là bắt buộc'),
+    dia_chi_giao_hang: v
+      .string()
+      .trim()
+      .min(1, 'Địa chỉ giao hàng không được để trống')
+      .max(500, 'Địa chỉ giao hàng tối đa 500 ký tự'),
+    ghi_chu: v.string().trim().max(2000, 'Ghi chú tối đa 2000 ký tự').optional().nullable(),
+    lines: v
+      .array(orderLineInputSchema)
+      .min(1, 'Đơn hàng phải có ít nhất một dòng sản phẩm')
+      .max(200, 'Đơn hàng tối đa 200 dòng sản phẩm'),
+  })
+  .superRefine((data, ctx) => {
+    // Only present-but-malformed dates are reported here; a missing or non-string
+    // value already produced its own issue at the field level, and a stable
+    // ordering keeps the first message per field the actionable one.
+    if (typeof data.ngay_dat_hang === 'string' && data.ngay_dat_hang.length > 0 && !isRealDate(data.ngay_dat_hang)) {
+      ctx.addIssue({ message: 'Ngày đặt hàng không hợp lệ (YYYY-MM-DD)', path: ['ngay_dat_hang'] });
+    }
+    if (
+      typeof data.ngay_giao_hang_yc === 'string' &&
+      data.ngay_giao_hang_yc.length > 0 &&
+      !isRealDate(data.ngay_giao_hang_yc)
+    ) {
+      ctx.addIssue({ message: 'Ngày giao hàng yêu cầu không hợp lệ (YYYY-MM-DD)', path: ['ngay_giao_hang_yc'] });
+    }
   })
   .refine(
-    (data) => {
-      const orderDate = new Date(data.ngay_dat_hang);
-      const deliveryDate = new Date(data.ngay_giao_hang_yc);
-      return deliveryDate >= orderDate;
-    },
+    (data) =>
+      !isRealDate(data.ngay_dat_hang) ||
+      !isRealDate(data.ngay_giao_hang_yc) ||
+      data.ngay_giao_hang_yc >= data.ngay_dat_hang,
     {
       message: 'Ngày giao hàng yêu cầu không được trước ngày đặt hàng',
       path: ['ngay_giao_hang_yc'],
     }
   );
 
-const updateOrderSchema = v.object({
-  ngay_giao_hang_yc: v.string().optional(),
-  dia_chi_giao_hang: v.string().min(1).optional(),
-  ghi_chu: v.string().optional().nullable(),
-  lines: v.array(orderLineInputSchema).min(1).optional(),
-});
+const updateOrderSchema = v
+  .object({
+    ngay_giao_hang_yc: v.dateISO('Ngày giao hàng yêu cầu không hợp lệ (YYYY-MM-DD)').optional(),
+    dia_chi_giao_hang: v
+      .string()
+      .trim()
+      .min(1, 'Địa chỉ giao hàng không được để trống')
+      .max(500, 'Địa chỉ giao hàng tối đa 500 ký tự')
+      .optional(),
+    ghi_chu: v.string().trim().max(2000, 'Ghi chú tối đa 2000 ký tự').optional().nullable(),
+    lines: v
+      .array(orderLineInputSchema)
+      .min(1, 'Đơn hàng phải có ít nhất một dòng sản phẩm')
+      .max(200, 'Đơn hàng tối đa 200 dòng sản phẩm')
+      .optional(),
+  })
 
-const confirmOrderSchema = v.object({
-  acknowledgeCreditLimit: v.boolean().optional().default(false),
-});
+const confirmOrderSchema = v
+  .object({
+    acknowledgeCreditLimit: v.boolean().optional().default(false),
+  })
 
-const cancelOrderSchema = v.object({
-  ly_do: v.string().min(1, 'Lý do hủy đơn hàng là bắt buộc'),
-});
+const cancelOrderSchema = v
+  .object({
+    ly_do: v
+      .string()
+      .trim()
+      .min(1, 'Lý do hủy đơn hàng là bắt buộc')
+      .max(500, 'Lý do hủy tối đa 500 ký tự'),
+  })
 
-const orderQuerySchema = v.object({
-  page: v.coerce.number().int().min(1).default(1),
-  pageSize: v.coerce.number().int().min(1).max(100).default(20),
-  search: v.string().optional(),
-  ma_khach_hang: v.coerce.number().int().positive().optional(),
-  trang_thai: v.enum(ORDER_STATUSES).optional(),
-  nguoi_ban: v.coerce.number().int().positive().optional(),
-  fromDate: v.string().optional(),
-  toDate: v.string().optional(),
-  sortBy: v.string().optional(),
-  sortOrder: v.enum(['ASC', 'DESC']).default('DESC'),
-});
+const orderQuerySchema = v
+  .object({
+    page: v.coerce.number().int('Số trang phải là số nguyên').min(1, 'Số trang tối thiểu là 1').default(1),
+    pageSize: v.coerce
+      .number()
+      .int('Kích thước trang phải là số nguyên')
+      .min(1, 'Kích thước trang tối thiểu là 1')
+      .max(100, 'Kích thước trang tối đa là 100')
+      .default(20),
+    search: v.string().trim().max(100, 'Từ khóa tìm kiếm tối đa 100 ký tự').optional(),
+    ma_khach_hang: v.coerce.number().int().positive('Mã khách hàng không hợp lệ').optional(),
+    trang_thai: v.enum(ORDER_STATUSES, 'Trạng thái đơn hàng không hợp lệ').optional(),
+    nguoi_ban: v.coerce.number().int().positive('Người bán không hợp lệ').optional(),
+    fromDate: v.dateISO('Ngày bắt đầu không đúng định dạng (YYYY-MM-DD)').optional(),
+    toDate: v.dateISO('Ngày kết thúc không đúng định dạng (YYYY-MM-DD)').optional(),
+    sortBy: v.string().trim().max(64, 'Cột sắp xếp không hợp lệ').optional(),
+    sortOrder: v.enum(['ASC', 'DESC'], 'Thứ tự sắp xếp không hợp lệ').default('DESC'),
+  })
+  .refine((data) => !data.fromDate || !data.toDate || data.fromDate <= data.toDate, {
+    message: 'Ngày kết thúc không được trước ngày bắt đầu',
+    path: ['toDate'],
+  });
 
 async function listOrders(queryFilters) {
   const parsed = orderQuerySchema.safeParse(queryFilters);
   if (!parsed.success) {
     throw new ValidationError(
-      'Validation failed for one or more query parameters.',
-      parsed.error.errors
+      INVALID_QUERY_MESSAGE,
+      fieldIssues(parsed.error.errors)
     );
   }
   return orderRepository.list(parsed.data);
@@ -103,8 +164,8 @@ async function createOrder(rawInput, sellerId) {
   const parsed = createOrderSchema.safeParse(rawInput);
   if (!parsed.success) {
     throw new ValidationError(
-      'Validation failed for one or more request fields.',
-      parsed.error.errors
+      INVALID_BODY_MESSAGE,
+      fieldIssues(parsed.error.errors)
     );
   }
   const input = parsed.data;
@@ -204,8 +265,8 @@ async function updateOrder(id, rawInput, updaterId) {
   const parsed = updateOrderSchema.safeParse(rawInput);
   if (!parsed.success) {
     throw new ValidationError(
-      'Validation failed for one or more request fields.',
-      parsed.error.errors
+      INVALID_BODY_MESSAGE,
+      fieldIssues(parsed.error.errors)
     );
   }
   const input = parsed.data;
@@ -348,8 +409,8 @@ async function cancelOrder(id, rawInput, updaterId, userRole) {
   const parsed = cancelOrderSchema.safeParse(rawInput);
   if (!parsed.success) {
     throw new ValidationError(
-      'Validation failed for one or more request fields.',
-      parsed.error.errors
+      INVALID_BODY_MESSAGE,
+      fieldIssues(parsed.error.errors)
     );
   }
   const { ly_do: lyDo } = parsed.data;

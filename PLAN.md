@@ -676,8 +676,26 @@ If stock mutation belongs to PH4, PH1 must call the PH4 contract rather than dir
 | Core mounts the router | `backend/src/app.js:82` -> `backend/src/routes/salesRoutes.js`; 32 routes registered under `/api/v1/sales` |
 | No PH1 auth subsystem | PH1 `auth.middleware`/JWT/`auth_token` retired; module uses Core `requireAuth`/`requireRoles`/`requirePermission` |
 | APIs namespaced | `/khach-hang`, `/san-pham`, `/don-hang`, `/giao-hang`, `/hoa-don`, `/cong-no`, `/tong-quan` (matches `TARGET_DESIGN.md` §2) |
-| Core RBAC enforced | `node backend/tests/test_ph1_sales_api.js` -> 115 checks, 0 failures (401/403/200 matrix per role, per domain) |
+| Core RBAC enforced | `node backend/tests/test_ph1_sales_api.js` -> 123 checks, 0 failures (401/403/200 matrix per role, per domain) |
 | Tests pass in the Core runtime | same run; SQL parity recorded in `docs/ph1-remediation/STEP5_BACKEND_EVIDENCE.md` (§2), gaps/defects in `KNOWN_GAPS.md` |
+
+#### Follow-up — request-validation hardening (2026-09-17)
+
+Step 5D/5E "client input is untrusted" was tightened after the port, keeping PH1 business behaviour:
+
+- Path ids must be plain decimal integers (`utils/sales/request.js::parseIdParam`) — `Number('abc')` used to reach a
+  `BIGINT` comparison and answer 500.
+- PH1's bilingual aliases (`ma_don_ban_hang`/`orderId`, `ma_kho`/`warehouseId`, ...) may no longer disagree: a
+  payload carrying both spellings with different values is rejected with `422` instead of silently resolving.
+- Dates must be real `YYYY-MM-DD` calendar days; `2026-02-30` no longer normalises into March, and the order
+  date rule now also survives a missing date (previously `undefined.split()` -> 500).
+- `overdueOnly` is parsed strictly (`KNOWN_GAPS.md` G-3 now FIXED); bounds/array caps added on every field;
+  field messages are Vietnamese throughout.
+- Unknown keys stay **stripped** and a forbidden `sortBy` keeps falling back to the default order — PH1 parity,
+  pinned by the parity suite (`KNOWN_GAPS.md` G-9).
+
+Evidence: `backend/tests/test_ph1_validation.js` (69 checks, no database), `backend/tests/test_ph1_sales_api.js`
+(123 checks), `backend/tests/test_ph1_business_parity.js` (70 checks), `frontend` `npm run build` exit 0.
 
 ---
 

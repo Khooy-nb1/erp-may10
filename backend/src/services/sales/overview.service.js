@@ -2,6 +2,8 @@
 
 const { v } = require('../../utils/sales/validate');
 const { ValidationError, ForbiddenError } = require('../../utils/sales/errors');
+const { INVALID_QUERY_MESSAGE, fieldIssues } = require('../../utils/sales/request');
+const { customerTypeEnum } = require('./customer.service');
 const overviewRepository = require('../../repositories/sales/overview.repository');
 
 /**
@@ -44,14 +46,14 @@ const ROLE_SCOPES = {
 
 const dashboardQuerySchema = v
   .object({
-    period: v.enum(DASHBOARD_PERIOD_VALUES).default('month'),
-    fromDate: v.string().optional(),
-    toDate: v.string().optional(),
-    nguoi_ban: v.coerce.number().int().positive('nguoi_ban phải là số nguyên dương').optional(),
-    loai_khach_hang: v.string().optional(),
+    period: v.enum(DASHBOARD_PERIOD_VALUES, 'Khoảng thời gian không hợp lệ').default('month'),
+    fromDate: v.string().trim().optional(),
+    toDate: v.string().trim().optional(),
+    nguoi_ban: v.coerce.number().int('nguoi_ban phải là số nguyên dương').positive('nguoi_ban phải là số nguyên dương').optional(),
+    loai_khach_hang: customerTypeEnum.optional(),
     limit: v.coerce
       .number()
-      .int()
+      .int('limit phải là số nguyên')
       .min(DASHBOARD_LIMIT_MIN, `limit phải nằm trong khoảng ${DASHBOARD_LIMIT_MIN}..${DASHBOARD_LIMIT_MAX}`)
       .max(DASHBOARD_LIMIT_MAX, `limit phải nằm trong khoảng ${DASHBOARD_LIMIT_MIN}..${DASHBOARD_LIMIT_MAX}`)
       .default(DASHBOARD_LIMIT_DEFAULT),
@@ -87,8 +89,8 @@ function parseIsoDateInput(value, field) {
       normalized.getUTCMonth() !== date.month - 1 ||
       normalized.getUTCDate() !== date.day
     ) {
-      throw new ValidationError('Validation failed for one or more query parameters.', [
-        { field, message: `${field} is not a valid calendar date.` },
+      throw new ValidationError(INVALID_QUERY_MESSAGE, [
+        { field, message: `${field} không phải là một ngày hợp lệ.` },
       ]);
     }
     return date;
@@ -96,8 +98,8 @@ function parseIsoDateInput(value, field) {
 
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
-    throw new ValidationError('Validation failed for one or more query parameters.', [
-      { field, message: `${field} must be an ISO date (YYYY-MM-DD) or an ISO 8601 timestamp.` },
+    throw new ValidationError(INVALID_QUERY_MESSAGE, [
+      { field, message: `${field} phải là ngày ISO (YYYY-MM-DD) hoặc timestamp ISO 8601.` },
     ]);
   }
   return ictCalendarDate(parsed);
@@ -105,18 +107,18 @@ function parseIsoDateInput(value, field) {
 
 function resolveCustomRange(fromDate, toDate) {
   const missing = [
-    ...(fromDate ? [] : [{ field: 'fromDate', message: 'fromDate is required when period=custom.' }]),
-    ...(toDate ? [] : [{ field: 'toDate', message: 'toDate is required when period=custom.' }]),
+    ...(fromDate ? [] : [{ field: 'fromDate', message: 'fromDate là bắt buộc khi period=custom.' }]),
+    ...(toDate ? [] : [{ field: 'toDate', message: 'toDate là bắt buộc khi period=custom.' }]),
   ];
   if (missing.length > 0) {
-    throw new ValidationError('Validation failed for one or more query parameters.', missing);
+    throw new ValidationError(INVALID_QUERY_MESSAGE, missing);
   }
 
   const from = ictMidnight(parseIsoDateInput(fromDate, 'fromDate'));
   const to = ictMidnight(parseIsoDateInput(toDate, 'toDate'));
   if (from.getTime() > to.getTime()) {
-    throw new ValidationError('Validation failed for one or more query parameters.', [
-      { field: 'fromDate', message: 'fromDate must be earlier than or equal to toDate.' },
+    throw new ValidationError(INVALID_QUERY_MESSAGE, [
+      { field: 'fromDate', message: 'fromDate phải nhỏ hơn hoặc bằng toDate.' },
     ]);
   }
 
@@ -199,7 +201,7 @@ function formatDecimal(value, scale) {
 function parseFilters(rawFilters) {
   const parsed = dashboardQuerySchema.safeParse(rawFilters);
   if (!parsed.success) {
-    throw new ValidationError('Validation failed for one or more query parameters.', parsed.error.errors);
+    throw new ValidationError(INVALID_QUERY_MESSAGE, fieldIssues(parsed.error.errors));
   }
   return parsed.data;
 }
@@ -208,8 +210,8 @@ function parseFilters(rawFilters) {
 function resolveWindow(filters) {
   const limit = filters.limit;
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT)) {
-    throw new ValidationError('Validation failed for one or more query parameters.', [
-      { field: 'limit', message: `limit must be an integer between 1 and ${MAX_LIMIT}.` },
+    throw new ValidationError(INVALID_QUERY_MESSAGE, [
+      { field: 'limit', message: `limit phải là số nguyên trong khoảng 1..${MAX_LIMIT}.` },
     ]);
   }
 

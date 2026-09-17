@@ -4,6 +4,7 @@ const express = require('express');
 const { requireRoles } = require('../../middlewares/auth');
 const { invoiceService } = require('../../services/sales/invoice.service');
 const { sendSuccess, sendPaginated } = require('../../utils/sales/response');
+const { parseIdParam } = require('../../utils/sales/request');
 
 /**
  * Invoice routes - mounted at `/hoa-don` in sales routes.
@@ -51,7 +52,7 @@ function createInvoiceRoutes(service = invoiceService) {
   // 3. Get invoice detail
   router.get('/:id', requireRoles('admin', 'ban_hang', 'ke_toan'), async (req, res, next) => {
     try {
-      const invoice = await service.getInvoiceById(Number(req.params.id));
+      const invoice = await service.getInvoiceById(parseIdParam(req.params.id, 'id', 'Mã hóa đơn'));
       sendSuccess(res, invoice);
     } catch (err) {
       next(err);

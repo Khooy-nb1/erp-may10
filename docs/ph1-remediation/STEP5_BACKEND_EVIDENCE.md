@@ -45,12 +45,19 @@ overview) — matches `TARGET_DESIGN.md` §2.
 | V4 | End-to-end API regression + RBAC + envelopes | `node tests/test_ph1_sales_api.js` | **115 passed, 0 failed** |
 | V5 | Cross-domain flow | same suite: order -> confirm -> invoice; order -> delivery `start`/`complete`/`fail`; receivables aging/summary invariants; dashboard role scoping | pass |
 | V6 | Core/PH4 regression after the mount | same suite: `/api/v1/auth/me`, `/api/v1/ton-kho`, `/api/v1/modules` | 200 |
+| V7 | Request-validation contract (alias conflicts, id parsing, date rules, boolean flags, bounds, crash paths) | `node tests/test_ph1_validation.js` | **69 passed, 0 failed** (no database required) |
+| V8 | Frontend production build after the dialog hardening | `npm run build` (Core workspace `frontend/`) | exit 0, 1816 modules |
 
 `tests/test_ph1_sales_api.js` is the module's permanent regression suite (Step 11 asset). It drives the real
 app against the configured database, asserts the contract §9.3 envelopes, the 401/403/404/409/422 matrix per
 role, field-level validation details, the credit-limit confirmation path, the cancel-state matrix, delivery
 lifecycle guards, invoice numbering/duplicate handling, aging-bucket exhaustiveness and dashboard scoping
 (`kho` = fulfillment only, money metrics never serialized).
+
+`tests/test_ph1_validation.js` is the schema-level companion (no database, no HTTP): it pins the request
+boundary itself — decimal-only path ids, alias conflicts, real calendar dates, the `overdueOnly` flag,
+per-field bounds, the repository sort allow-lists and the "missing fields answer 422, never a 500" crash paths
+(see §3 D9).
 
 ---
 
@@ -64,8 +71,9 @@ lifecycle guards, invoice numbering/duplicate handling, aging-bucket exhaustiven
 | D4 | Module-scoped error boundary renders the module's own errors | Core's `errorHandler` overwrites `details` with `err.stack` (dev) or drops it, so field-level validation messages never reached the client and 2 Gate-3 checks failed until the boundary existed. The boundary handles only the module's `AppError` hierarchy; every other error still goes to Core's handler |
 | D5 | `details` entries are normalised to `[{ field, message }]` at the boundary | Validator issues are zod-shaped (`{ path, message }`); the contract shape is field-based |
 | D6 | Identity helpers replace `req.userId` / `req.user.vai_tro` | Core's `req.user` exposes `{ id, role, dbRole, rawRole, role permissions taken from roleMapping }`; missing role fails closed |
-| D7 | `overdueOnly` uses `Boolean()` coercion (the string `"false"` is truthy) | Preserved PH1/zod `z.coerce.boolean()` behaviour on purpose; logged in `KNOWN_GAPS.md` |
+| D7 | `overdueOnly` is parsed strictly (`true`/`false`, `1`/`0`, trimmed and case-insensitive); any other value is 422 | PH1/zod `Boolean()` coercion made `?overdueOnly=false` filter *to* overdue rows and turned `?overdueOnly=maybe` into `true` (G-3). The ported screens only sent the flag when truthy, so no client change was needed |
 | D8 | Delivery transition query locks with `FOR UPDATE OF g` | PH1's `FOR UPDATE` over nullable outer joins raises `FOR UPDATE cannot be applied to the nullable side of an outer join` in PostgreSQL 16 — every `start`/`complete`/`fail` call returned 500. Fixed (see `KNOWN_GAPS.md` G-1) |
+| D9 | Request validation is hardened beyond PH1: path ids must be plain decimal integers; aliased fields (`ma_don_ban_hang`/`orderId`, ...) may not disagree; dates must be real `YYYY-MM-DD` days; cross-field rules (`ngay_giao_hang_yc >= ngay_dat_hang`, `fromDate <= toDate`, `dueFromDate <= dueToDate`); length/range/array caps on every field; Vietnamese messages throughout | Fail fast at the boundary instead of `Number('abc')` reaching a `BIGINT` comparison (500), `new Date('2026-02-30')` silently normalizing to March, an alias pair silently picking a branch, or `undefined.split()` inside a date refinement (fixed crash path). Unknown keys are still *stripped* rather than rejected — see `KNOWN_GAPS.md` G-9. Evidence: `tests/test_ph1_validation.js`, `tests/test_ph1_sales_api.js` |
 
 ---
 
@@ -73,7 +81,8 @@ lifecycle guards, invoice numbering/duplicate handling, aging-bucket exhaustiven
 
 ```bash
 cd C:/Users/ACER/OtherProjects/ph1-integration/backend
-node tests/test_ph1_sales_api.js          # 115 checks, exit 0
+node tests/test_ph1_sales_api.js          # 123 checks, exit 0
+node tests/test_ph1_validation.js         # 69 checks, exit 0 (no database needed)
 node -e "require('./src/routes/salesRoutes.js')"   # module loads
 ```
 

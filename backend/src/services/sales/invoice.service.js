@@ -7,6 +7,12 @@ const {
   ValidationError,
   ConflictError,
 } = require('../../utils/sales/errors');
+const {
+  INVALID_BODY_MESSAGE,
+  INVALID_QUERY_MESSAGE,
+  assertNoAliasConflict,
+  fieldIssues,
+} = require('../../utils/sales/request');
 const invoiceRepository = require('../../repositories/sales/invoice.repository');
 
 /**
@@ -22,52 +28,60 @@ const invoiceStatusEnum = v.enum(['chua_thanh_toan', 'thanh_toan_mot_phan', 'da_
 
 const createInvoiceSchema = v
   .object({
-    ma_don_ban_hang: v.coerce.number().int().positive().optional(),
-    orderId: v.coerce.number().int().positive().optional(),
-    ma_khach_hang: v.coerce.number().int().positive().optional(),
-    customerId: v.coerce.number().int().positive().optional(),
-    ngay_xuat_hoa_don: v.string().optional(),
-    issueDate: v.string().optional(),
+    ma_don_ban_hang: v.coerce.number().int().positive('Mã đơn hàng không hợp lệ').optional(),
+    orderId: v.coerce.number().int().positive('Mã đơn hàng không hợp lệ').optional(),
+    ma_khach_hang: v.coerce.number().int().positive('Mã khách hàng không hợp lệ').optional(),
+    customerId: v.coerce.number().int().positive('Mã khách hàng không hợp lệ').optional(),
+    ngay_xuat_hoa_don: v.dateISO('Ngày xuất hóa đơn không đúng định dạng (YYYY-MM-DD)').optional(),
+    issueDate: v.dateISO('Ngày xuất hóa đơn không đúng định dạng (YYYY-MM-DD)').optional(),
     so_tien_da_thu: v.coerce.number().min(0, 'Số tiền đã thu không được âm').default(0),
-    paidAmount: v.coerce.number().min(0).optional(),
-    ghi_chu: v.string().optional().nullable(),
-    notes: v.string().optional().nullable(),
+    paidAmount: v.coerce.number().min(0, 'Số tiền đã thu không được âm').optional(),
+    ghi_chu: v.string().trim().max(2000, 'Ghi chú tối đa 2000 ký tự').optional().nullable(),
+    notes: v.string().trim().max(2000, 'Ghi chú tối đa 2000 ký tự').optional().nullable(),
   })
   .superRefine((data, ctx) => {
     const orderId = data.ma_don_ban_hang || data.orderId;
     if (!orderId) {
       ctx.addIssue({ code: 'custom', message: 'Mã đơn hàng là bắt buộc', path: ['ma_don_ban_hang'] });
     }
-    const issueDateStr = data.ngay_xuat_hoa_don || data.issueDate;
-    if (issueDateStr && issueDateStr.trim().length > 0) {
-      const parsed = new Date(issueDateStr);
-      if (isNaN(parsed.getTime())) {
-        ctx.addIssue({ code: 'custom', message: 'Ngày xuất hóa đơn không hợp lệ', path: ['ngay_xuat_hoa_don'] });
-      }
-    }
   })
   .transform((data) => ({
     ma_don_ban_hang: data.ma_don_ban_hang || data.orderId,
     ma_khach_hang: data.ma_khach_hang || data.customerId,
-    ngay_xuat_hoa_don: data.ngay_xuat_hoa_don || data.issueDate || new Date().toISOString(),
+    ngay_xuat_hoa_don: data.ngay_xuat_hoa_don || data.issueDate || new Date().toISOString().split('T')[0],
     so_tien_da_thu: data.paidAmount !== undefined ? data.paidAmount : data.so_tien_da_thu,
     ghi_chu: data.ghi_chu || data.notes || null,
   }));
 
-const invoiceQuerySchema = v.object({
-  page: v.coerce.number().int().min(1).default(1),
-  pageSize: v.coerce.number().int().min(1).max(100).default(20),
-  search: v.string().optional(),
-  ma_hoa_don: v.string().optional(),
-  ma_don_ban_hang: v.coerce.number().int().positive().optional(),
-  ma_khach_hang: v.coerce.number().int().positive().optional(),
-  trang_thai: invoiceStatusEnum.optional(),
-  fromDate: v.string().optional(),
-  toDate: v.string().optional(),
-  dueFromDate: v.string().optional(),
-  dueToDate: v.string().optional(),
-  sortOrder: v.enum(['ASC', 'DESC']).default('DESC'),
-});
+const invoiceQuerySchema = v
+  .object({
+    page: v.coerce.number().int('Số trang phải là số nguyên').min(1, 'Số trang tối thiểu là 1').default(1),
+    pageSize: v.coerce
+      .number()
+      .int('Kích thước trang phải là số nguyên')
+      .min(1, 'Kích thước trang tối thiểu là 1')
+      .max(100, 'Kích thước trang tối đa là 100')
+      .default(20),
+    search: v.string().trim().max(100, 'Từ khóa tìm kiếm tối đa 100 ký tự').optional(),
+    ma_hoa_don: v.string().trim().max(50, 'Mã hóa đơn tối đa 50 ký tự').optional(),
+    ma_don_ban_hang: v.coerce.number().int().positive().optional(),
+    ma_khach_hang: v.coerce.number().int().positive().optional(),
+    trang_thai: invoiceStatusEnum.optional(),
+    fromDate: v.dateISO('Ngày bắt đầu không đúng định dạng (YYYY-MM-DD)').optional(),
+    toDate: v.dateISO('Ngày kết thúc không đúng định dạng (YYYY-MM-DD)').optional(),
+    dueFromDate: v.dateISO('Ngày đáo hạn bắt đầu không đúng định dạng (YYYY-MM-DD)').optional(),
+    dueToDate: v.dateISO('Ngày đáo hạn kết thúc không đúng định dạng (YYYY-MM-DD)').optional(),
+    sortBy: v.string().trim().max(64, 'Cột sắp xếp không hợp lệ').optional(),
+    sortOrder: v.enum(['ASC', 'DESC'], 'Thứ tự sắp xếp không hợp lệ').default('DESC'),
+  })
+  .refine((data) => !data.fromDate || !data.toDate || data.fromDate <= data.toDate, {
+    message: 'Ngày kết thúc không được trước ngày bắt đầu',
+    path: ['toDate'],
+  })
+  .refine((data) => !data.dueFromDate || !data.dueToDate || data.dueFromDate <= data.dueToDate, {
+    message: 'Ngày đáo hạn kết thúc không được trước ngày bắt đầu',
+    path: ['dueToDate'],
+  });
 
 function calculateDueDate(issueDate, creditDays) {
   const days = Math.max(0, creditDays || 0);
@@ -88,10 +102,7 @@ function deriveInvoiceStatus(paid, total, dueDate) {
 async function listInvoices(queryFilters) {
   const parsed = invoiceQuerySchema.safeParse(queryFilters);
   if (!parsed.success) {
-    throw new ValidationError(
-      'Validation failed for one or more query parameters.',
-      parsed.error.errors
-    );
+    throw new ValidationError(INVALID_QUERY_MESSAGE, fieldIssues(parsed.error.errors));
   }
   return invoiceRepository.list(parsed.data);
 }
@@ -105,12 +116,17 @@ async function getInvoiceById(id) {
 }
 
 async function createInvoice(rawInput, creatorId) {
+  assertNoAliasConflict(rawInput, [
+    ['ma_don_ban_hang', 'orderId'],
+    ['ma_khach_hang', 'customerId'],
+    ['ngay_xuat_hoa_don', 'issueDate'],
+    ['so_tien_da_thu', 'paidAmount'],
+    ['ghi_chu', 'notes'],
+  ]);
+
   const parsed = createInvoiceSchema.safeParse(rawInput);
   if (!parsed.success) {
-    throw new ValidationError(
-      'Validation failed for one or more request fields.',
-      parsed.error.errors
-    );
+    throw new ValidationError(INVALID_BODY_MESSAGE, fieldIssues(parsed.error.errors));
   }
   const input = parsed.data;
 
@@ -136,7 +152,9 @@ async function createInvoice(rawInput, creatorId) {
       throw new ConflictError('DATABASE_CONFLICT', result.details || 'Không thể tạo mã hóa đơn duy nhất.');
     }
     if (result.error === 'VALIDATION_ERROR') {
-      throw new ValidationError(result.details || 'Số tiền đã thu không hợp lệ.');
+      throw new ValidationError(result.details || 'Số tiền đã thu không hợp lệ.', [
+        { field: 'so_tien_da_thu', message: result.details || 'Số tiền đã thu không hợp lệ.' },
+      ]);
     }
     throw new AppError(422, result.error, result.details || 'Lỗi xử lý xuất hóa đơn.');
   }

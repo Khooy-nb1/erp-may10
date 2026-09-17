@@ -5,7 +5,8 @@ import { Dialog } from '../ui/Dialog.jsx';
 import { DateInput } from '../ui/DateInput.jsx';
 import { NumberInput } from '../ui/NumberInput.jsx';
 import { Textarea } from '../ui/Textarea.jsx';
-import { ErrorState } from '../common/ErrorState.jsx';
+import { toast } from '../ui/toast.jsx';
+import { fieldStatus, firstFieldError, invoiceFieldErrors, serverFieldErrors, toWireAmount } from '../../lib/validation.js';
 
 /**
  * Invoice creation as a modal, ported from the old `/invoices/new` page so the
@@ -26,7 +27,7 @@ export function InvoiceCreateDialog({ isOpen, onOpenChange, onCreated }) {
   const [notes, setNotes] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Each open starts from a clean form, with the issue date defaulted to today.
   useEffect(() => {
@@ -36,31 +37,35 @@ export function InvoiceCreateDialog({ isOpen, onOpenChange, onCreated }) {
     setPaidAmount(0);
     setNotes('');
     setIsSubmitting(false);
-    setError(null);
+    setFieldErrors({});
   }, [isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (orderId === null || !Number(orderId)) {
-      setError('Vui lòng nhập ID đơn hàng hợp lệ.');
+    // Same rules and messages as `createInvoiceSchema`; the server re-checks anyway.
+    const localErrors = invoiceFieldErrors({ orderId, issueDate, paidAmount, notes });
+    const firstError = firstFieldError(localErrors);
+    if (firstError) {
+      setFieldErrors(localErrors);
       return;
     }
 
     setIsSubmitting(true);
-    setError(null);
+    setFieldErrors({});
 
     try {
       const invoice = await createInvoice({
         ma_don_ban_hang: Number(orderId),
         ngay_xuat_hoa_don: issueDate,
-        so_tien_da_thu: Number(paidAmount) || 0,
+        so_tien_da_thu: toWireAmount(paidAmount),
         ghi_chu: notes.trim() || null,
       });
 
       onCreated?.(invoice.id);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể xuất hóa đơn bán hàng.');
+      setFieldErrors(serverFieldErrors(err, ['ma_don_ban_hang', 'ngay_xuat_hoa_don', 'so_tien_da_thu', 'ghi_chu']));
+      toast.error(err instanceof Error ? err : 'Không thể xuất hóa đơn bán hàng.');
     } finally {
       setIsSubmitting(false);
     }
@@ -98,8 +103,6 @@ export function InvoiceCreateDialog({ isOpen, onOpenChange, onCreated }) {
         noValidate
         className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto pr-1"
       >
-        {error ? <ErrorState message={error} onRetry={() => setError(null)} /> : null}
-
         <NumberInput
           label="ID Đơn bán hàng *"
           placeholder="Nhập ID đơn hàng cần xuất hóa đơn (VD: 1)"
@@ -107,6 +110,7 @@ export function InvoiceCreateDialog({ isOpen, onOpenChange, onCreated }) {
           value={orderId}
           onChange={setOrderId}
           hasClear
+          status={fieldStatus(fieldErrors, 'ma_don_ban_hang')}
           className="w-full"
         />
 
@@ -115,6 +119,7 @@ export function InvoiceCreateDialog({ isOpen, onOpenChange, onCreated }) {
           description="Hạn thanh toán sẽ được hệ thống tính tự động dựa trên số ngày công nợ của khách hàng."
           value={issueDate ? issueDate : undefined}
           onChange={(value) => setIssueDate(value ?? '')}
+          status={fieldStatus(fieldErrors, 'ngay_xuat_hoa_don')}
           className="w-full"
         />
 
@@ -123,6 +128,7 @@ export function InvoiceCreateDialog({ isOpen, onOpenChange, onCreated }) {
           min={0}
           value={paidAmount}
           onChange={(value) => setPaidAmount(Math.max(0, Number(value) || 0))}
+          status={fieldStatus(fieldErrors, 'so_tien_da_thu')}
           className="w-full"
         />
 
@@ -131,6 +137,7 @@ export function InvoiceCreateDialog({ isOpen, onOpenChange, onCreated }) {
           rows={2}
           value={notes}
           onChange={setNotes}
+          status={fieldStatus(fieldErrors, 'ghi_chu')}
           className="w-full"
         />
       </form>

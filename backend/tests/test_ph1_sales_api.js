@@ -316,6 +316,57 @@ async function main() {
       body: { ...orderPayload(), lines: [{ ma_san_pham: productId, so_luong: 0 }] },
     });
     check('zero quantity -> 422', zeroQuantity.status === 422, zeroQuantity.status);
+    const missingOrderDates = await call(baseUrl, 'POST', '/api/v1/sales/don-hang', {
+      token: TOKENS.ban_hang,
+      body: { ma_khach_hang: customerId, lines: [{ ma_san_pham: productId, so_luong: 1 }] },
+    });
+    check('order without dates/address -> 422 (not 500)', missingOrderDates.status === 422, missingOrderDates.status);
+    check(
+      'order without dates names the required fields',
+      Boolean(
+        missingOrderDates.body &&
+          Array.isArray(missingOrderDates.body.details) &&
+          ['ngay_dat_hang', 'ngay_giao_hang_yc', 'dia_chi_giao_hang'].every((field) =>
+            missingOrderDates.body.details.some((d) => d.field === field)
+          )
+      ),
+      missingOrderDates.body && missingOrderDates.body.details
+    );
+    const impossibleOrderDate = await call(baseUrl, 'POST', '/api/v1/sales/don-hang', {
+      token: TOKENS.ban_hang,
+      body: { ...orderPayload(), ngay_dat_hang: '2026-02-30' },
+    });
+    check('impossible order date -> 422', impossibleOrderDate.status === 422, impossibleOrderDate.status);
+    check(
+      'impossible order date names ngay_dat_hang',
+      Boolean(
+        impossibleOrderDate.body &&
+          Array.isArray(impossibleOrderDate.body.details) &&
+          impossibleOrderDate.body.details.some((d) => d.field === 'ngay_dat_hang')
+      ),
+      impossibleOrderDate.body && impossibleOrderDate.body.details
+    );
+    const rawSortColumn = await call(baseUrl, 'GET', '/api/v1/sales/don-hang?sortBy=id%3B%20DROP%20TABLE%20don_ban_hang', {
+      token: TOKENS.admin,
+    });
+    check(
+      'order sort outside the allow-list falls back to the default order -> 200',
+      rawSortColumn.status === 200 && Array.isArray(rawSortColumn.body.data),
+      rawSortColumn.status
+    );
+    const unknownOrderParam = await call(baseUrl, 'GET', '/api/v1/sales/don-hang?limit=10', { token: TOKENS.admin });
+    check('unknown order query parameter is ignored -> 200', unknownOrderParam.status === 200, unknownOrderParam.status);
+    const malformedOrderId = await call(baseUrl, 'GET', '/api/v1/sales/don-hang/abc', { token: TOKENS.admin });
+    check('malformed order id -> 422 (not 500)', malformedOrderId.status === 422, malformedOrderId.status);
+    check(
+      'malformed order id reports the id field',
+      Boolean(
+        malformedOrderId.body &&
+          Array.isArray(malformedOrderId.body.details) &&
+          malformedOrderId.body.details.some((d) => d.field === 'id')
+      ),
+      malformedOrderId.body && malformedOrderId.body.details
+    );
     const unknownProduct = await call(baseUrl, 'POST', '/api/v1/sales/don-hang', {
       token: TOKENS.ban_hang,
       body: { ...orderPayload(), lines: [{ ma_san_pham: 99999999, so_luong: 1 }] },

@@ -13,9 +13,10 @@ const isVisible = (element) => element.getClientRects().length > 0;
  * report back in place.
  *
  * PH1 used `@radix-ui/react-alert-dialog`, which is stricter than the plain
- * dialog: Escape and backdrop clicks are both ignored, so the only ways out are
- * the cancel button or the caller closing it. That contract is kept here, with
- * the portal, focus trap, scroll lock and focus restore hand-rolled.
+ * dialog in one respect only: backdrop clicks are ignored, so the ways out are
+ * Escape, the cancel button, or the caller closing it. Escape did dismiss PH1's
+ * prompt (Radix only removes outside-click dismissal), so it is wired here too;
+ * the portal, focus trap, scroll lock and focus restore are hand-rolled.
  *
  * Props (PH1 `AlertDialogProps`): isOpen (alias `open`), onOpenChange, title,
  * description, actionLabel, cancelLabel, onAction, isActionLoading,
@@ -40,7 +41,6 @@ export const AlertDialog = ({
   const descriptionId = useId();
 
   // Scroll lock, focus hand-off into the panel, and focus restore on close.
-  // Escape is not wired up at all: PH1's AlertDialog had no keyboard dismissal.
   useEffect(() => {
     if (!active) return undefined;
     const opener = document.activeElement;
@@ -66,10 +66,17 @@ export const AlertDialog = ({
     };
   }, [active]);
 
-  // Tab stays inside the panel, as Radix's focus trap did.
+  // Escape cancels the prompt and Tab stays inside the panel, as Radix's
+  // `AlertDialogPrimitive` did (it dismissed on Escape while keeping the caller
+  // in charge of the outcome, so closing here never performs the action).
   useEffect(() => {
     if (!active) return undefined;
     const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onOpenChange(false);
+        return;
+      }
       if (event.key !== 'Tab') return;
       const panel = panelRef.current;
       if (!panel) return;
@@ -93,7 +100,7 @@ export const AlertDialog = ({
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [active]);
+  }, [active, onOpenChange]);
 
   if (!active) return null;
 

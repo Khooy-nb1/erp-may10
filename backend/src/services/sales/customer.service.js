@@ -2,6 +2,11 @@
 
 const { v } = require('../../utils/sales/validate');
 const { NotFoundError, ValidationError, ConflictError } = require('../../utils/sales/errors');
+const {
+  INVALID_BODY_MESSAGE,
+  INVALID_QUERY_MESSAGE,
+  fieldIssues,
+} = require('../../utils/sales/request');
 const customerRepository = require('../../repositories/sales/customer.repository');
 
 /**
@@ -17,50 +22,79 @@ const customerRepository = require('../../repositories/sales/customer.repository
 const customerTypeEnum = v.enum(['ca_nhan', 'to_chuc', 'dai_ly', 'xuat_khau']);
 const customerStatusEnum = v.enum(['hoat_dong', 'tam_khoa', 'ngung_giao_dich']);
 
-const createCustomerSchema = v.object({
-  ten_khach_hang: v.string().min(1, 'Tên khách hàng không được để trống').max(200),
-  loai_khach_hang: customerTypeEnum,
-  ma_so_thue: v.string().max(20).optional().nullable(),
-  so_dien_thoai: v.string().min(8, 'Số điện thoại phải từ 8 ký tự').max(20),
-  email: v.string().email('Email không đúng định dạng').optional().nullable().or(v.literal('')),
-  dia_chi: v.string().min(1, 'Địa chỉ không được để trống'),
-  tinh_thanh_pho: v.string().min(1, 'Tỉnh/thành phố không được để trống'),
-  nguoi_lien_he: v.string().max(150).optional().nullable(),
-  han_muc_cong_no: v.coerce.number().min(0, 'Hạn mức công nợ phải lớn hơn hoặc bằng 0').default(0),
-  so_ngay_cong_no: v.coerce.number().int().min(0, 'Số ngày công nợ phải lớn hơn hoặc bằng 0').default(0),
-  ghi_chu: v.string().optional().nullable(),
-});
+const createCustomerSchema = v
+  .object({
+    ten_khach_hang: v
+      .string()
+      .trim()
+      .min(1, 'Tên khách hàng không được để trống')
+      .max(200, 'Tên khách hàng tối đa 200 ký tự'),
+    loai_khach_hang: customerTypeEnum,
+    ma_so_thue: v.string().trim().max(20, 'Mã số thuế tối đa 20 ký tự').optional().nullable(),
+    so_dien_thoai: v
+      .phone()
+      .trim()
+      .min(8, 'Số điện thoại phải từ 8 ký tự')
+      .max(20, 'Số điện thoại tối đa 20 ký tự'),
+    email: v
+      .string()
+      .trim()
+      .max(100, 'Email tối đa 100 ký tự')
+      .email('Email không đúng định dạng')
+      .optional()
+      .nullable()
+      .or(v.literal('')),
+    dia_chi: v.string().trim().min(1, 'Địa chỉ không được để trống').max(500, 'Địa chỉ tối đa 500 ký tự'),
+    tinh_thanh_pho: v
+      .string()
+      .trim()
+      .min(1, 'Tỉnh/thành phố không được để trống')
+      .max(100, 'Tỉnh/thành phố tối đa 100 ký tự'),
+    nguoi_lien_he: v.string().trim().max(150, 'Người liên hệ tối đa 150 ký tự').optional().nullable(),
+    han_muc_cong_no: v.coerce
+      .number()
+      .min(0, 'Hạn mức công nợ phải lớn hơn hoặc bằng 0')
+      .max(1e15, 'Hạn mức công nợ quá lớn')
+      .default(0),
+    so_ngay_cong_no: v.coerce
+      .number()
+      .int('Số ngày công nợ phải là số nguyên')
+      .min(0, 'Số ngày công nợ phải lớn hơn hoặc bằng 0')
+      .max(3650, 'Số ngày công nợ tối đa 3650 ngày')
+      .default(0),
+    ghi_chu: v.string().trim().max(2000, 'Ghi chú tối đa 2000 ký tự').optional().nullable(),
+  })
 
 const updateCustomerSchema = createCustomerSchema.partial();
 
-const updateCustomerStatusSchema = v.object({
-  trang_thai: customerStatusEnum,
-  ly_do: v.string().optional(),
-});
+const updateCustomerStatusSchema = v
+  .object({
+    trang_thai: customerStatusEnum,
+    ly_do: v.string().trim().max(500, 'Lý do tối đa 500 ký tự').optional(),
+  })
 
-const customerQuerySchema = v.object({
-  page: v.coerce.number().int().min(1).default(1),
-  pageSize: v.coerce.number().int().min(1).max(100).default(20),
-  search: v.string().optional(),
-  loai_khach_hang: customerTypeEnum.optional(),
-  tinh_thanh_pho: v.string().optional(),
-  trang_thai: customerStatusEnum.optional(),
-  sortBy: v.string().optional(),
-  sortOrder: v.enum(['ASC', 'DESC']).default('DESC'),
-});
-
-function validationDetails(issues) {
-  return issues.map((issue) => ({ field: issue.path.join('.'), message: issue.message }));
-}
+const customerQuerySchema = v
+  .object({
+    page: v.coerce.number().int('Số trang phải là số nguyên').min(1, 'Số trang tối thiểu là 1').default(1),
+    pageSize: v.coerce
+      .number()
+      .int('Kích thước trang phải là số nguyên')
+      .min(1, 'Kích thước trang tối thiểu là 1')
+      .max(100, 'Kích thước trang tối đa là 100')
+      .default(20),
+    search: v.string().trim().max(100, 'Từ khóa tìm kiếm tối đa 100 ký tự').optional(),
+    loai_khach_hang: customerTypeEnum.optional(),
+    tinh_thanh_pho: v.string().trim().max(100, 'Tỉnh/thành phố tối đa 100 ký tự').optional(),
+    trang_thai: customerStatusEnum.optional(),
+    sortBy: v.string().trim().max(64, 'Cột sắp xếp không hợp lệ').optional(),
+    sortOrder: v.enum(['ASC', 'DESC'], 'Thứ tự sắp xếp không hợp lệ').default('DESC'),
+  })
 
 function createCustomerService(repository = customerRepository) {
   async function listCustomers(queryFilters) {
     const parseResult = customerQuerySchema.safeParse(queryFilters);
     if (!parseResult.success) {
-      throw new ValidationError(
-        'Validation failed for one or more query parameters.',
-        validationDetails(parseResult.error.errors)
-      );
+      throw new ValidationError(INVALID_QUERY_MESSAGE, fieldIssues(parseResult.error.errors));
     }
     return repository.list(parseResult.data);
   }
@@ -77,8 +111,8 @@ function createCustomerService(repository = customerRepository) {
     const parseResult = createCustomerSchema.safeParse(rawInput);
     if (!parseResult.success) {
       throw new ValidationError(
-        'Validation failed for one or more request fields.',
-        validationDetails(parseResult.error.errors)
+        INVALID_BODY_MESSAGE,
+        fieldIssues(parseResult.error.errors)
       );
     }
     const validated = parseResult.data;
@@ -128,8 +162,8 @@ function createCustomerService(repository = customerRepository) {
     const parseResult = updateCustomerSchema.safeParse(rawInput);
     if (!parseResult.success) {
       throw new ValidationError(
-        'Validation failed for one or more request fields.',
-        validationDetails(parseResult.error.errors)
+        INVALID_BODY_MESSAGE,
+        fieldIssues(parseResult.error.errors)
       );
     }
     const validated = parseResult.data;
@@ -161,8 +195,8 @@ function createCustomerService(repository = customerRepository) {
     const parseResult = updateCustomerStatusSchema.safeParse(rawInput);
     if (!parseResult.success) {
       throw new ValidationError(
-        'Validation failed for one or more request fields.',
-        validationDetails(parseResult.error.errors)
+        INVALID_BODY_MESSAGE,
+        fieldIssues(parseResult.error.errors)
       );
     }
     const validated = parseResult.data;

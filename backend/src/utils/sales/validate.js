@@ -25,6 +25,43 @@
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** ISO calendar date, `YYYY-MM-DD`. */
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Digits with the usual separators: `0912345678`, `+84 91 234 5678`, `(024) 3-9...`. */
+const PHONE_RE = /^[0-9+\-(). ]{8,20}$/;
+
+/** True when an ISO date names a real calendar day (`2026-02-30` is not one). */
+function isRealDate(value) {
+  // Non-strings reach this helper whenever a sibling field failed validation, so
+  // the guard has to come before `.split()` — a TypeError here escapes as a 500.
+  if (typeof value !== 'string' || !DATE_RE.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+/**
+ * Parses a coerced boolean. `Boolean('false')` is `true`, so query flags are
+ * read explicitly: `true`/`false`, `1`/`0` only — anything else is a 422 rather
+ * than a silently inverted filter.
+ */
+function coerceBoolean(value) {
+  if (typeof value === 'boolean') return value;
+  if (value === 1 || value === '1') return true;
+  if (value === 0 || value === '0') return false;
+  if (typeof value === 'string') {
+    const normalised = value.trim().toLowerCase();
+    if (normalised === 'true') return true;
+    if (normalised === 'false') return false;
+  }
+  return INVALID;
+}
+
 const INVALID = Symbol('invalid');
 
 const MESSAGES = {
@@ -39,6 +76,12 @@ const MESSAGES = {
   int: 'Giá trị phải là số nguyên.',
   positive: 'Giá trị phải lớn hơn 0.',
   email: 'Email không đúng định dạng.',
+  phone: 'Số điện thoại không đúng định dạng.',
+  finite: 'Giá trị phải là số hữu hạn.',
+  pattern: 'Giá trị không đúng định dạng.',
+  unknownKey: 'Trường này không được phép gửi lên.',
+  date: 'Ngày phải theo định dạng YYYY-MM-DD.',
+  dateInvalid: 'Ngày không tồn tại.',
 };
 
 function makeIssue(path, message) {
@@ -67,6 +110,12 @@ class Schema {
     this.positiveMessage = null;
     this.emailMessage = null;
     this.enumMessage = null;
+    this.patternRegex = null;
+    this.patternMessage = null;
+    this.isTrimmed = false;
+    this.isDateISO = false;
+    this.dateMessage = null;
+    this.isStrict = false;
     this.refinements = [];
     this.transformFn = null;
     this.alternatives = [];
@@ -139,6 +188,44 @@ class Schema {
   email(message = null) {
     return this.derive((s) => {
       s.emailMessage = message || MESSAGES.email;
+    });
+  }
+
+  trim() {
+    return this.derive((s) => {
+      s.isTrimmed = true;
+    });
+  }
+
+  regex(pattern, message = null) {
+    return this.derive((s) => {
+      s.patternRegex = pattern;
+      s.patternMessage = message || MESSAGES.pattern;
+    });
+  }
+
+  /**
+   * Requires an ISO calendar date (`YYYY-MM-DD`) that actually exists:
+   * `2026-02-30` and `2026-13-01` are rejected, not silently rolled over.
+   */
+  dateISO(message = null) {
+    return this.derive((s) => {
+      s.isDateISO = true;
+      s.dateMessage = message || MESSAGES.date;
+    });
+  }
+
+  /**
+   * Rejects unknown keys instead of stripping them (zod's `.strict()`). Applied
+   * to every request-body and query schema so a client cannot probe or smuggle
+   * fields the module does not accept.
+   */
+  strict() {
+    if (this.kind !== 'object') {
+      throw new Error('strict() is only supported on object schemas');
+    }
+    return this.derive((s) => {
+      s.isStrict = true;
     });
   }
 
@@ -263,7 +350,14 @@ class Schema {
       case 'number':
         return this.parseNumber(input, path, issues);
       case 'boolean':
-        if (this.config.coerce) return Boolean(input);
+        if (this.config.coerce) {
+          const coerced = coerceBoolean(input);
+          if (coerced === INVALID) {
+            issues.push(makeIssue(path, MESSAGES.boolean));
+            return undefined;
+          }
+          return coerced;
+        }
         if (typeof input !== 'boolean') {
           issues.push(makeIssue(path, MESSAGES.boolean));
           return undefined;
@@ -299,6 +393,9 @@ class Schema {
       issues.push(makeIssue(path, MESSAGES.string));
       return undefined;
     }
+    if (this.isTrimmed) {
+      value = value.trim();
+    }
     if (this.minValue !== null && value.length < this.minValue) {
       issues.push(
         makeIssue(path, this.minMessage || `Giá trị phải có ít nhất ${this.minValue} ký tự.`)
@@ -311,9 +408,23 @@ class Schema {
       );
       return undefined;
     }
+    if (this.patternRegex && !this.patternRegex.test(value)) {
+      issues.push(makeIssue(path, this.patternMessage));
+      return undefined;
+    }
     if (this.emailMessage && !EMAIL_RE.test(value)) {
       issues.push(makeIssue(path, this.emailMessage));
       return undefined;
+    }
+    if (this.isDateISO) {
+      if (!DATE_RE.test(value)) {
+        issues.push(makeIssue(path, this.dateMessage));
+        return undefined;
+      }
+      if (!isRealDate(value)) {
+        issues.push(makeIssue(path, MESSAGES.dateInvalid));
+        return undefined;
+      }
     }
     return value;
   }
@@ -321,10 +432,21 @@ class Schema {
   parseNumber(input, path, issues) {
     let value = input;
     if (this.config.coerce) {
+      if (typeof input === 'string' && input.trim() === '') {
+        // `Number('')` is 0: an empty box must not read as a legitimate zero.
+        issues.push(makeIssue(path, MESSAGES.number));
+        return undefined;
+      }
       value = typeof input === 'number' ? input : Number(input);
     }
     if (typeof value !== 'number' || Number.isNaN(value)) {
       issues.push(makeIssue(path, MESSAGES.number));
+      return undefined;
+    }
+    if (!Number.isFinite(value)) {
+      // `Number('Infinity')`, `Number('1e999')` and raw Infinity are not usable
+      // amounts, quantities or pagination values.
+      issues.push(makeIssue(path, MESSAGES.finite));
       return undefined;
     }
     if (this.isInt && !Number.isInteger(value)) {
@@ -386,6 +508,13 @@ class Schema {
       return undefined;
     }
     const output = {};
+    if (this.isStrict) {
+      for (const key of Object.keys(input)) {
+        if (!Object.prototype.hasOwnProperty.call(this.config.shape, key)) {
+          issues.push(makeIssue(path.concat(key), MESSAGES.unknownKey));
+        }
+      }
+    }
     for (const [key, field] of Object.entries(this.config.shape)) {
       const raw = input[key];
       const childPath = path.concat(key);
@@ -431,6 +560,10 @@ const v = {
     return schema;
   },
   literal: (value, config = {}) => new Schema('literal', { value, message: config.message || null }),
+  /** ISO calendar date string (`YYYY-MM-DD`) that must exist on the calendar. */
+  dateISO: (message = null) => new Schema('string', {}).dateISO(message),
+  /** Phone number: digits plus `+ - ( ) . space`, 8-20 characters. */
+  phone: (message = null) => new Schema('string', {}).regex(PHONE_RE, message || MESSAGES.phone),
   array: (items, config = {}) => new Schema('array', { items, ...config }),
   object: (shape) => new Schema('object', { shape }),
   coerce: {
@@ -446,4 +579,4 @@ const v = {
   },
 };
 
-module.exports = { v, MESSAGES, Schema };
+module.exports = { v, MESSAGES, Schema, PHONE_RE, DATE_RE, isRealDate };

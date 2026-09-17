@@ -4,6 +4,7 @@ const express = require('express');
 const { requireRoles, requirePermission } = require('../../middlewares/auth');
 const { orderService } = require('../../services/sales/order.service');
 const { sendSuccess, sendPaginated } = require('../../utils/sales/response');
+const { parseIdParam } = require('../../utils/sales/request');
 const { currentUserId, currentRole } = require('../../utils/sales/identity');
 
 /**
@@ -52,7 +53,7 @@ function createOrderRoutes(service = orderService) {
   // 3. Get sales order detail
   router.get('/:id', requireRoles('admin', 'ban_hang', 'kho', 'ke_toan'), async (req, res, next) => {
     try {
-      const order = await service.getOrderById(Number(req.params.id));
+      const order = await service.getOrderById(parseIdParam(req.params.id, 'id', 'Mã đơn bán hàng'));
       sendSuccess(res, order);
     } catch (err) {
       next(err);
@@ -62,7 +63,7 @@ function createOrderRoutes(service = orderService) {
   // 4. Update pending sales order
   router.patch('/:id', requirePermission('sales.update'), async (req, res, next) => {
     try {
-      const updated = await service.updateOrder(Number(req.params.id), req.body, currentUserId(req));
+      const updated = await service.updateOrder(parseIdParam(req.params.id, 'id', 'Mã đơn bán hàng'), req.body, currentUserId(req));
       sendSuccess(res, updated, 'Cập nhật đơn bán hàng thành công.');
     } catch (err) {
       next(err);
@@ -72,7 +73,7 @@ function createOrderRoutes(service = orderService) {
   // 5. Confirm sales order
   router.post('/:id/confirm', requirePermission('sales.approve'), async (req, res, next) => {
     try {
-      const confirmed = await service.confirmOrder(Number(req.params.id), req.body, currentUserId(req));
+      const confirmed = await service.confirmOrder(parseIdParam(req.params.id, 'id', 'Mã đơn bán hàng'), req.body, currentUserId(req));
       sendSuccess(res, confirmed, 'Xác nhận đơn bán hàng thành công.');
     } catch (err) {
       next(err);
@@ -83,7 +84,7 @@ function createOrderRoutes(service = orderService) {
   router.post('/:id/cancel', requirePermission('sales.update'), async (req, res, next) => {
     try {
       const cancelled = await service.cancelOrder(
-        Number(req.params.id),
+        parseIdParam(req.params.id, 'id', 'Mã đơn bán hàng'),
         req.body,
         currentUserId(req),
         currentRole(req)

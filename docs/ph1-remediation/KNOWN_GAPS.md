@@ -32,13 +32,16 @@ byte-for-byte or behaviour-for-behaviour; items marked **OWNER** need a business
   that belongs to the Finance module / the Core owner — see `INTEGRATION_REQUESTS.md` §4. The regression suite
   documents the current behaviour with an explicit `note -` line.
 
-## G-3 — `overdueOnly` query flag cannot be turned off with `"false"` (PRESERVED)
+## G-3 — `overdueOnly` query flag ignored `"false"` (FIXED)
 
 - **Where:** `z.coerce.boolean()` in PH1's receivable query schema; `v.coerce.boolean()` in the port.
-- **Observation:** `Boolean('false') === true`, so `?overdueOnly=false` still filters to overdue rows. Only
-  omitting the parameter disables the filter.
-- **Disposition:** preserved for behaviour parity. If the UI ever needs a tri-state filter, change the schema
-  and the screen together.
+- **Observation:** `Boolean('false') === true`, so `?overdueOnly=false` still filtered to overdue rows; only omitting
+  the parameter disabled the filter. Non-boolean text (`?overdueOnly=maybe`) was silently `true` as well.
+- **Fix:** the validator's boolean coercion reads the value explicitly (`true`/`false`, `1`/`0`; trimmed,
+  case-insensitive) and answers `422` otherwise (`utils/sales/validate.js::coerceBoolean`).
+- **Evidence:** `tests/test_ph1_validation.js` — `overdueOnly=false stays false`, `overdueOnly=true stays true`,
+  `non-boolean overdueOnly rejected`. The ported screens only ever sent the flag when truthy
+  (`frontend/src/sales/pages/ReceivableListPage.jsx` → `overdueOnly || undefined`), so no client change was needed.
 
 ## G-4 — Dashboard "money" metrics are role-masked in the service, not in SQL (PRESERVED)
 
@@ -87,3 +90,29 @@ byte-for-byte or behaviour-for-behaviour; items marked **OWNER** need a business
   route guards and menu entries at them. Recommended: (b) — it restores PH1's per-role reach without handing
   warehouse accounts the customer/invoice/receivable pages. The module guard stays `sales.view` until the ruling
   lands (ruling R-1).
+
+## G-8 — Invoice list filters `trang_thai` on the stored column, not the derived status (PRESERVED / OWNER)
+
+- **Where:** `repositories/sales/invoice.repository.js` — the list SQL filters `h.trang_thai = $n`, while every row
+  is re-stamped on read by `normalizeInvoiceRecord` (`da_thanh_toan` when fully paid, otherwise `qua_han` once
+  `ngay_dao_han` has passed, otherwise `thanh_toan_mot_phan`/`chua_thanh_toan`).
+- **Observation:** the status written at issuance is a snapshot. An invoice issued as `chua_thanh_toan` that later
+  passes its due date is *serialized* as `qua_han` but is not matched by `?trang_thai=qua_han`, so a status filter
+  can return rows whose displayed status differs from the filter and omit rows that display it.
+- **Disposition:** preserved from PH1 (same split between stored column and read-time derivation; the ageing
+  behaviour itself is intended). Fixing it means filtering on the expression the serializer uses — or persisting
+  status transitions on a schedule — which changes a shipped filter, so it stays with the module owner. The
+  regression suites exercise the filter against freshly issued invoices only.
+
+## G-9 — Unknown keys are stripped and a forbidden `sortBy` falls back (PRESERVED)
+
+- **Where:** every module schema (`v.object({...})` without `.strict()`) and every list repository
+  (`ALLOWED_*_SORT_COLUMNS.includes(filters.sortBy)` before an `ORDER BY`).
+- **Observation:** a request carrying an unsupported field or an unsupported sort column is answered `200` with the
+  field dropped and the default ordering kept — PH1/zod behaviour (`z.object()` strips unknown keys). The
+  projection is what protects mass assignment (`ma_khach_hang`, `nguoi_tao`, `id` cannot be patched) and the
+  repository allow-list is what protects the `ORDER BY` clause.
+- **Disposition:** preserved deliberately. Rejecting unknown keys with `422` was implemented and then reverted:
+  `tests/test_ph1_business_parity.js` pins the `200` behaviour for both the PATCH whitelist and the `sortBy`
+  injection probe, and stripping already satisfies the security requirement. Schema-level enums *were* kept where
+  PH1 had them (`trang_thai`, and the dashboard's `loai_khach_hang`) — those answer `422` on an unknown value.

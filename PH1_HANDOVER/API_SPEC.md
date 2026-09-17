@@ -70,6 +70,25 @@ The overview routes additionally re-assert data scope inside the service (`overv
 
 Vietnamese field-level validation messages come from the module validator's `MESSAGES` table (`validate.js:30-41`); validator issues are normalised from zod's `{path,message}` to the contract's `{field,message}` by `normaliseDetails` (`errorBoundary.js:36-54`) or by each service's `validationDetails` helper.
 
+Body and query failures share one message pair from `utils/sales/request.js`:
+`INVALID_BODY_MESSAGE = 'Dữ liệu gửi lên không hợp lệ.'` and `INVALID_QUERY_MESSAGE = 'Tham số truy vấn không hợp lệ.'` — the ported zod defaults were English (`Validation failed for one or more request fields.`) and no longer appear.
+
+### 1.6 Request validation contract (cross-cutting)
+
+| Rule | Behaviour | Source |
+|---|---|---|
+| Path ids | Must be plain decimal digits; anything else (`abc`, `1.5`, `1e3`, `0`) → `422` with `details[{field:'id'}]` instead of reaching PostgreSQL and surfacing as a 500 | `request.js::parseIdParam`, used by every `/:id` route |
+| Bilingual aliases | A payload may use the Vietnamese or the English spelling, **not both with different values** — disagreeing aliases → `422` (`Chỉ gửi một trong hai trường <canonical> hoặc <alias>.`) | `request.js::assertNoAliasConflict` |
+| Dates | Business dates (`ngay_dat_hang`, `ngay_giao_hang_yc`, `ngay_giao`, `ngay_xuat_hoa_don`) must be real `YYYY-MM-DD` calendar days (`2026-02-30` → `422`); query ranges (`fromDate`, `toDate`, `dueFromDate`, `dueToDate`) must be real days too. The dashboard additionally accepts full ISO-8601 timestamps (converted to the Asia/Ho_Chi_Minh day) | `validate.js::isRealDate`/`v.dateISO`, `overview.service.js::parseIsoDateInput` |
+| Cross-field | `ngay_giao_hang_yc >= ngay_dat_hang`; `fromDate <= toDate`; `dueFromDate <= dueToDate`; `period=custom` requires both dates | the schemas in §2 |
+| Booleans | `true`/`false`/`1`/`0`, trimmed and case-insensitive; any other value → `422` (PH1's `Boolean()` coercion treated `"false"` as `true` — `KNOWN_GAPS.md` G-3) | `validate.js::coerceBoolean` |
+| Unknown keys | Body and query keys outside the schema are **stripped** (PH1/zod parity, never applied); unknown values inside an enum field (`trang_thai`, `loai_khach_hang`, `period`, ...) → `422` | `validate.js`, `KNOWN_GAPS.md` G-9 |
+| `sortBy` | Free string, resolved against the repository's `ALLOWED_*_SORT_COLUMNS`; an unlisted column falls back to the default ordering (never interpolated raw) | `repositories/sales/*.repository.js` |
+| Bounds | Every text field carries a max length, every numeric field a range, every line array a max size (see §2) | the schemas in §2 |
+
+Line numbers in the tables below were captured on the 2026-09-16 revision; the file and symbol names are the
+stable reference (`PLAN.md` Step 5 follow-up moved a handful of lines in `services/sales/*`).
+
 ---
 
 ## 2. Endpoint Reference
@@ -82,20 +101,20 @@ Legend: fields list query params (GET) or body fields (POST/PATCH) in `snake_cas
 
 | METHOD /path | Purpose | Guard | Fields | → | errorCode(s) | Source |
 |---|---|---|---|---|---|---|
-| `GET /` | List customers | `requireRoles('admin', 'ban_hang', 'ke_toan')` | `page` int≥1 def1, `pageSize` int 1..100 def20, `search` str, `loai_khach_hang` enum `ca_nhan\|to_chuc\|dai_ly\|xuat_khau`, `tinh_thanh_pho` str, `trang_thai` enum `hoat_dong\|tam_khoa\|ngung_giao_dich`, `sortBy` str, `sortOrder` enum `ASC\|DESC` def `DESC` | 200 list | `VALIDATION_ERROR` | customers.routes.js:23; schema customer.service.js:41-47 |
-| `POST /` | Create customer | `requirePermission('sales.create')` | req `ten_khach_hang` str 1..200, `loai_khach_hang` enum above, `so_dien_thoai` str 8..20, `dia_chi` str≥1, `tinh_thanh_pho` str≥1; opt `ma_so_thue` str≤20/null, `email` email/nullable/`''`, `nguoi_lien_he` str≤150/null, `han_muc_cong_no` num≥0 def0, `so_ngay_cong_no` int≥0 def0, `ghi_chu` str/null | 201 | `VALIDATION_ERROR`; `DATABASE_CONFLICT` | customers.routes.js:44; schema customer.service.js:20-32, order of ops 87-104 |
-| `GET /:id` | Customer detail | `requireRoles('admin', 'ban_hang', 'ke_toan')` | — | 200 | `CUSTOMER_NOT_FOUND` | customers.routes.js:54 |
-| `PATCH /:id` | Update general info | `requirePermission('sales.update')` | all create fields optional (`.partial()`) | 200 | `CUSTOMER_NOT_FOUND`; `VALIDATION_ERROR` | customers.routes.js:64; schema customer.service.js:34 |
-| `PATCH /:id/status` | Update status (Admin only) | `requireRoles('admin')` | req `trang_thai` enum above, opt `ly_do` str | 200 | `CUSTOMER_NOT_FOUND`; `VALIDATION_ERROR` | customers.routes.js:74; schema customer.service.js:36-39 |
+| `GET /` | List customers | `requireRoles('admin', 'ban_hang', 'ke_toan')` | `page` int≥1 def1, `pageSize` int 1..100 def20, `search` str≤100, `loai_khach_hang` enum `ca_nhan\|to_chuc\|dai_ly\|xuat_khau`, `tinh_thanh_pho` str≤100, `trang_thai` enum `hoat_dong\|tam_khoa\|ngung_giao_dich`, `sortBy` str (repo allow-list), `sortOrder` enum `ASC\|DESC` def `DESC` | 200 list | `VALIDATION_ERROR` | customers.routes.js:23; `customer.service.js::customerQuerySchema` |
+| `POST /` | Create customer | `requirePermission('sales.create')` | req `ten_khach_hang` str 1..200, `loai_khach_hang` enum above, `so_dien_thoai` str 8..20 matching `^[0-9+\-(). ]{8,20}$` (`Số điện thoại không đúng định dạng`), `dia_chi` str 1..500, `tinh_thanh_pho` str 1..100; opt `ma_so_thue` str≤20/null, `email` email≤100/nullable/`''`, `nguoi_lien_he` str≤150/null, `han_muc_cong_no` num 0..1e15 def0, `so_ngay_cong_no` int 0..3650 def0, `ghi_chu` str≤2000/null | 201 | `VALIDATION_ERROR`; `DATABASE_CONFLICT` | customers.routes.js:44; `customer.service.js::createCustomerSchema` |
+| `GET /:id` | Customer detail | `requireRoles('admin', 'ban_hang', 'ke_toan')` | id decimal digits (`422` otherwise) | 200 | `CUSTOMER_NOT_FOUND`; `VALIDATION_ERROR` | customers.routes.js:54 |
+| `PATCH /:id` | Update general info | `requirePermission('sales.update')` | all create fields optional (`.partial()`), same bounds | 200 | `CUSTOMER_NOT_FOUND`; `VALIDATION_ERROR` | customers.routes.js:64; `customer.service.js::updateCustomerSchema` |
+| `PATCH /:id/status` | Update status (Admin only) | `requireRoles('admin')` | req `trang_thai` enum above, opt `ly_do` str≤500 | 200 | `CUSTOMER_NOT_FOUND`; `VALIDATION_ERROR` | customers.routes.js:74; `customer.service.js::updateCustomerStatusSchema` |
 | `GET /:id/summary` | Commercial summary | `requireRoles('admin', 'ban_hang', 'ke_toan')` | — | 200 | `CUSTOMER_NOT_FOUND` | customers.routes.js:84 |
-| `GET /:id/receivables` | Customer's receivables | `requirePermission('sales.view')` | receivable query fields (see §2.6); `ma_khach_hang` is forced to the path id | 200 list | `VALIDATION_ERROR` | customers.routes.js:94; receivable.service.js:89-95 |
+| `GET /:id/receivables` | Customer's receivables | `requirePermission('sales.view')` | receivable query fields (see §2.6); `ma_khach_hang` is forced to the path id | 200 list | `VALIDATION_ERROR` | customers.routes.js:94; `receivable.service.js::getCustomerReceivables` |
 
 ### 2.2 Products — `/api/v1/sales/san-pham`
 
 | METHOD /path | Purpose | Guard | Fields | → | errorCode(s) | Source |
 |---|---|---|---|---|---|---|
-| `GET /` | List / search products | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | `page` int≥1 def1, `pageSize` int 1..100 def20, `search` str, `size` str, `mau_sac` str, `trang_thai` enum `dang_ban\|ngung_ban\|mau_moi`, `sortBy` str, `sortOrder` enum `ASC\|DESC` def `ASC` | 200 list | `VALIDATION_ERROR` | products.routes.js:19; schema product.service.js:13-22 |
-| `GET /:id` | Product detail | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | — | 200 | `PRODUCT_NOT_FOUND` | products.routes.js:40 |
+| `GET /` | List / search products | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | `page` int≥1 def1, `pageSize` int 1..100 def20, `search` str≤100, `size` str≤20, `mau_sac` str≤50, `trang_thai` enum `dang_ban\|ngung_ban\|mau_moi`, `sortBy` str (repo allow-list), `sortOrder` enum `ASC\|DESC` def `ASC` | 200 list | `VALIDATION_ERROR` | products.routes.js:19; `product.service.js::productQuerySchema` |
+| `GET /:id` | Product detail | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | id decimal digits | 200 | `PRODUCT_NOT_FOUND`; `VALIDATION_ERROR` | products.routes.js:40 |
 
 ### 2.3 Orders — `/api/v1/sales/don-hang`
 
@@ -103,12 +122,12 @@ Order status enum (`ORDER_STATUSES`): `cho_xac_nhan \| da_xac_nhan \| dang_san_x
 
 | METHOD /path | Purpose | Guard | Fields | → | errorCode(s) | Source |
 |---|---|---|---|---|---|---|
-| `GET /` | List orders | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | `page`, `pageSize` (1..100 def20), `search` str, `ma_khach_hang` int>0, `trang_thai` order enum, `nguoi_ban` int>0, `fromDate` str, `toDate` str, `sortBy` str, `sortOrder` `ASC\|DESC` def `DESC` | 200 list | `VALIDATION_ERROR` | orders.routes.js:22; schema order.service.js:70-80 |
-| `POST /` | Create order | `requirePermission('sales.create')` | req `ma_khach_hang` int>0, `ngay_dat_hang` str≥1, `ngay_giao_hang_yc` str≥1 (must be ≥ `ngay_dat_hang`), `dia_chi_giao_hang` str≥1, `lines` array min1 of `{ ma_san_pham int>0, so_luong num>0, ty_le_giam_gia num 0..100 def0, ghi_chu str/null }`; opt `ghi_chu` str/null | 201 | `VALIDATION_ERROR`; `CUSTOMER_NOT_FOUND`; `CUSTOMER_INACTIVE`; `PRODUCT_NOT_FOUND`; `PRODUCT_NOT_SELLABLE`; `DATABASE_CONFLICT` | orders.routes.js:43; schema order.service.js:27-53; guards 114-169 |
-| `GET /:id` | Order detail (with lines) | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | — | 200 | `ORDER_NOT_FOUND` | orders.routes.js:53 |
-| `PATCH /:id` | Update pending order | `requirePermission('sales.update')` | opt `ngay_giao_hang_yc` str, `dia_chi_giao_hang` str≥1, `ghi_chu` str/null, `lines` array min1 | 200 | `ORDER_NOT_FOUND`; `ORDER_INVALID_STATE`; `PRODUCT_NOT_FOUND`; `PRODUCT_NOT_SELLABLE`; `VALIDATION_ERROR` | orders.routes.js:63; schema order.service.js:55-60; guards 192-260 |
-| `POST /:id/confirm` | Confirm order | `requirePermission('sales.approve')` | opt `acknowledgeCreditLimit` bool def `false`; a parse failure silently defaults to `false` (no 422) | 200 | `ORDER_NOT_FOUND`; `ORDER_INVALID_STATE`; `CUSTOMER_NOT_FOUND`; `CUSTOMER_INACTIVE`; `CUSTOMER_CREDIT_LIMIT_EXCEEDED` | orders.routes.js:73; schema order.service.js:62-64; guards 264-320 |
-| `POST /:id/cancel` | Cancel order | `requirePermission('sales.update')` | req `ly_do` str≥1 | 200 | `ORDER_NOT_FOUND`; `ORDER_INVALID_STATE`; `AUTH_FORBIDDEN` (confirmed order, non-admin); `VALIDATION_ERROR` | orders.routes.js:83; schema order.service.js:66-68; guards 324-369 |
+| `GET /` | List orders | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | `page`, `pageSize` (1..100 def20), `search` str≤100, `ma_khach_hang` int>0, `trang_thai` order enum, `nguoi_ban` int>0, `fromDate`/`toDate` real `YYYY-MM-DD` days (`fromDate <= toDate`), `sortBy` str (repo allow-list), `sortOrder` `ASC\|DESC` def `DESC` | 200 list | `VALIDATION_ERROR` | orders.routes.js:22; `order.service.js::orderQuerySchema` |
+| `POST /` | Create order | `requirePermission('sales.create')` | req `ma_khach_hang` int>0, `ngay_dat_hang` real `YYYY-MM-DD`, `ngay_giao_hang_yc` real `YYYY-MM-DD` (must be ≥ `ngay_dat_hang`), `dia_chi_giao_hang` str 1..500, `lines` array 1..200 of `{ ma_san_pham int>0, so_luong num>0 ≤1e6, ty_le_giam_gia num 0..100 def0, ghi_chu str≤500/null }`; opt `ghi_chu` str≤2000/null | 201 | `VALIDATION_ERROR`; `CUSTOMER_NOT_FOUND`; `CUSTOMER_INACTIVE`; `PRODUCT_NOT_FOUND`; `PRODUCT_NOT_SELLABLE`; `DATABASE_CONFLICT` | orders.routes.js:43; `order.service.js::createOrderSchema`/`orderLineInputSchema`; guards in `createOrder` |
+| `GET /:id` | Order detail (with lines) | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | id decimal digits | 200 | `ORDER_NOT_FOUND`; `VALIDATION_ERROR` | orders.routes.js:53 |
+| `PATCH /:id` | Update pending order | `requirePermission('sales.update')` | opt `ngay_giao_hang_yc` real `YYYY-MM-DD`, `dia_chi_giao_hang` str 1..500, `ghi_chu` str≤2000/null, `lines` array 1..200 | 200 | `ORDER_NOT_FOUND`; `ORDER_INVALID_STATE`; `PRODUCT_NOT_FOUND`; `PRODUCT_NOT_SELLABLE`; `VALIDATION_ERROR` | orders.routes.js:63; `order.service.js::updateOrderSchema` |
+| `POST /:id/confirm` | Confirm order | `requirePermission('sales.approve')` | opt `acknowledgeCreditLimit` bool def `false`; a non-boolean value → `422` (a missing field keeps the default) | 200 | `ORDER_NOT_FOUND`; `ORDER_INVALID_STATE`; `CUSTOMER_NOT_FOUND`; `CUSTOMER_INACTIVE`; `CUSTOMER_CREDIT_LIMIT_EXCEEDED` | orders.routes.js:73; `order.service.js::confirmOrderSchema` |
+| `POST /:id/cancel` | Cancel order | `requirePermission('sales.update')` | req `ly_do` str 1..500 | 200 | `ORDER_NOT_FOUND`; `ORDER_INVALID_STATE`; `AUTH_FORBIDDEN` (confirmed order, non-admin); `VALIDATION_ERROR` | orders.routes.js:83; `order.service.js::cancelOrderSchema` |
 
 ### 2.4 Deliveries — `/api/v1/sales/giao-hang`
 
@@ -116,12 +135,12 @@ Delivery status enum: `cho_giao \| dang_giao \| da_giao \| that_bai` (`delivery.
 
 | METHOD /path | Purpose | Guard | Fields | → | errorCode(s) | Source |
 |---|---|---|---|---|---|---|
-| `GET /` | List deliveries | `requireRoles('admin', 'ban_hang', 'kho')` | `page`, `pageSize` (1..100 def20), `search` str, `ma_don_ban_hang` int>0, `ma_kho` int>0, `trang_thai` delivery enum, `sortBy` str, `sortOrder` `ASC\|DESC` def `DESC` | 200 list | `VALIDATION_ERROR` | deliveries.routes.js:23; schema delivery.service.js:94-104 |
-| `POST /` | Create delivery header | `requireRoles('admin', 'kho', 'ban_hang')` | one-of req `ma_don_ban_hang`\|`orderId` int>0; one-of req `ma_kho`\|`warehouseId` int>0; one-of req `ngay_giao`\|`deliveryDate` str valid date; one-of req `ten_nguoi_nhan`\|`receiverName` str≤150; one-of req `dia_chi_giao`\|`deliveryAddress` str; opt `phuong_tien_van_chuyen`\|`transportMethod` str/null; opt `nguoi_giao_hang`\|`deliveryPersonId` int>0/null; opt `ghi_chu`\|`notes` str/null. Submitting `deliveredLines` is rejected. | 201 | `VALIDATION_ERROR`; `DELIVERY_LINES_UNSUPPORTED`; `ORDER_NOT_FOUND`; `ORDER_INVALID_STATE`; `WAREHOUSE_NOT_FOUND`; `DATABASE_CONFLICT` | deliveries.routes.js:44; schema delivery.service.js:22-77; guards 128-181 |
-| `GET /:id` | Delivery detail | `requireRoles('admin', 'ban_hang', 'kho')` | — | 200 | `DELIVERY_NOT_FOUND` | deliveries.routes.js:55 |
-| `POST /:id/start` | `cho_giao` → `dang_giao` | `requireRoles('admin', 'kho')` | — (no body) | 200 | `DELIVERY_NOT_FOUND`; `DELIVERY_INVALID_STATE` | deliveries.routes.js:65; delivery.service.js:196-210 |
-| `POST /:id/complete` | `dang_giao` → `da_giao` | `requireRoles('admin', 'kho')` | — (no body) | 200 | `DELIVERY_NOT_FOUND`; `DELIVERY_INVALID_STATE` (409 when already `da_giao`) | deliveries.routes.js:76; delivery.service.js:213-240 |
-| `POST /:id/fail` | `dang_giao` → `that_bai` | `requireRoles('admin', 'kho')` | one-of req `ly_do`\|`reason` str≥1 | 200 | `DELIVERY_NOT_FOUND`; `DELIVERY_INVALID_STATE`; `VALIDATION_ERROR` | deliveries.routes.js:87; schema delivery.service.js:79-92; guards 243-270 |
+| `GET /` | List deliveries | `requireRoles('admin', 'ban_hang', 'kho')` | `page`, `pageSize` (1..100 def20), `search` str≤100, `ma_don_ban_hang` int>0, `ma_kho` int>0, `trang_thai` delivery enum, `sortBy` str (repo allow-list), `sortOrder` `ASC\|DESC` def `DESC` | 200 list | `VALIDATION_ERROR` | deliveries.routes.js:23; `delivery.service.js::deliveryQuerySchema` |
+| `POST /` | Create delivery header | `requireRoles('admin', 'kho', 'ban_hang')` | one-of req `ma_don_ban_hang`\|`orderId` int>0; one-of req `ma_kho`\|`warehouseId` int>0; one-of req `ngay_giao`\|`deliveryDate` real `YYYY-MM-DD`; one-of req `ten_nguoi_nhan`\|`receiverName` str≤150; one-of req `dia_chi_giao`\|`deliveryAddress` str≤500; opt `phuong_tien_van_chuyen`\|`transportMethod` str≤100/null; opt `nguoi_giao_hang`\|`deliveryPersonId` int>0/null; opt `ghi_chu`\|`notes` str≤2000/null. Each alias pair may not be sent with two different values. Submitting `deliveredLines` is rejected. | 201 | `VALIDATION_ERROR`; `DELIVERY_LINES_UNSUPPORTED`; `ORDER_NOT_FOUND`; `ORDER_INVALID_STATE`; `WAREHOUSE_NOT_FOUND`; `DATABASE_CONFLICT` | deliveries.routes.js:44; `delivery.service.js::createDeliverySchema`; guards in `createDelivery` |
+| `GET /:id` | Delivery detail | `requireRoles('admin', 'ban_hang', 'kho')` | id decimal digits | 200 | `DELIVERY_NOT_FOUND`; `VALIDATION_ERROR` | deliveries.routes.js:55 |
+| `POST /:id/start` | `cho_giao` → `dang_giao` | `requireRoles('admin', 'kho')` | — (no body) | 200 | `DELIVERY_NOT_FOUND`; `DELIVERY_INVALID_STATE` | deliveries.routes.js:65; `delivery.service.js::startDelivery` |
+| `POST /:id/complete` | `dang_giao` → `da_giao` | `requireRoles('admin', 'kho')` | — (no body) | 200 | `DELIVERY_NOT_FOUND`; `DELIVERY_INVALID_STATE` (409 when already `da_giao`) | deliveries.routes.js:76; `delivery.service.js::completeDelivery` |
+| `POST /:id/fail` | `dang_giao` → `that_bai` | `requireRoles('admin', 'kho')` | one-of req `ly_do`\|`reason` str 1..500 (the pair may not disagree) | 200 | `DELIVERY_NOT_FOUND`; `DELIVERY_INVALID_STATE`; `VALIDATION_ERROR` | deliveries.routes.js:87; `delivery.service.js::failDeliverySchema`; guards in `failDelivery` |
 
 ### 2.5 Invoices — `/api/v1/sales/hoa-don`
 
@@ -129,9 +148,9 @@ Invoice status enum: `chua_thanh_toan \| thanh_toan_mot_phan \| da_thanh_toan \|
 
 | METHOD /path | Purpose | Guard | Fields | → | errorCode(s) | Source |
 |---|---|---|---|---|---|---|
-| `GET /` | List invoices | `requireRoles('admin', 'ban_hang', 'ke_toan')` | `page`, `pageSize` (1..100 def20), `search` str, `ma_hoa_don` str, `ma_don_ban_hang` int>0, `ma_khach_hang` int>0, `trang_thai` invoice enum, `fromDate`, `toDate`, `dueFromDate`, `dueToDate` str, `sortOrder` `ASC\|DESC` def `DESC` | 200 list | `VALIDATION_ERROR` | invoices.routes.js:21; schema invoice.service.js:57-67 |
-| `POST /` | Issue invoice | `requireRoles('admin', 'ke_toan')` | one-of req `ma_don_ban_hang`\|`orderId` int>0; opt `ma_khach_hang`\|`customerId` int>0; opt `ngay_xuat_hoa_don`\|`issueDate` str valid date; `so_tien_da_thu` num≥0 def0 or `paidAmount` num≥0; opt `ghi_chu`\|`notes` str/null | 201 | `VALIDATION_ERROR`; `ORDER_NOT_FOUND`; `INVOICE_ALREADY_EXISTS`; `DATABASE_CONFLICT`; `INVOICE_INVALID_ORDER`; `INVOICE_CUSTOMER_MISMATCH`; `INVOICE_CREATION_FAILED` | invoices.routes.js:42; schema invoice.service.js:23-55; mapping 128-146 |
-| `GET /:id` | Invoice detail | `requireRoles('admin', 'ban_hang', 'ke_toan')` | — | 200 | `INVOICE_NOT_FOUND` | invoices.routes.js:52 |
+| `GET /` | List invoices | `requireRoles('admin', 'ban_hang', 'ke_toan')` | `page`, `pageSize` (1..100 def20), `search` str≤100, `ma_hoa_don` str, `ma_don_ban_hang` int>0, `ma_khach_hang` int>0, `trang_thai` invoice enum, `fromDate`, `toDate`, `dueFromDate`, `dueToDate` real `YYYY-MM-DD` days (`dueFromDate <= dueToDate`), `sortBy` str (repo allow-list), `sortOrder` `ASC\|DESC` def `DESC` | 200 list | `VALIDATION_ERROR` | invoices.routes.js:21; `invoice.service.js::invoiceQuerySchema` |
+| `POST /` | Issue invoice | `requireRoles('admin', 'ke_toan')` | one-of req `ma_don_ban_hang`\|`orderId` int>0 (the pair may not disagree); opt `ma_khach_hang`\|`customerId` int>0; opt `ngay_xuat_hoa_don`\|`issueDate` real `YYYY-MM-DD` (defaults to today); `so_tien_da_thu` num≥0 def0 or `paidAmount` num≥0; opt `ghi_chu`\|`notes` str≤2000/null | 201 | `VALIDATION_ERROR`; `ORDER_NOT_FOUND`; `INVOICE_ALREADY_EXISTS`; `DATABASE_CONFLICT`; `INVOICE_INVALID_ORDER`; `INVOICE_CUSTOMER_MISMATCH`; `INVOICE_CREATION_FAILED` | invoices.routes.js:42; `invoice.service.js::createInvoiceSchema`; guards in `createInvoice` |
+| `GET /:id` | Invoice detail | `requireRoles('admin', 'ban_hang', 'ke_toan')` | id decimal digits | 200 | `INVOICE_NOT_FOUND`; `VALIDATION_ERROR` | invoices.routes.js:52 |
 
 ### 2.6 Receivables — `/api/v1/sales/cong-no`
 
@@ -139,21 +158,21 @@ Receivable status enum: `chua_thanh_toan \| mot_phan \| da_thanh_toan \| qua_han
 
 | METHOD /path | Purpose | Guard | Fields | → | errorCode(s) | Source |
 |---|---|---|---|---|---|---|
-| `GET /summary` | Receivable KPI summary | `requirePermission('sales.view')` | opt `ma_khach_hang` int>0 | 200 | `VALIDATION_ERROR` | receivables.routes.js:19; schema receivable.service.js:30-32 |
+| `GET /summary` | Receivable KPI summary | `requirePermission('sales.view')` | opt `ma_khach_hang` int>0 | 200 | `VALIDATION_ERROR` | receivables.routes.js:19; `receivable.service.js::receivableSummaryQuerySchema` |
 | `GET /aging` | Aging bucket report (Finance only) | `requirePermission('accounting.receivable')` | — | 200 | — | receivables.routes.js:29 |
-| `GET /` | List receivables | `requirePermission('sales.view')` | `page`, `pageSize` (1..100 def20), `search` str, `ma_khach_hang` int>0, `ma_hoa_don` int>0, `trang_thai` receivable enum, `dueFromDate`, `dueToDate` str, `overdueOnly` bool, `sortBy` str, `sortOrder` `ASC\|DESC` def `DESC` | 200 list | `VALIDATION_ERROR` | receivables.routes.js:39; schema receivable.service.js:16-28 |
+| `GET /` | List receivables | `requirePermission('sales.view')` | `page`, `pageSize` (1..100 def20), `search` str≤100, `ma_khach_hang` int>0, `ma_hoa_don` int>0, `trang_thai` receivable enum, `dueFromDate`, `dueToDate` real `YYYY-MM-DD` days (`dueFromDate <= dueToDate`), `overdueOnly` strict bool (`true`/`false`/`1`/`0`), `sortBy` str (repo allow-list), `sortOrder` `ASC\|DESC` def `DESC` | 200 list | `VALIDATION_ERROR` | receivables.routes.js:39; `receivable.service.js::receivableQuerySchema` |
 
 ### 2.7 Overview — `/api/v1/sales/tong-quan`
 
-All five routes share the dashboard query schema (`overview.service.js:45-60`): `period` enum `month\|quarter\|year\|custom` def `month`, `fromDate` str, `toDate` str, `nguoi_ban` int>0, `loai_khach_hang` str, `limit` int 1..50 def10. Cross-field rule: `fromDate` and `toDate` are **required when `period=custom`**, and `fromDate` must not exceed `toDate`. `kho` is denied the money-backed routes both by guard and by the service's `assertMoneyScope` (`overview.service.js:152-155`).
+All five routes share the dashboard query schema (`overview.service.js::dashboardQuerySchema`): `period` enum `month\|quarter\|year\|custom` def `month`, `fromDate`/`toDate` ISO day or ISO-8601 timestamp, `nguoi_ban` int>0, `loai_khach_hang` enum `ca_nhan\|to_chuc\|dai_ly\|xuat_khau`, `limit` int 1..50 def10. Cross-field rule: `fromDate` and `toDate` are **required when `period=custom`**, and `fromDate` must not exceed `toDate`. `kho` is denied the money-backed routes both by guard and by the service's `assertMoneyScope` (`overview.service.js::assertMoneyScope`).
 
 | METHOD /path | Purpose | Guard | Fields | → | errorCode(s) | Source |
 |---|---|---|---|---|---|---|
-| `GET /summary` | Role-scoped KPI summary | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | dashboard query (above) | 200 | `VALIDATION_ERROR`; `AUTH_FORBIDDEN` (role outside `ROLE_SCOPES`) | overview.routes.js:22; overview.service.js:230 |
-| `GET /revenue-chart` | Invoice revenue by period | `requireRoles('admin', 'ban_hang', 'ke_toan')` | dashboard query | 200 | `VALIDATION_ERROR`; `AUTH_FORBIDDEN` | overview.routes.js:32; overview.service.js:247 |
-| `GET /order-status` | Order count by status | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | dashboard query | 200 | `VALIDATION_ERROR` | overview.routes.js:42; overview.service.js:259 |
-| `GET /top-customers` | Top customers by value | `requireRoles('admin', 'ban_hang', 'ke_toan')` | dashboard query | 200 | `VALIDATION_ERROR`; `AUTH_FORBIDDEN` | overview.routes.js:52; overview.service.js:265 |
-| `GET /top-products` | Top products by value | `requireRoles('admin', 'ban_hang', 'ke_toan')` | dashboard query | 200 | `VALIDATION_ERROR`; `AUTH_FORBIDDEN` | overview.routes.js:62; overview.service.js:276 |
+| `GET /summary` | Role-scoped KPI summary | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | dashboard query (above) | 200 | `VALIDATION_ERROR`; `AUTH_FORBIDDEN` (role outside `ROLE_SCOPES`) | overview.routes.js:22; `overview.service.js::getSummary` |
+| `GET /revenue-chart` | Invoice revenue by period | `requireRoles('admin', 'ban_hang', 'ke_toan')` | dashboard query | 200 | `VALIDATION_ERROR`; `AUTH_FORBIDDEN` | overview.routes.js:32; `overview.service.js::getRevenueChart` |
+| `GET /order-status` | Order count by status | `requireRoles('admin', 'ban_hang', 'kho', 'ke_toan')` | dashboard query | 200 | `VALIDATION_ERROR` | overview.routes.js:42; `overview.service.js::getOrderStatus` |
+| `GET /top-customers` | Top customers by value | `requireRoles('admin', 'ban_hang', 'ke_toan')` | dashboard query | 200 | `VALIDATION_ERROR`; `AUTH_FORBIDDEN` | overview.routes.js:52; `overview.service.js::getTopCustomers` |
+| `GET /top-products` | Top products by value | `requireRoles('admin', 'ban_hang', 'ke_toan')` | dashboard query | 200 | `VALIDATION_ERROR`; `AUTH_FORBIDDEN` | overview.routes.js:62; `overview.service.js::getTopProducts` |
 
 ---
 

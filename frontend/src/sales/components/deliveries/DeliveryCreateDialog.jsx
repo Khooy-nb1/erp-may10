@@ -7,7 +7,8 @@ import { Textarea } from '../ui/Textarea.jsx';
 import { NumberInput } from '../ui/NumberInput.jsx';
 import { Select } from '../ui/Select.jsx';
 import { DateInput } from '../ui/DateInput.jsx';
-import { ErrorState } from '../common/ErrorState.jsx';
+import { toast } from '../ui/toast.jsx';
+import { deliveryFieldErrors, fieldStatus, firstFieldError, serverFieldErrors } from '../../lib/validation.js';
 
 const WAREHOUSE_OPTIONS = [
   { value: '1', label: 'Kho Nguyên Phụ Liệu Số 1 (KNL01)' },
@@ -23,6 +24,17 @@ const FORM_FIELDS = {
   transportMethod: 'Xe tải công ty',
   notes: '',
 };
+
+/** Field names the create endpoint validates, used to place its field messages. */
+const PAYLOAD_FIELDS = [
+  'ma_don_ban_hang',
+  'ma_kho',
+  'ngay_giao',
+  'ten_nguoi_nhan',
+  'dia_chi_giao',
+  'phuong_tien_van_chuyen',
+  'ghi_chu',
+];
 
 /** Today as `YYYY-MM-DD`, the format the API and the native date control share. */
 function todayISO() {
@@ -55,12 +67,12 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
   const [notes, setNotes] = useState(FORM_FIELDS.notes);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Each open starts from a clean form, with the entry point's order preselected.
   useEffect(() => {
     if (!isOpen) return;
-    setError(null);
+    setFieldErrors({});
     setIsSubmitting(false);
     setOrderId(presetOrderId ?? null);
     setWarehouseId(FORM_FIELDS.warehouseId);
@@ -71,24 +83,30 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
     setNotes(FORM_FIELDS.notes);
   }, [isOpen, presetOrderId]);
 
-  /** PH1's submit-time checks, in order: the first failure is the one shown. */
-  const validate = () => {
-    if (orderId === null || !Number(orderId)) return 'Vui lòng nhập ID đơn hàng hợp lệ.';
-    if (!receiverName.trim()) return 'Tên người nhận là bắt buộc.';
-    if (!deliveryAddress.trim()) return 'Địa chỉ nhận hàng là bắt buộc.';
-    return null;
-  };
+  /**
+   * Submit-time checks, in order - the same rules and messages as
+   * `createDeliverySchema`, so the first failure is the one shown.
+   */
+  const validate = () => firstFieldError(deliveryFieldErrors({
+    orderId,
+    warehouseId,
+    deliveryDate,
+    receiverName,
+    deliveryAddress,
+    transportMethod,
+    notes,
+  }));
 
   const handleSubmit = async (event) => {
     if (event) event.preventDefault();
     const validationError = validate();
     if (validationError) {
-      setError(validationError);
+      setFieldErrors({ [validationError.field]: validationError.message });
       return;
     }
 
     setIsSubmitting(true);
-    setError(null);
+    setFieldErrors({});
 
     try {
       const created = await createDelivery({
@@ -104,7 +122,8 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
       onCreated?.(created.id);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể lập đợt giao hàng.');
+      setFieldErrors(serverFieldErrors(err, PAYLOAD_FIELDS));
+      toast.error(err instanceof Error ? err : 'Không thể lập đợt giao hàng.');
     } finally {
       setIsSubmitting(false);
     }
@@ -142,8 +161,6 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
         noValidate
         className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto pr-1"
       >
-        {error ? <ErrorState message={error} onRetry={() => setError(null)} /> : null}
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <NumberInput
             label="ID đơn bán hàng liên kết *"
@@ -151,6 +168,7 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
             value={orderId}
             onChange={setOrderId}
             hasClear
+            status={fieldStatus(fieldErrors, 'ma_don_ban_hang')}
             className="w-full"
           />
 
@@ -159,6 +177,7 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
             options={WAREHOUSE_OPTIONS}
             value={warehouseId}
             onChange={setWarehouseId}
+            status={fieldStatus(fieldErrors, 'ma_kho')}
             className="w-full"
           />
 
@@ -166,6 +185,7 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
             label="Ngày giao hàng *"
             value={deliveryDate ? deliveryDate : undefined}
             onChange={(value) => setDeliveryDate(value ?? '')}
+            status={fieldStatus(fieldErrors, 'ngay_giao')}
             className="w-full"
           />
 
@@ -174,6 +194,7 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
             placeholder="Họ tên người nhận"
             value={receiverName}
             onChange={setReceiverName}
+            status={fieldStatus(fieldErrors, 'ten_nguoi_nhan')}
             className="w-full"
           />
 
@@ -183,6 +204,7 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
               placeholder="Địa chỉ giao nhận hàng hóa"
               value={deliveryAddress}
               onChange={setDeliveryAddress}
+              status={fieldStatus(fieldErrors, 'dia_chi_giao')}
               className="w-full"
             />
           </div>
@@ -191,6 +213,7 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
             label="Phương tiện vận chuyển"
             value={transportMethod}
             onChange={setTransportMethod}
+            status={fieldStatus(fieldErrors, 'phuong_tien_van_chuyen')}
             className="w-full"
           />
 
@@ -200,6 +223,7 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
               rows={2}
               value={notes}
               onChange={setNotes}
+              status={fieldStatus(fieldErrors, 'ghi_chu')}
               className="w-full"
             />
           </div>

@@ -4,6 +4,7 @@ const express = require('express');
 const { requireRoles } = require('../../middlewares/auth');
 const { productService } = require('../../services/sales/product.service');
 const { sendSuccess, sendPaginated } = require('../../utils/sales/response');
+const { parseIdParam } = require('../../utils/sales/request');
 
 /**
  * Product routes - mounted at `/san-pham` in sales routes.
@@ -39,7 +40,7 @@ function createProductRoutes(service = productService) {
   // Get product detail
   router.get('/:id', requireRoles('admin', 'ban_hang', 'kho', 'ke_toan'), async (req, res, next) => {
     try {
-      const product = await service.getProductById(Number(req.params.id));
+      const product = await service.getProductById(parseIdParam(req.params.id, 'id', 'Mã sản phẩm'));
       sendSuccess(res, product);
     } catch (err) {
       next(err);
