@@ -76,7 +76,7 @@ export function Table({
         <tr
           key={String(typeof idKey === 'function' ? idKey(row) : row[idKey])}
           aria-rowindex={rowIndexStart === undefined ? undefined : rowIndexStart + rowIndex}
-          className={cn('border-b border-brand-border last:border-b-0', hasHover ? 'hover:bg-slate-50' : null)}
+          className={cn('border-b border-brand-border last:border-b-0', hasHover ? 'group hover:bg-slate-50' : null)}
         >
           {columns.map((column, columnIndex) => (
             <td
@@ -86,7 +86,9 @@ export function Table({
                 'whitespace-nowrap px-4',
                 DENSITY_CLASSES[density],
                 ALIGN_CLASSES[column.align ?? 'start'],
-                columnIndex === 0 ? 'sticky left-0 z-10 bg-white' : null
+                columnIndex === 0
+                  ? cn('sticky left-0 z-10 bg-white', hasHover ? 'group-hover:bg-slate-50' : null)
+                  : null
               )}
             >
               {column.renderCell ? column.renderCell(row, rowIndex) : row[column.key]}

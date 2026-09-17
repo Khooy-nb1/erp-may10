@@ -211,6 +211,7 @@ export function SalesOrderCreateDialog({ isOpen, onOpenChange, onCreated }) {
     {
       key: 'unitPrice',
       header: 'Đơn giá',
+      width: pixel(130),
       align: 'end',
       renderCell: (row) => (
         <Text className="font-medium tabular-nums">{formatCurrency(Number(row.line.product.gia_ban))}</Text>
@@ -237,6 +238,7 @@ export function SalesOrderCreateDialog({ isOpen, onOpenChange, onCreated }) {
     {
       key: 'lineTotal',
       header: 'Thành tiền',
+      width: pixel(140),
       align: 'end',
       renderCell: (row) => {
         const gross = row.line.quantity * Number(row.line.product.gia_ban);

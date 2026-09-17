@@ -167,6 +167,7 @@ export function SalesOrderDetailPage() {
               icon={<Check size={16} aria-hidden />}
               // The credit-limit Banner carries its own primary while it is open (G7).
               disabled={actionLoading || Boolean(creditWarning)}
+              loading={actionLoading}
               onClick={() => handleConfirm(false)}
             >
               Xác nhận đơn hàng

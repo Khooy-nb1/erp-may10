@@ -159,7 +159,12 @@ export function NumberInput(props) {
         ) : null}
       </div>
       {hasMessage ? (
-        <p id={messageId} className={cn('text-sm', statusTextClass(status))}>
+        <p
+          id={messageId}
+          role={status?.type === 'error' ? 'alert' : 'status'}
+          aria-live={status?.type === 'error' ? 'assertive' : 'polite'}
+          className={cn('text-sm', statusTextClass(status))}
+        >
           {status?.message}
         </p>
       ) : null}

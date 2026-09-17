@@ -44,7 +44,7 @@ const agingColumns = [
     key: 'count',
     header: 'Số khoản',
     width: pixel(120),
-    align: 'center',
+    align: 'end',
     renderCell: (item) => (
       <Text className={item.isTotal ? 'font-bold tabular-nums' : 'tabular-nums'}>{item.count}</Text>
     ),
@@ -248,7 +248,7 @@ export function ReceivableListPage() {
       renderCell: (item) => {
         const daysOverdue = Number(item.daysOverdue) || 0;
         return daysOverdue > 0 ? (
-          <Text className="font-semibold text-rose-700">Quá hạn {daysOverdue} ngày</Text>
+          <Text className="font-semibold text-rose-700 tabular-nums">Quá hạn {daysOverdue} ngày</Text>
         ) : (
           <Text className="text-brand-secondary">—</Text>
         );

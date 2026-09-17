@@ -10,7 +10,7 @@ import { cn } from '../../lib/cn.js';
  * tokens rewritten onto Core's Tailwind 3.4 brand palette.
  */
 const BASE_CLASSES =
-  'inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-colors disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50';
 
 const VARIANT_CLASSES = {
   primary: 'bg-brand-primary text-white hover:bg-brand-dark',
@@ -63,11 +63,21 @@ export const Button = ({
   );
 
   if (href !== undefined) {
+    const isDisabled = disabled || loading;
     return (
       <Link
-        to={href}
-        className={classes}
-        onClick={onClick}
+        to={isDisabled ? '#' : href}
+        role={isDisabled ? 'link' : undefined}
+        aria-disabled={isDisabled || undefined}
+        tabIndex={isDisabled ? -1 : undefined}
+        className={cn(classes, isDisabled ? 'cursor-not-allowed opacity-50' : null)}
+        onClick={(event) => {
+          if (isDisabled) {
+            event.preventDefault();
+            return;
+          }
+          onClick?.(event);
+        }}
         aria-busy={loading || undefined}
       >
         {content}

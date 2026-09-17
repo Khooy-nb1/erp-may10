@@ -38,7 +38,12 @@ export const Textarea = ({
         className={cn(controlClass, 'py-2', controlBorderClass(status))}
       />
       {status?.message ? (
-        <p id={messageId} className={cn('text-sm', statusTextClass(status))}>
+        <p
+          id={messageId}
+          role={status.type === 'error' ? 'alert' : 'status'}
+          aria-live={status.type === 'error' ? 'assertive' : 'polite'}
+          className={cn('text-sm', statusTextClass(status))}
+        >
           {status.message}
         </p>
       ) : null}

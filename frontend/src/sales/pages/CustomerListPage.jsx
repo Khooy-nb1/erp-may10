@@ -68,7 +68,7 @@ const columns = [
     header: 'Tỉnh/Thành',
     width: proportional(1),
     renderCell: (item) => (
-      <span className="block max-w-[240px] truncate" title={item.tinh_thanh_pho}>
+      <span className="block max-w-[280px] truncate" title={item.tinh_thanh_pho}>
         {item.tinh_thanh_pho}
       </span>
     ),

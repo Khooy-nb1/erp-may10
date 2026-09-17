@@ -136,6 +136,7 @@ export function DeliveryDetailPage() {
               variant="primary"
               icon={<Truck size={16} aria-hidden />}
               disabled={actionLoading}
+              loading={actionLoading}
               onClick={handleStart}
             >
               Bắt đầu vận chuyển

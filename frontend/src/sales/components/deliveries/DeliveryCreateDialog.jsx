@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { createDelivery } from '../../services/deliveryService.js';
 import { Button } from '../ui/Button.jsx';
 import { Dialog } from '../ui/Dialog.jsx';
@@ -45,6 +45,7 @@ function todayISO() {
  * @param {(deliveryId: number | string) => void} [props.onCreated] Receives the new delivery id once the API accepts it; the caller decides where to go next.
  */
 export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCreated }) {
+  const formId = useId();
   const [orderId, setOrderId] = useState(presetOrderId ?? null);
   const [warehouseId, setWarehouseId] = useState(FORM_FIELDS.warehouseId);
   const [deliveryDate, setDeliveryDate] = useState(todayISO);
@@ -78,7 +79,8 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
     return null;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (event) => {
+    if (event) event.preventDefault();
     const validationError = validate();
     if (validationError) {
       setError(validationError);
@@ -114,11 +116,11 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
         Hủy
       </Button>
       <Button
-        type="button"
+        type="submit"
+        form={formId}
         variant="primary"
         loading={isSubmitting}
         disabled={isSubmitting}
-        onClick={handleSubmit}
       >
         {isSubmitting ? 'Đang tạo...' : 'Lưu phiếu giao hàng'}
       </Button>
@@ -134,7 +136,12 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
       className="max-w-xl"
       footer={footer}
     >
-      <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto pr-1">
+      <form
+        id={formId}
+        onSubmit={handleSubmit}
+        noValidate
+        className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto pr-1"
+      >
         {error ? <ErrorState message={error} onRetry={() => setError(null)} /> : null}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -197,7 +204,7 @@ export function DeliveryCreateDialog({ isOpen, onOpenChange, presetOrderId, onCr
             />
           </div>
         </div>
-      </div>
+      </form>
     </Dialog>
   );
 }

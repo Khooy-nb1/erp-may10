@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { IconButton } from './IconButton.jsx';
 import { cn } from '../../lib/cn.js';
 
 const FOCUSABLE_SELECTOR =
@@ -131,14 +132,14 @@ export const Dialog = ({
           <h2 id={titleId} className="text-lg font-semibold text-brand-text">
             {title}
           </h2>
-          <button
-            type="button"
-            aria-label="Đóng"
+          <IconButton
+            label="Đóng"
+            icon={<X size={16} aria-hidden />}
+            variant="ghost"
+            size="sm"
             onClick={() => onOpenChange(false)}
-            className="-mr-1 -mt-1 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-50 hover:text-brand-text"
-          >
-            <X size={16} aria-hidden />
-          </button>
+            className="-mr-1 -mt-1 rounded-full text-slate-400 hover:text-brand-text"
+          />
         </div>
         {description ? (
           <p id={descriptionId} className="mt-1 text-sm text-brand-secondary">

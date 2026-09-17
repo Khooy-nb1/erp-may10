@@ -28,6 +28,7 @@ export function Combobox({
   const activeOptionRef = useRef(null);
   const id = useId();
   const listboxId = `${id}-listbox`;
+  const messageId = `${id}-message`;
 
   useEffect(() => {
     activeOptionRef.current?.scrollIntoView?.({ block: 'nearest' });
@@ -61,6 +62,7 @@ export function Combobox({
           aria-autocomplete="list"
           aria-activedescendant={isOpen && activeIndex >= 0 ? optionId(activeIndex) : undefined}
           aria-invalid={status?.type === 'error' || undefined}
+          aria-describedby={status?.message ? messageId : undefined}
           value={query}
           placeholder={placeholder}
           disabled={disabled}
@@ -135,7 +137,14 @@ export function Combobox({
         ) : null}
       </div>
       {status?.message ? (
-        <p className={cn('text-sm', statusTextClass(status))}>{status.message}</p>
+        <p
+          id={messageId}
+          role={status.type === 'error' ? 'alert' : 'status'}
+          aria-live={status.type === 'error' ? 'assertive' : 'polite'}
+          className={cn('text-sm', statusTextClass(status))}
+        >
+          {status.message}
+        </p>
       ) : null}
     </div>
   );

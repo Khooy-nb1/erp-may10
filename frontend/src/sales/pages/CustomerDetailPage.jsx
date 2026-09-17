@@ -185,7 +185,7 @@ export function CustomerDetailPage() {
     {
       key: 'daysOverdue',
       header: 'Số ngày quá hạn',
-      align: 'center',
+      align: 'end',
       width: proportional(1),
       renderCell: (r) =>
         r.daysOverdue && r.daysOverdue > 0 ? (
@@ -199,7 +199,6 @@ export function CustomerDetailPage() {
     {
       key: 'trang_thai',
       header: 'Trạng thái',
-      align: 'center',
       width: proportional(1),
       renderCell: (r) => <StatusBadge status={r.trang_thai} />,
     },
@@ -221,9 +220,13 @@ export function CustomerDetailPage() {
       breadcrumbs={breadcrumbs}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <TextLink to="/sales/customers" weight="medium">
-            <ArrowLeft size={16} aria-hidden /> Danh sách
-          </TextLink>
+          <Button
+            variant="secondary"
+            icon={<ArrowLeft size={16} aria-hidden />}
+            href="/sales/customers"
+          >
+            Danh sách
+          </Button>
 
           {isAdmin(user) && customer ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -413,7 +416,7 @@ export function CustomerDetailPage() {
                       )}
 
                       <Card className="p-0">
-                        <Table data={receivableRows} columns={receivableColumns} idKey="id" hasHover />
+                        <Table data={receivableRows} columns={receivableColumns} idKey="id" density="compact" hasHover />
                         <div className="flex flex-wrap gap-1 px-4 py-3">
                           <Text variant="supporting">
                             Hiển thị {receivables.length}/{receivablesTotal} khoản công nợ phải thu
@@ -439,6 +442,7 @@ export function CustomerDetailPage() {
         )}"? Thao tác này có thể hoàn tác bằng cách chuyển lại trạng thái.`}
         actionLabel="Xác nhận"
         cancelLabel="Hủy"
+        actionVariant={pendingStatus === 'ngung_giao_dich' ? 'destructive' : 'primary'}
         isActionLoading={updatingStatus}
         onAction={() => {
           void handleStatusChange();

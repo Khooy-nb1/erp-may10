@@ -78,7 +78,7 @@ const columns = [
   {
     key: 'trang_thai',
     header: 'Trạng thái',
-    width: pixel(140),
+    width: pixel(150),
     align: 'start',
     renderCell: (item) => <StatusBadge status={item.trang_thai} />,
   },
