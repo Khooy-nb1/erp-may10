@@ -1,0 +1,8 @@
+-- PH1 Sales module — seed data
+--
+-- NONE. The module adds no seed rows: master data (khách hàng, sản phẩm, kho, người dùng) and the
+-- warehouse documents come from Core's existing seed (`database/seed.sql`).
+--
+-- Sales rows created during development verification (orders, deliveries, invoices, receivables) belong to the
+-- disposable development database and are marked `[SMOKE]` / `[SMOKE-PARITY]`; the automated suites delete them
+-- themselves (PH1_HANDOVER/TEST_REPORT.md §3).

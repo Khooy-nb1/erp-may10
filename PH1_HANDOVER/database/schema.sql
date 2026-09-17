@@ -1,0 +1,8 @@
+-- PH1 Sales module — approved additive DDL
+--
+-- NONE. The PH1 Sales module requires zero DDL against `erp_may10`:
+--   - the schema in use is byte-identical to Core's (git blob aaae749b299139ff28b996bb75559c3766d4e2fc, 887 lines);
+--   - every repository operation maps onto pre-existing tables;
+--   - this file intentionally contains no statements.
+--
+-- Evidence: docs/ph1-remediation/DB_COMPATIBILITY_MATRIX.md
