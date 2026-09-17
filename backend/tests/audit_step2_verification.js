@@ -1,13 +1,19 @@
 const http = require('http');
 const db = require('../src/config/database');
+const { signToken } = require('../src/middlewares/auth');
 
-function apiRequest(path, method = 'GET', data = null, role = 'kho', userId = '1') {
+// Core hardened its auth: identity headers (`x-role`/`x-user-id`) are rejected and a
+// signed `erp_token` is required. Keep the scenario calls untouched and mint the token
+// for the acting role/user here instead.
+const ROLE_USER_IDS = { admin: 1, ban_hang: 2, kho: 5, ke_toan: 6 };
+
+function apiRequest(path, method = 'GET', data = null, role = 'kho', userId = null) {
   return new Promise((resolve, reject) => {
     const postData = data ? JSON.stringify(data) : null;
+    const token = signToken(userId || ROLE_USER_IDS[role] || ROLE_USER_IDS.kho);
     const headers = {
       'Content-Type': 'application/json',
-      'x-role': role,
-      'x-user-id': userId,
+      Authorization: `Bearer ${token}`,
     };
     if (postData) {
       headers['Content-Length'] = Buffer.byteLength(postData);
