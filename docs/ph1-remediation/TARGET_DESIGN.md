@@ -36,7 +36,7 @@ Inside Core `MainLayout.jsx`, `SalesRoutes` defines all child paths relative to 
 |---|---|---|---|
 | `/sales` (index) | `SalesOverviewPage` (from `pages/dashboard/DashboardPage.tsx`) | Sales summary / KPIs; must be renamed and rebranded — it may not remain a global dashboard (§1.2) | `sales.view` |
 | `/sales/customers` | `CustomerListPage` | Customer table with search, filters, pagination | `sales.view` |
-| `/sales/customers/new` | `CustomerCreatePage` | Customer registration form (11 fields per the zod schema) | `sales.create` |
+| *(none — dialog)* | `CustomerCreateDialog` | Customer registration is a **dialog on the list page** (11 fields per the zod schema); the legacy `/sales/customers/new` URL redirects to the list | `sales.create` (dialog action) |
 | `/sales/customers/:id` | `CustomerDetailPage` | Customer profile with 4 tabs (`Thông tin chi tiết`, `Đơn bán hàng`, `Hóa đơn`, `Sổ công nợ`) | `sales.view` |
 | `/sales/products` | `ProductListPage` | Product catalog lookup, sizing, colors, pricing | `sales.view` |
 | `/sales/orders` | `SalesOrderListPage` | Sales orders list with status filters; hosts the create dialog | `sales.view` |

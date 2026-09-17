@@ -4,7 +4,6 @@ import { ToastHost } from './components/ui/toast.jsx';
 import './sales.css';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { CustomerListPage } from './pages/CustomerListPage.jsx';
-import { CustomerCreatePage } from './pages/CustomerCreatePage.jsx';
 import { CustomerDetailPage } from './pages/CustomerDetailPage.jsx';
 import { ProductListPage } from './pages/ProductListPage.jsx';
 import { SalesOrderListPage } from './pages/SalesOrderListPage.jsx';
@@ -29,7 +28,7 @@ export default function SalesRoutes() {
       <Routes>
         <Route index element={<DashboardPage />} />
         <Route path="customers" element={<CustomerListPage />} />
-        <Route path="customers/new" element={<CustomerCreatePage />} />
+        <Route path="customers/new" element={<Navigate to="/sales/customers" replace />} />
         <Route path="customers/:id" element={<CustomerDetailPage />} />
         <Route path="products" element={<ProductListPage />} />
         <Route path="orders" element={<SalesOrderListPage />} />

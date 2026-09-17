@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Text } from '../components/ui/Typography.jsx';
 import { Button } from '../components/ui/Button.jsx';
@@ -10,6 +11,7 @@ import { PageScaffold } from '../components/common/PageScaffold.jsx';
 import { DataTableCard } from '../components/common/DataTableCard.jsx';
 import { FilterBar } from '../components/common/FilterBar.jsx';
 import { StatusBadge } from '../components/common/StatusBadge.jsx';
+import { CustomerCreateDialog } from '../components/customers/CustomerCreateDialog.jsx';
 import { formatCurrency } from '../lib/format.js';
 
 /**
@@ -18,6 +20,9 @@ import { formatCurrency } from '../lib/format.js';
  * The columns read only the fields below off the row, so the API payload is
  * handed to the table as-is, without re-mapping rows. In-module links move under
  * Core's mount point (`/customers/:id` -> `/sales/customers/:id`).
+ *
+ * Core adaptation: customer creation opens `CustomerCreateDialog` instead of
+ * navigating to `/sales/customers/new`, which now redirects back to this list.
  */
 
 const LOAI_KHACH_OPTIONS = [
@@ -84,6 +89,8 @@ const columns = [
 ];
 
 export function CustomerListPage() {
+  const navigate = useNavigate();
+
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -99,6 +106,11 @@ export function CustomerListPage() {
   // "Xóa bộ lọc" must refetch even when only the search text changed: search is
   // submit-triggered and therefore not an effect dependency.
   const [reloadToken, setReloadToken] = useState(0);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  // Set while a successful create hands off to the detail route, so the close
+  // that follows it does not refetch a list the page is leaving.
+  const createdRef = useRef(false);
 
   const fetchList = async () => {
     setLoading(true);
@@ -131,12 +143,25 @@ export function CustomerListPage() {
     fetchList();
   };
 
+  const handleCreateOpenChange = (isOpen) => {
+    setCreateOpen(isOpen);
+    if (isOpen || createdRef.current) {
+      createdRef.current = false;
+      return;
+    }
+    fetchList();
+  };
+
   return (
     <PageScaffold
       title="Quản lý khách hàng"
       subtitle={`Tổng số ${total} khách hàng trong hệ thống`}
       actions={
-        <Button variant="primary" icon={<Plus size={16} />} href="/sales/customers/new">
+        <Button
+          variant="primary"
+          icon={<Plus size={16} aria-hidden />}
+          onClick={() => setCreateOpen(true)}
+        >
           Thêm khách hàng mới
         </Button>
       }
@@ -200,6 +225,15 @@ export function CustomerListPage() {
             }}
           />
         }
+      />
+
+      <CustomerCreateDialog
+        isOpen={createOpen}
+        onOpenChange={handleCreateOpenChange}
+        onCreated={(id) => {
+          createdRef.current = true;
+          navigate(`/sales/customers/${id}`);
+        }}
       />
     </PageScaffold>
   );
