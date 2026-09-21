@@ -7,7 +7,13 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test:concurrency": "node tests/test_concurrency.js",
-    "test:api": "node tests/test_ph4_api.js"
+    "test:api": "node tests/test_ph4_api.js",
+    "test:ph3": "node tests/test_ph3_purchasing.js",
+    "test:ph3:concurrency": "node tests/test_ph3_concurrency.js",
+    "test:ph2": "node tests/test_ph2_production.js",
+    "test:ph2:concurrency": "node tests/test_ph2_concurrency.js",
+    "test:ph5": "node tests/test_ph5_finance.js",
+    "test": "node tests/test_ph5_finance.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

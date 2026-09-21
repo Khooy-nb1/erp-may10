@@ -1,0 +1,392 @@
+﻿const db = require('../config/database');
+
+// BÃ¡o cÃ¡o tá»“n kho tá»•ng há»£p
+async function getBaoCaoTonKho(req, res, next) {
+  try {
+    const { ma_kho, loai_vat_tu, duoi_dinh_muc, search } = req.query;
+
+    let query = `
+      SELECT tk.id, tk.ma_kho, k.ma_kho AS ma_kho_code, k.ten_kho,
+             tk.ma_vat_tu, vt.ma_vat_tu AS ma_vat_tu_code, vt.ten_vat_tu, vt.loai_vat_tu,
+             dvt.ten_don_vi AS ten_dvt,
+             tk.so_luong_ton,
+             COALESCE(vt.muc_ton_toi_thieu, 0) AS dinh_muc_ton_toi_thieu,
+             tk.gia_tri_ton_kho,
+             CASE 
+               WHEN tk.so_luong_ton <= 0 THEN 'het_hang'
+               WHEN tk.so_luong_ton <= COALESCE(vt.muc_ton_toi_thieu, 0) THEN 'canh_bao_thap'
+               ELSE 'an_toan'
+             END AS trang_thai_ton,
+             tk.ngay_cap_nhat,
+             nd.ho_ten AS nguoi_cap_nhat_ten
+      FROM ton_kho tk
+      JOIN kho k ON tk.ma_kho = k.id
+      JOIN vat_tu vt ON tk.ma_vat_tu = vt.id
+      LEFT JOIN don_vi_tinh dvt ON tk.don_vi_tinh = dvt.id
+      LEFT JOIN nguoi_dung nd ON tk.nguoi_cap_nhat = nd.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (ma_kho) {
+      params.push(ma_kho);
+      query += ` AND tk.ma_kho = $${params.length}`;
+    }
+
+    if (loai_vat_tu) {
+      params.push(loai_vat_tu);
+      query += ` AND vt.loai_vat_tu = $${params.length}`;
+    }
+
+    if (duoi_dinh_muc === 'true') {
+      query += ` AND tk.so_luong_ton <= COALESCE(vt.muc_ton_toi_thieu, 0)`;
+    }
+
+    if (search) {
+      params.push(`%${search}%`);
+      query += ` AND (vt.ten_vat_tu ILIKE $${params.length} OR vt.ma_vat_tu ILIKE $${params.length} OR k.ten_kho ILIKE $${params.length})`;
+    }
+
+    query += ` ORDER BY k.id ASC, tk.so_luong_ton ASC`;
+
+    const result = await db.query(query, params);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Tháº» kho: Tra cá»©u lá»‹ch sá»­ nháº­p xuáº¥t, luÃ¢n chuyá»ƒn vÃ  kiá»ƒm kÃª cá»§a má»™t váº­t tÆ° táº¡i má»™t kho (FR-11)
+async function getTheKho(req, res, next) {
+  try {
+    const { ma_kho, ma_vat_tu, tu_ngay, den_ngay, loai_bien_dong, movement_type, ma_lo } = req.query;
+
+    if (!ma_kho || !ma_vat_tu) {
+      return res.status(400).json({
+        success: false,
+        errorCode: 'VALIDATION_ERROR',
+        message: 'Vui lÃ²ng cung cáº¥p ma_kho vÃ  ma_vat_tu Ä‘á»ƒ tra cá»©u tháº» kho.',
+      });
+    }
+
+    // Láº¥y thÃ´ng tin kho vÃ  váº­t tÆ°
+    const [infoRes, tonRes] = await Promise.all([
+      db.query(
+        `SELECT k.ten_kho, k.ma_kho AS ma_kho_code, vt.ten_vat_tu, vt.ma_vat_tu, dvt.ten_don_vi AS ten_dvt
+         FROM kho k, vat_tu vt
+         LEFT JOIN don_vi_tinh dvt ON vt.ma_don_vi_tinh = dvt.id
+         WHERE k.id = $1 AND vt.id = $2`,
+        [ma_kho, ma_vat_tu]
+      ),
+      db.query(
+        `SELECT so_luong_ton, gia_tri_ton_kho FROM ton_kho WHERE ma_kho = $1 AND ma_vat_tu = $2`,
+        [ma_kho, ma_vat_tu]
+      ),
+    ]);
+
+    const currentStock = parseFloat(tonRes.rows[0]?.so_luong_ton || 0);
+
+    // Há»£p nháº¥t 5 nguá»“n biáº¿n Ä‘á»™ng kho (FR-11):
+    // 1. Nháº­p kho (RECEIPT: +qty)
+    // 2. Xuáº¥t kho (ISSUE: -qty)
+    // 3. Chuyá»ƒn kho xuáº¥t (TRANSFER_OUT: -qty)
+    // 4. Chuyá»ƒn kho nháº­p (TRANSFER_IN: +qty)
+    // 5. Äiá»u chá»‰nh kiá»ƒm kÃª (STOCKTAKE_ADJUSTMENT: actual - system)
+    const sql = `
+      WITH all_moves AS (
+        -- 1. Nháº­p kho
+        SELECT
+          pnk.id AS doc_id,
+          ct.id AS detail_id,
+          pnk.ngay_nhap AS thoi_gian,
+          pnk.ma_phieu_nhap AS ma_chung_tu,
+          'RECEIPT' AS movement_type,
+          'nhap_kho' AS loai_bien_dong,
+          COALESCE(pnk.loai_nhap, 'Nháº­p kho') AS dien_giai,
+          ct.so_luong_nhap::numeric AS quantity_change,
+          ct.so_luong_nhap::numeric AS so_luong,
+          'tang' AS huong_bien_dong,
+          COALESCE(ct.don_gia_nhap, 0)::numeric AS don_gia,
+          COALESCE(ct.thanh_tien, ct.so_luong_nhap * COALESCE(ct.don_gia_nhap, 0))::numeric AS thanh_tien,
+          l.ma_lo,
+          vtk.ma_vi_tri,
+          pnk.ma_phieu_nhap AS reference
+        FROM chi_tiet_phieu_nhap ct
+        JOIN phieu_nhap_kho pnk ON ct.ma_phieu_nhap_kho = pnk.id
+        LEFT JOIN lo_vat_tu l ON ct.ma_lo_vat_tu = l.id
+        LEFT JOIN vi_tri_kho vtk ON ct.ma_vi_tri_kho = vtk.id
+        WHERE pnk.ma_kho_nhap = $1 AND ct.ma_vat_tu = $2 AND pnk.trang_thai = 'da_nhap'
+
+        UNION ALL
+
+        -- 2. Xuáº¥t kho
+        SELECT
+          pxk.id AS doc_id,
+          ct.id AS detail_id,
+          pxk.ngay_xuat AS thoi_gian,
+          pxk.ma_phieu_xuat AS ma_chung_tu,
+          'ISSUE' AS movement_type,
+          'xuat_kho' AS loai_bien_dong,
+          COALESCE(pxk.loai_xuat, 'Xuáº¥t kho') AS dien_giai,
+          (-ct.so_luong_xuat)::numeric AS quantity_change,
+          ct.so_luong_xuat::numeric AS so_luong,
+          'giam' AS huong_bien_dong,
+          COALESCE(ct.don_gia_xuat, 0)::numeric AS don_gia,
+          COALESCE(ct.thanh_tien, ct.so_luong_xuat * COALESCE(ct.don_gia_xuat, 0))::numeric AS thanh_tien,
+          l.ma_lo,
+          NULL::varchar AS ma_vi_tri,
+          pxk.ma_phieu_xuat AS reference
+        FROM chi_tiet_phieu_xuat ct
+        JOIN phieu_xuat_kho pxk ON ct.ma_phieu_xuat_kho = pxk.id
+        LEFT JOIN lo_vat_tu l ON ct.ma_lo_vat_tu = l.id
+        WHERE pxk.ma_kho_xuat = $1 AND ct.ma_vat_tu = $2 AND pxk.trang_thai = 'da_xuat'
+
+        UNION ALL
+
+        -- 3. Chuyá»ƒn kho xuáº¥t
+        SELECT
+          pck.id AS doc_id,
+          ct.id AS detail_id,
+          pck.ngay_chuyen AS thoi_gian,
+          pck.ma_phieu_chuyen AS ma_chung_tu,
+          'TRANSFER_OUT' AS movement_type,
+          'chuyen_kho_xuat' AS loai_bien_dong,
+          CONCAT('Xuáº¥t chuyá»ƒn sang ', COALESCE(kn.ten_kho, CONCAT('Kho ID ', pck.ma_kho_nhap)), CASE WHEN pck.ly_do IS NOT NULL AND pck.ly_do <> '' THEN CONCAT(' - ', pck.ly_do) ELSE '' END) AS dien_giai,
+          (-ct.so_luong_chuyen)::numeric AS quantity_change,
+          ct.so_luong_chuyen::numeric AS so_luong,
+          'giam' AS huong_bien_dong,
+          COALESCE(ct.don_gia, 0)::numeric AS don_gia,
+          (ct.so_luong_chuyen * COALESCE(ct.don_gia, 0))::numeric AS thanh_tien,
+          NULL::varchar AS ma_lo,
+          NULL::varchar AS ma_vi_tri,
+          pck.ma_phieu_chuyen AS reference
+        FROM chi_tiet_chuyen_kho ct
+        JOIN phieu_chuyen_kho pck ON ct.ma_phieu_chuyen_kho = pck.id
+        LEFT JOIN kho kn ON pck.ma_kho_nhap = kn.id
+        WHERE pck.ma_kho_xuat = $1 AND ct.ma_vat_tu = $2 AND pck.trang_thai = 'da_chuyen'
+
+        UNION ALL
+
+        -- 4. Chuyá»ƒn kho nháº­p
+        SELECT
+          pck.id AS doc_id,
+          ct.id AS detail_id,
+          pck.ngay_chuyen AS thoi_gian,
+          pck.ma_phieu_chuyen AS ma_chung_tu,
+          'TRANSFER_IN' AS movement_type,
+          'chuyen_kho_nhap' AS loai_bien_dong,
+          CONCAT('Nháº­n chuyá»ƒn tá»« ', COALESCE(kx.ten_kho, CONCAT('Kho ID ', pck.ma_kho_xuat)), CASE WHEN pck.ly_do IS NOT NULL AND pck.ly_do <> '' THEN CONCAT(' - ', pck.ly_do) ELSE '' END) AS dien_giai,
+          ct.so_luong_chuyen::numeric AS quantity_change,
+          ct.so_luong_chuyen::numeric AS so_luong,
+          'tang' AS huong_bien_dong,
+          COALESCE(ct.don_gia, 0)::numeric AS don_gia,
+          (ct.so_luong_chuyen * COALESCE(ct.don_gia, 0))::numeric AS thanh_tien,
+          NULL::varchar AS ma_lo,
+          NULL::varchar AS ma_vi_tri,
+          pck.ma_phieu_chuyen AS reference
+        FROM chi_tiet_chuyen_kho ct
+        JOIN phieu_chuyen_kho pck ON ct.ma_phieu_chuyen_kho = pck.id
+        LEFT JOIN kho kx ON pck.ma_kho_xuat = kx.id
+        WHERE pck.ma_kho_nhap = $1 AND ct.ma_vat_tu = $2 AND pck.trang_thai = 'da_chuyen'
+
+        UNION ALL
+
+        -- 5. Äiá»u chá»‰nh kiá»ƒm kÃª
+        SELECT
+          pkk.id AS doc_id,
+          ct.id AS detail_id,
+          pkk.ngay_kiem_ke AS thoi_gian,
+          pkk.ma_phieu_kiem_ke AS ma_chung_tu,
+          'STOCKTAKE_ADJUSTMENT' AS movement_type,
+          'dieu_chinh_kiem_ke' AS loai_bien_dong,
+          CONCAT('Kiá»ƒm kÃª ', COALESCE(pkk.ky_kiem_ke, ''), ' (Sá»•: ', ct.so_luong_so_sach, ' -> Thá»±c: ', ct.so_luong_thuc_te, ')') AS dien_giai,
+          (ct.so_luong_thuc_te - ct.so_luong_so_sach)::numeric AS quantity_change,
+          ABS(ct.so_luong_thuc_te - ct.so_luong_so_sach)::numeric AS so_luong,
+          CASE WHEN (ct.so_luong_thuc_te - ct.so_luong_so_sach) >= 0 THEN 'tang' ELSE 'giam' END AS huong_bien_dong,
+          COALESCE(vt.gia_nhap_trung_binh, 0)::numeric AS don_gia,
+          COALESCE(ct.gia_tri_chenh_lech, ABS(ct.so_luong_thuc_te - ct.so_luong_so_sach) * COALESCE(vt.gia_nhap_trung_binh, 0))::numeric AS thanh_tien,
+          NULL::varchar AS ma_lo,
+          NULL::varchar AS ma_vi_tri,
+          pkk.ma_phieu_kiem_ke AS reference
+        FROM chi_tiet_kiem_ke ct
+        JOIN phieu_kiem_ke pkk ON ct.ma_phieu_kiem_ke = pkk.id
+        JOIN vat_tu vt ON ct.ma_vat_tu = vt.id
+        WHERE pkk.ma_kho = $1 AND ct.ma_vat_tu = $2
+          AND (pkk.trang_thai = 'da_dieu_chinh' OR ct.da_dieu_chinh = 'da_dieu_chinh')
+      ),
+      totals AS (
+        SELECT COALESCE(SUM(quantity_change), 0) AS total_delta FROM all_moves
+      ),
+      calculated AS (
+        SELECT
+          m.*,
+          -- Running balance: (currentStock - total_delta) + cumulative quantity_change
+          (($3 - t.total_delta) + SUM(m.quantity_change) OVER (
+            ORDER BY m.thoi_gian ASC,
+                     CASE m.movement_type
+                       WHEN 'RECEIPT' THEN 1
+                       WHEN 'TRANSFER_IN' THEN 2
+                       WHEN 'ISSUE' THEN 3
+                       WHEN 'TRANSFER_OUT' THEN 4
+                       WHEN 'STOCKTAKE_ADJUSTMENT' THEN 5
+                       ELSE 6
+                     END,
+                     m.doc_id ASC,
+                     m.detail_id ASC
+          ))::numeric AS running_balance,
+          ($3 - t.total_delta)::numeric AS opening_balance
+        FROM all_moves m
+        CROSS JOIN totals t
+      )
+      SELECT * FROM calculated
+      WHERE 1=1
+        AND ($4::timestamptz IS NULL OR thoi_gian >= $4::timestamptz)
+        AND ($5::timestamptz IS NULL OR thoi_gian <= $5::timestamptz)
+        AND ($6::varchar IS NULL OR loai_bien_dong = $6::varchar)
+        AND ($7::varchar IS NULL OR movement_type = $7::varchar)
+        AND ($8::varchar IS NULL OR ma_lo = $8::varchar)
+      ORDER BY thoi_gian ASC,
+               CASE movement_type
+                 WHEN 'RECEIPT' THEN 1
+                 WHEN 'TRANSFER_IN' THEN 2
+                 WHEN 'ISSUE' THEN 3
+                 WHEN 'TRANSFER_OUT' THEN 4
+                 WHEN 'STOCKTAKE_ADJUSTMENT' THEN 5
+                 ELSE 6
+               END,
+               doc_id ASC,
+               detail_id ASC
+    `;
+
+    const result = await db.query(sql, [
+      ma_kho,
+      ma_vat_tu,
+      currentStock,
+      tu_ngay || null,
+      den_ngay || null,
+      loai_bien_dong || null,
+      movement_type || null,
+      ma_lo || null,
+    ]);
+
+    const transactions = result.rows.map((row) => {
+      const qtyChange = parseFloat(row.quantity_change);
+      const runBal = parseFloat(row.running_balance);
+      const donGia = parseFloat(row.don_gia) || 0;
+      const thanhTien = parseFloat(row.thanh_tien) || 0;
+
+      return {
+        doc_id: row.doc_id,
+        detail_id: row.detail_id,
+        thoi_gian: row.thoi_gian,
+        transaction_time: row.thoi_gian,
+        ma_chung_tu: row.ma_chung_tu,
+        document_code: row.ma_chung_tu,
+        movement_type: row.movement_type,
+        loai_bien_dong: row.loai_bien_dong,
+        dien_giai: row.dien_giai,
+        quantity_change: qtyChange,
+        so_luong: Math.abs(qtyChange),
+        huong_bien_dong: row.huong_bien_dong,
+        don_gia: donGia,
+        thanh_tien: thanhTien,
+        ma_lo: row.ma_lo,
+        ma_vi_tri: row.ma_vi_tri,
+        reference: row.reference,
+        running_balance: runBal,
+        so_du_luy_ke: runBal,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        thongTinChung: infoRes.rows[0] || {},
+        tonHienTai: tonRes.rows[0] || { so_luong_ton: 0, gia_tri_ton_kho: 0 },
+        soDuDauKy: result.rows.length > 0 ? parseFloat(result.rows[0].opening_balance) : currentStock,
+        soDuCuoiKy: currentStock,
+        tongSoPhatSinh: transactions.length,
+        nhatKyBienDong: transactions,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Thá»‘ng kÃª Dashboard cho module PH4
+async function getDashboardStats(req, res, next) {
+  try {
+    const [
+      tongVatTuRes,
+      tongGiaTriRes,
+      canhBaoRes,
+      nhapThangRes,
+      xuatThangRes,
+      topTonRes,
+      phanBoKhoRes,
+    ] = await Promise.all([
+      db.query(`SELECT COUNT(*) AS total_items FROM ton_kho WHERE so_luong_ton > 0`),
+      db.query(`SELECT COALESCE(SUM(gia_tri_ton_kho), 0) AS total_val FROM ton_kho`),
+      db.query(`
+        SELECT COUNT(*) AS low_stock 
+        FROM ton_kho tk
+        JOIN vat_tu vt ON tk.ma_vat_tu = vt.id
+        WHERE tk.so_luong_ton <= COALESCE(vt.muc_ton_toi_thieu, 0)
+      `),
+      db.query(`
+        SELECT COUNT(*) AS count, COALESCE(SUM(tong_gia_tri_nhap), 0) AS total_val
+        FROM phieu_nhap_kho
+        WHERE ngay_nhap >= DATE_TRUNC('month', CURRENT_DATE) AND trang_thai = 'da_nhap'
+      `),
+      db.query(`
+        SELECT COUNT(*) AS count, COALESCE(SUM(tong_gia_tri_xuat), 0) AS total_val
+        FROM phieu_xuat_kho
+        WHERE ngay_xuat >= DATE_TRUNC('month', CURRENT_DATE) AND trang_thai = 'da_xuat'
+      `),
+      db.query(`
+        SELECT vt.ten_vat_tu, vt.ma_vat_tu, dvt.ten_don_vi AS ten_dvt, SUM(tk.so_luong_ton) AS tong_ton, SUM(tk.gia_tri_ton_kho) AS tong_gia_tri
+        FROM ton_kho tk
+        JOIN vat_tu vt ON tk.ma_vat_tu = vt.id
+        LEFT JOIN don_vi_tinh dvt ON tk.don_vi_tinh = dvt.id
+        GROUP BY vt.ten_vat_tu, vt.ma_vat_tu, dvt.ten_don_vi
+        ORDER BY tong_gia_tri DESC
+        LIMIT 5
+      `),
+      db.query(`
+        SELECT k.ten_kho, COUNT(tk.id) AS so_loai_vt, COALESCE(SUM(tk.gia_tri_ton_kho), 0) AS gia_tri_kho
+        FROM kho k
+        LEFT JOIN ton_kho tk ON k.id = tk.ma_kho
+        GROUP BY k.id, k.ten_kho
+        ORDER BY gia_tri_kho DESC
+      `),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        tongSoMatHangTon: parseInt(tongVatTuRes.rows[0].total_items, 10),
+        tongGiaTriTonKho: parseFloat(tongGiaTriRes.rows[0].total_val),
+        soMatHangCanhBao: parseInt(canhBaoRes.rows[0].low_stock, 10),
+        phieuNhapTrongThang: {
+          soLuong: parseInt(nhapThangRes.rows[0].count, 10),
+          giaTri: parseFloat(nhapThangRes.rows[0].total_val),
+        },
+        phieuXuatTrongThang: {
+          soLuong: parseInt(xuatThangRes.rows[0].count, 10),
+          giaTri: parseFloat(xuatThangRes.rows[0].total_val),
+        },
+        topVatTuGiaTriCao: topTonRes.rows,
+        phanBoTheoKho: phanBoKhoRes.rows,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  getBaoCaoTonKho,
+  getTheKho,
+  getDashboardStats,
+};
