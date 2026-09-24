@@ -381,15 +381,18 @@ async function runAllPurchasingTests() {
     // TEST 1: Create supplier (Tạo mới nhà cung cấp)
     // -------------------------------------------------------------------------
     console.log('1. TEST 1: Create supplier (Tạo nhà cung cấp mới):');
-    const supCode = `NCC-TEST-${Date.now().toString().slice(-4)}`;
+    const supSuffix = Date.now().toString().slice(-8);
+    const supCode = `NCC-TEST-${supSuffix.slice(-4)}`;
     const createSupRes = await request(
       '/api/v1/purchasing/suppliers',
       'POST',
       {
         ma_nha_cung_cap: supCode,
         ten_nha_cung_cap: 'Công Ty Cung Cấp Vải Sợi Sài Gòn',
+        ma_so_thue: `03${supSuffix}`,
+        so_gpkd: `GP-${supSuffix}`,
         dia_chi: '123 Đường Cộng Hòa, Q. Tân Bình, TP.HCM',
-        so_dien_thoai: '0987654321',
+        so_dien_thoai: `09${supSuffix}`,
         email: 'sales@saisoil.vn',
         nguoi_lien_he: 'Vũ Đức Đam',
         loai_hang_cung_cap: 'Vải cotton, sợi dệt',

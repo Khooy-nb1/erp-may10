@@ -258,7 +258,7 @@ async function getSuppliers(req, res, next) {
 
     if (search) {
       params.push(`%${search.trim()}%`);
-      query += ` AND (ncc.ten_nha_cung_cap ILIKE $${params.length} OR ncc.ma_nha_cung_cap ILIKE $${params.length} OR ncc.email ILIKE $${params.length} OR ncc.so_dien_thoai ILIKE $${params.length})`;
+      query += ` AND (ncc.ten_nha_cung_cap ILIKE $${params.length} OR ncc.ma_nha_cung_cap ILIKE $${params.length} OR ncc.email ILIKE $${params.length} OR ncc.so_dien_thoai ILIKE $${params.length} OR ncc.ma_so_thue ILIKE $${params.length} OR ncc.so_gpkd ILIKE $${params.length})`;
     }
 
     if (trang_thai) {
@@ -358,11 +358,16 @@ async function createSupplier(req, res, next) {
       ma_nha_cung_cap,
       ten_nha_cung_cap,
       ma_so_thue,
+      so_gpkd,
       dia_chi,
       quoc_gia = 'Viet Nam',
       nguoi_lien_he,
       so_dien_thoai,
       email,
+      so_tai_khoan,
+      so_tai_khoan_ngan_hang,
+      ten_ngan_hang,
+      chi_nhanh_ngan_hang,
       loai_hang_cung_cap,
       han_muc_tin_dung = 0,
       so_ngay_gia_han = 30,
@@ -371,13 +376,16 @@ async function createSupplier(req, res, next) {
     } = req.body;
 
     const nguoiTao = req.user?.id || 1;
+    const cleanPhone = (so_dien_thoai || '').trim().replace(/[\s.-]/g, '');
+    const cleanTax = (ma_so_thue || '').trim();
+    const cleanGpkd = (so_gpkd || '').trim();
 
     // Tự sinh mã NCC nếu không truyền
     const maNCC =
       ma_nha_cung_cap ||
       `NCC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // Kiểm tra trùng mã NCC
+    // 1. Kiểm tra trùng mã NCC
     const checkDup = await db.query('SELECT id FROM nha_cung_cap WHERE ma_nha_cung_cap = $1', [maNCC]);
     if (checkDup.rows.length > 0) {
       return res.status(409).json({
@@ -387,24 +395,65 @@ async function createSupplier(req, res, next) {
       });
     }
 
+    // 2. Kiểm tra trùng Mã số thuế
+    if (cleanTax) {
+      const checkTax = await db.query('SELECT id FROM nha_cung_cap WHERE ma_so_thue = $1', [cleanTax]);
+      if (checkTax.rows.length > 0) {
+        return res.status(409).json({
+          success: false,
+          errorCode: 'CONFLICT',
+          message: `Mã số thuế [${cleanTax}] đã tồn tại trong hệ thống.`,
+        });
+      }
+    }
+
+    // 3. Kiểm tra trùng Số GPKD / ĐKKD
+    if (cleanGpkd) {
+      const checkGpkd = await db.query('SELECT id FROM nha_cung_cap WHERE so_gpkd = $1', [cleanGpkd]);
+      if (checkGpkd.rows.length > 0) {
+        return res.status(409).json({
+          success: false,
+          errorCode: 'CONFLICT',
+          message: `Số GPKD / ĐKKD [${cleanGpkd}] đã tồn tại trong hệ thống.`,
+        });
+      }
+    }
+
+    // 4. Kiểm tra trùng Số điện thoại
+    if (cleanPhone) {
+      const checkPhone = await db.query('SELECT id FROM nha_cung_cap WHERE so_dien_thoai = $1', [cleanPhone]);
+      if (checkPhone.rows.length > 0) {
+        return res.status(409).json({
+          success: false,
+          errorCode: 'CONFLICT',
+          message: `Số điện thoại [${cleanPhone}] đã được sử dụng bởi nhà cung cấp khác.`,
+        });
+      }
+    }
+
     const insertRes = await db.query(
       `INSERT INTO nha_cung_cap (
-         ma_nha_cung_cap, ten_nha_cung_cap, ma_so_thue, dia_chi, quoc_gia,
+         ma_nha_cung_cap, ten_nha_cung_cap, ma_so_thue, so_gpkd, dia_chi, quoc_gia,
          nguoi_lien_he, so_dien_thoai, email, loai_hang_cung_cap,
+         so_tai_khoan, ten_ngan_hang, chi_nhanh_ngan_hang,
          han_muc_tin_dung, so_ngay_gia_han, diem_danh_gia, trang_thai,
          nguoi_tao, nguoi_cap_nhat
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $18)
        RETURNING *`,
       [
         maNCC,
         ten_nha_cung_cap.trim(),
-        ma_so_thue || null,
+        cleanTax || null,
+        cleanGpkd || null,
         dia_chi.trim(),
         quoc_gia,
         nguoi_lien_he.trim(),
-        so_dien_thoai.trim(),
+        cleanPhone,
         email.trim(),
         loai_hang_cung_cap || null,
+        so_tai_khoan || so_tai_khoan_ngan_hang || null,
+        ten_ngan_hang || null,
+        chi_nhanh_ngan_hang || null,
         parseFloat(han_muc_tin_dung) || 0,
         parseInt(so_ngay_gia_han, 10) || 30,
         parseFloat(diem_danh_gia) || 0,
@@ -451,11 +500,16 @@ async function updateSupplier(req, res, next) {
     const {
       ten_nha_cung_cap,
       ma_so_thue,
+      so_gpkd,
       dia_chi,
       quoc_gia,
       nguoi_lien_he,
       so_dien_thoai,
       email,
+      so_tai_khoan,
+      so_tai_khoan_ngan_hang,
+      ten_ngan_hang,
+      chi_nhanh_ngan_hang,
       loai_hang_cung_cap,
       han_muc_tin_dung,
       so_ngay_gia_han,
@@ -463,34 +517,82 @@ async function updateSupplier(req, res, next) {
       trang_thai,
     } = req.body;
 
+    const cleanTax = ma_so_thue !== undefined ? ma_so_thue.trim() : undefined;
+    const cleanGpkd = so_gpkd !== undefined ? so_gpkd.trim() : undefined;
+    const cleanPhone = so_dien_thoai !== undefined ? so_dien_thoai.trim().replace(/[\s.-]/g, '') : undefined;
+
+    // Kiểm tra trùng Mã số thuế với NCC khác
+    if (cleanTax) {
+      const checkTax = await db.query('SELECT id FROM nha_cung_cap WHERE ma_so_thue = $1 AND id != $2', [cleanTax, id]);
+      if (checkTax.rows.length > 0) {
+        return res.status(409).json({
+          success: false,
+          errorCode: 'CONFLICT',
+          message: `Mã số thuế [${cleanTax}] đã được sử dụng bởi nhà cung cấp khác.`,
+        });
+      }
+    }
+
+    // Kiểm tra trùng GPKD với NCC khác
+    if (cleanGpkd) {
+      const checkGpkd = await db.query('SELECT id FROM nha_cung_cap WHERE so_gpkd = $1 AND id != $2', [cleanGpkd, id]);
+      if (checkGpkd.rows.length > 0) {
+        return res.status(409).json({
+          success: false,
+          errorCode: 'CONFLICT',
+          message: `Số GPKD / ĐKKD [${cleanGpkd}] đã được sử dụng bởi nhà cung cấp khác.`,
+        });
+      }
+    }
+
+    // Kiểm tra trùng SĐT với NCC khác
+    if (cleanPhone) {
+      const checkPhone = await db.query('SELECT id FROM nha_cung_cap WHERE so_dien_thoai = $1 AND id != $2', [cleanPhone, id]);
+      if (checkPhone.rows.length > 0) {
+        return res.status(409).json({
+          success: false,
+          errorCode: 'CONFLICT',
+          message: `Số điện thoại [${cleanPhone}] đã được đăng ký bởi nhà cung cấp khác.`,
+        });
+      }
+    }
+
     const nguoiCapNhat = req.user?.id || 1;
 
     const updateRes = await db.query(
       `UPDATE nha_cung_cap SET
          ten_nha_cung_cap = COALESCE($1, ten_nha_cung_cap),
          ma_so_thue = COALESCE($2, ma_so_thue),
-         dia_chi = COALESCE($3, dia_chi),
-         quoc_gia = COALESCE($4, quoc_gia),
-         nguoi_lien_he = COALESCE($5, nguoi_lien_he),
-         so_dien_thoai = COALESCE($6, so_dien_thoai),
-         email = COALESCE($7, email),
-         loai_hang_cung_cap = COALESCE($8, loai_hang_cung_cap),
-         han_muc_tin_dung = COALESCE($9, han_muc_tin_dung),
-         so_ngay_gia_han = COALESCE($10, so_ngay_gia_han),
-         diem_danh_gia = COALESCE($11, diem_danh_gia),
-         trang_thai = COALESCE($12, trang_thai),
-         nguoi_cap_nhat = $13,
+         so_gpkd = COALESCE($3, so_gpkd),
+         dia_chi = COALESCE($4, dia_chi),
+         quoc_gia = COALESCE($5, quoc_gia),
+         nguoi_lien_he = COALESCE($6, nguoi_lien_he),
+         so_dien_thoai = COALESCE($7, so_dien_thoai),
+         email = COALESCE($8, email),
+         so_tai_khoan = COALESCE($9, so_tai_khoan),
+         ten_ngan_hang = COALESCE($10, ten_ngan_hang),
+         chi_nhanh_ngan_hang = COALESCE($11, chi_nhanh_ngan_hang),
+         loai_hang_cung_cap = COALESCE($12, loai_hang_cung_cap),
+         han_muc_tin_dung = COALESCE($13, han_muc_tin_dung),
+         so_ngay_gia_han = COALESCE($14, so_ngay_gia_han),
+         diem_danh_gia = COALESCE($15, diem_danh_gia),
+         trang_thai = COALESCE($16, trang_thai),
+         nguoi_cap_nhat = $17,
          ngay_cap_nhat = NOW()
-       WHERE id = $14
+       WHERE id = $18
        RETURNING *`,
       [
         ten_nha_cung_cap,
-        ma_so_thue,
+        cleanTax,
+        cleanGpkd,
         dia_chi,
         quoc_gia,
         nguoi_lien_he,
-        so_dien_thoai,
+        cleanPhone,
         email,
+        so_tai_khoan || so_tai_khoan_ngan_hang,
+        ten_ngan_hang,
+        chi_nhanh_ngan_hang,
         loai_hang_cung_cap,
         han_muc_tin_dung,
         so_ngay_gia_han,
