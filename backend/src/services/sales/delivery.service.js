@@ -234,18 +234,14 @@ function createDeliveryService(repository = deliveryRepository) {
   }
 
   async function completeDelivery(id, updaterId) {
-    const res = await repository.transitionStatus(id, 'dang_giao', 'da_giao', updaterId);
+    // Warehouse fulfilment and the `da_giao` transition share one transaction
+    // (`completeDeliveryAtomic`); a repeat call is a no-op that returns the
+    // delivery that is already complete, so stock can never be deducted twice.
+    const res = await repository.completeDeliveryAtomic(id, updaterId);
     if (!res.currentRecord) {
       throw new NotFoundError('DELIVERY_NOT_FOUND', `Không tìm thấy đợt giao hàng có ID ${id}.`);
     }
     if (!res.success) {
-      if (res.currentRecord.trang_thai === 'da_giao') {
-        throw new AppError(
-          409,
-          'DELIVERY_INVALID_STATE',
-          'Đợt giao hàng này đã được xác nhận hoàn thành trước đó. Không thể hoàn thành lại.'
-        );
-      }
       if (res.currentRecord.trang_thai === 'cho_giao') {
         throw new AppError(
           422,
@@ -259,7 +255,22 @@ function createDeliveryService(repository = deliveryRepository) {
         `Không thể hoàn thành đợt giao hàng đã ở trạng thái "${res.currentRecord.trang_thai}".`
       );
     }
-    return res.currentRecord;
+
+    const record = res.currentRecord;
+    if (res.fulfillment) {
+      return {
+        ...record,
+        fulfillment: {
+          ma_phieu_xuat: res.fulfillment.phieu_xuat ? res.fulfillment.phieu_xuat.ma_phieu_xuat : null,
+          tong_gia_tri_xuat: res.fulfillment.totalValue,
+          lines: res.fulfillment.lines.map((line) => ({
+            ma_vat_tu: line.stockCode,
+            so_luong_xuat: line.quantity,
+          })),
+        },
+      };
+    }
+    return record;
   }
 
   async function failDelivery(id, rawInput, updaterId) {

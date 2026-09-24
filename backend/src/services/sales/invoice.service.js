@@ -163,7 +163,12 @@ async function createInvoice(rawInput, creatorId) {
     throw new AppError(500, 'INVOICE_CREATION_FAILED', 'Không thể tạo bản ghi hóa đơn.');
   }
 
-  return result.invoice;
+  // The receivable is written in the same transaction (integration service);
+  // it is returned with the invoice so callers see both sides of the hand-off.
+  return {
+    ...result.invoice,
+    cong_no: result.receivable ? result.receivable.receivable : null,
+  };
 }
 
 module.exports = {

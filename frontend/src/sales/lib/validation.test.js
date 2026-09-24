@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 
 import {
   CUSTOMER_TYPES,
+  TAX_CODE_PATTERN,
   customerFieldError,
   customerFieldErrors,
   deliveryFieldErrors,
@@ -25,6 +26,7 @@ import {
   isRealDate,
   isoDateError,
   maxLengthError,
+  normalizePhone,
   orderFieldErrors,
   serverFieldErrors,
   toWireAmount,
@@ -127,9 +129,71 @@ test('cleared numeric fields take the dialog default, not a number error', () =>
   assert.equal(Number.isNaN(toWireQuantity(undefined)), true);
 });
 
+test('phone numbers accept VN domestic and E.164, normalising separators', () => {
+  assert.equal(normalizePhone('+84 91 234-5678'), '+84912345678');
+  assert.equal(normalizePhone('091-234-5678'), '0912345678');
+  assert.equal(normalizePhone(' 0912345678 '), '0912345678');
+
+  const accepted = [
+    '0912345678',
+    '091-234-5678',
+    '091 234 5678',
+    '+84912345678',
+    '+84 91 234-5678',
+    '+1 415 555 0100',
+  ];
+  for (const phone of accepted) {
+    assert.equal(
+      customerFieldError({ ...validCustomer, so_dien_thoai: phone }, 'so_dien_thoai'),
+      null,
+      phone
+    );
+  }
+
+  const rejected = [
+    '091234567', // 9 digits
+    '09123456789', // 11 digits, not E.164
+    'abcdefgh', // letters
+    '09a1234567', // letters mixed in
+    '(091) 2345678', // parentheses are not separators
+    '+0123456789', // E.164 country code cannot start with 0
+  ];
+  for (const phone of rejected) {
+    assert.notEqual(
+      customerFieldError({ ...validCustomer, so_dien_thoai: phone }, 'so_dien_thoai'),
+      null,
+      phone
+    );
+  }
+});
+
+test('tax ids accept the two Vietnamese shapes and nothing else', () => {
+  assert.equal(TAX_CODE_PATTERN.test('0100109106'), true);
+  assert.equal(TAX_CODE_PATTERN.test('0100109106-001'), true);
+  assert.equal(TAX_CODE_PATTERN.test('010010910'), false);
+  assert.equal(TAX_CODE_PATTERN.test('0100109106-01'), false);
+  assert.equal(TAX_CODE_PATTERN.test('0100109106-0011'), false);
+
+  for (const taxCode of ['0100109106', '0100109106-001', '', null]) {
+    assert.equal(
+      customerFieldError({ ...validCustomer, ma_so_thue: taxCode }, 'ma_so_thue'),
+      null,
+      JSON.stringify(taxCode)
+    );
+  }
+
+  // `.or(v.literal(''))` matches an exact empty string only, so whitespace is a
+  // format failure rather than an absent tax id.
+  assert.equal(
+    customerFieldError({ ...validCustomer, ma_so_thue: '   ' }, 'ma_so_thue'),
+    'Mã số thuế không đúng định dạng (10 số hoặc 10 số-3 số)'
+  );
+});
+
 test('customer field rules carry the API wording', () => {
   const cases = [
-    ['ten_khach_hang', '', 'Tên khách hàng không được để trống'],
+    ['ten_khach_hang', '', 'Tên khách hàng phải từ 2 ký tự'],
+    ['ten_khach_hang', 'A', 'Tên khách hàng phải từ 2 ký tự'],
     ['ten_khach_hang', 'A'.repeat(201), 'Tên khách hàng tối đa 200 ký tự'],
     ['loai_khach_hang', 'bogus', 'Giá trị không nằm trong danh sách cho phép.'],
     // `v.phone().trim().min(8).max(20)` runs length before the pattern, so a
@@ -139,14 +203,24 @@ test('customer field rules carry the API wording', () => {
     ['so_dien_thoai', '', 'Số điện thoại phải từ 8 ký tự'],
     ['so_dien_thoai', '   ', 'Số điện thoại phải từ 8 ký tự'],
     ['so_dien_thoai', '1'.repeat(21), 'Số điện thoại tối đa 20 ký tự'],
+    // Vietnamese formats: domestic `0` + 9 digits, or E.164 with a real country
+    // code. Separators (spaces, `-`) are stripped; other punctuation is not.
+    ['so_dien_thoai', '091234567', 'Số điện thoại không đúng định dạng.'],
+    ['so_dien_thoai', '09123456789', 'Số điện thoại không đúng định dạng.'],
+    ['so_dien_thoai', '(091) 2345678', 'Số điện thoại không đúng định dạng.'],
     ['email', 'nope', 'Email không đúng định dạng'],
     // `.or(v.literal(''))` accepts an exact empty string only: whitespace is a
     // format failure, a padded address is fine (the server trims).
     ['email', '   ', 'Email không đúng định dạng'],
     ['email', `${'a'.repeat(99)}@x.vn`, 'Email tối đa 100 ký tự'],
-    ['dia_chi', '', 'Địa chỉ không được để trống'],
-    ['tinh_thanh_pho', '', 'Tỉnh/thành phố không được để trống'],
+    ['dia_chi', '', 'Địa chỉ phải từ 5 ký tự'],
+    ['dia_chi', '1234', 'Địa chỉ phải từ 5 ký tự'],
+    ['tinh_thanh_pho', '', 'Tỉnh/thành phố phải từ 2 ký tự'],
+    ['tinh_thanh_pho', 'H', 'Tỉnh/thành phố phải từ 2 ký tự'],
     ['ma_so_thue', 'T'.repeat(21), 'Mã số thuế tối đa 20 ký tự'],
+    ['ma_so_thue', '010010910', 'Mã số thuế không đúng định dạng (10 số hoặc 10 số-3 số)'],
+    ['ma_so_thue', '0100109106-01', 'Mã số thuế không đúng định dạng (10 số hoặc 10 số-3 số)'],
+    ['ma_so_thue', 'MST-000001', 'Mã số thuế không đúng định dạng (10 số hoặc 10 số-3 số)'],
     ['nguoi_lien_he', 'N'.repeat(151), 'Người liên hệ tối đa 150 ký tự'],
     ['han_muc_cong_no', -1, 'Hạn mức công nợ phải lớn hơn hoặc bằng 0'],
     ['han_muc_cong_no', 1e16, 'Hạn mức công nợ quá lớn'],
@@ -194,8 +268,13 @@ test('order rules cover the required, date, cross-field and line checks', () => 
   );
   assert.equal(
     orderFieldErrors({ ...validOrder, deliveryAddress: '' }).dia_chi_giao_hang,
-    'Địa chỉ giao hàng không được để trống'
+    'Địa chỉ giao hàng phải từ 5 ký tự'
   );
+  assert.equal(
+    orderFieldErrors({ ...validOrder, deliveryAddress: '1234' }).dia_chi_giao_hang,
+    'Địa chỉ giao hàng phải từ 5 ký tự'
+  );
+  assert.equal(orderFieldErrors({ ...validOrder, deliveryAddress: '12345' }).dia_chi_giao_hang, undefined);
   assert.equal(
     orderFieldErrors({ ...validOrder, notes: 'G'.repeat(2001) }).ghi_chu,
     'Ghi chú tối đa 2000 ký tự'

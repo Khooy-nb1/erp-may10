@@ -491,7 +491,16 @@ async function main() {
     const deliveryStarted = await call(baseUrl, 'POST', `/api/v1/sales/giao-hang/${delivery.id}/start`, { token: TOKENS.kho, body: {} });
     check('kho starts delivery -> 200 dang_giao', deliveryStarted.status === 200 && deliveryStarted.body.data.trang_thai === 'dang_giao', deliveryStarted.body && deliveryStarted.body.data);
     const deliveryCompleted = await call(baseUrl, 'POST', `/api/v1/sales/giao-hang/${delivery.id}/complete`, { token: TOKENS.kho, body: {} });
-    check('kho completes delivery -> 200 da_giao', deliveryCompleted.status === 200 && deliveryCompleted.body.data.trang_thai === 'da_giao', deliveryCompleted.body && deliveryCompleted.body.data);
+    // Completion runs the warehouse hand-off, which resolves the stock item from
+    // `san_pham.ma_vat_tu_ton_kho`; this catalogue row carries no such link, so
+    // the hand-off is refused instead of guessing one and nothing is deducted.
+    // The deducting happy path, its idempotency and the insufficient-stock guard
+    // are covered by `tests/test_ph1_fulfillment_integration.js`.
+    check(
+      'kho completes delivery of a product with no stock item -> 422 PRODUCT_STOCK_ITEM_NOT_FOUND',
+      deliveryCompleted.status === 422 && deliveryCompleted.body.errorCode === 'PRODUCT_STOCK_ITEM_NOT_FOUND',
+      deliveryCompleted.body
+    );
     const deliverySecond = await call(baseUrl, 'POST', '/api/v1/sales/giao-hang', { token: TOKENS.kho, body: deliveryPayload() });
     const deliveryFailNoReason = await call(baseUrl, 'POST', `/api/v1/sales/giao-hang/${deliverySecond.body.data.id}/fail`, { token: TOKENS.kho, body: {} });
     check('fail without reason -> 422', deliveryFailNoReason.status === 422, deliveryFailNoReason.status);
@@ -508,12 +517,16 @@ async function main() {
       receivablesAfterInvoice.status === 200 && Array.isArray(receivablesAfterInvoice.body.data) && typeof receivablesAfterInvoice.body.meta.total === 'number',
       receivablesAfterInvoice.body && receivablesAfterInvoice.body.meta
     );
-    // Known PH1 gap (preserved, not fixed): issuing an invoice writes
-    // `hoa_don_ban_hang` only - no code path in PH1 inserted into `cong_no`
-    // outside the seed script, so the receivable ledger is not posted to on
-    // issuance. Recorded in docs/ph1-remediation/KNOWN_GAPS.md for the
-    // Integration Owner; posting to AR belongs to Finance, not to this module.
-    console.log(`   note - invoice ${invoice.ma_hoa_don} posted ${receivablesAfterInvoice.body.meta.total} cong_no row(s) (PH1 parity: no AR posting outside seed data)`);
+    // Issuing an invoice posts its `phai_thu` receivable in the same transaction
+    // (sales -> finance integration). The row's fields, the duplicate guard and
+    // the part-paid derivation are asserted in
+    // `tests/test_ph1_fulfillment_integration.js`.
+    check(
+      'issuing an invoice posted exactly one phai_thu receivable for it',
+      receivablesAfterInvoice.body.meta.total === 1 &&
+        receivablesAfterInvoice.body.data.every((row) => row.loai_cong_no === 'phai_thu'),
+      receivablesAfterInvoice.body && receivablesAfterInvoice.body.data
+    );
     const aging = await call(baseUrl, 'GET', '/api/v1/sales/cong-no/aging', { token: TOKENS.ke_toan });
     const agingBuckets = aging.body && aging.body.data;
     const bucketSum = agingBuckets

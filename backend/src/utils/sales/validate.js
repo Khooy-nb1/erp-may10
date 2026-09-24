@@ -14,6 +14,7 @@
  *   v.enum([...])                        v.object({...})
  *   v.array(item).min(1,'msg')           v.literal('') / .or(v.literal(''))
  *   .optional() .nullable() .default(x) .partial() .email('msg')
+ *   .normalize(fn) .regex(re, 'msg') .dateISO('msg')
  *   .refine(fn,{message,path}) .superRefine(fn) .transform(fn)
  *
  * Semantics kept from zod: modifiers return a derived schema (shared schemas are
@@ -28,8 +29,23 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** ISO calendar date, `YYYY-MM-DD`. */
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Digits with the usual separators: `0912345678`, `+84 91 234 5678`, `(024) 3-9...`. */
-const PHONE_RE = /^[0-9+\-(). ]{8,20}$/;
+/**
+ * Vietnamese phone number: domestic `0` + 9 digits (`0912345678`) or E.164
+ * (`+` + country code 1-9 + up to 14 more digits, `+84912345678`). Separators
+ * are not part of the format — `normalizePhone` strips them before this test,
+ * so letters, parentheses and every other character are rejected.
+ */
+const PHONE_RE = /^(?:0\d{9}|\+[1-9]\d{7,14})$/;
+
+/**
+ * Strips the separators a phone number may be typed with (spaces and `-`) so
+ * `+84 91 234-5678` and `+84912345678` are the same number. Everything else
+ * (letters, `(`, `)`, `.`) is left in place and therefore rejected by `PHONE_RE`.
+ */
+function normalizePhone(value) {
+  if (typeof value !== 'string') return value;
+  return value.trim().replace(/[\s-]+/g, '');
+}
 
 /** True when an ISO date names a real calendar day (`2026-02-30` is not one). */
 function isRealDate(value) {
@@ -113,6 +129,7 @@ class Schema {
     this.patternRegex = null;
     this.patternMessage = null;
     this.isTrimmed = false;
+    this.normalizer = null;
     this.isDateISO = false;
     this.dateMessage = null;
     this.isStrict = false;
@@ -194,6 +211,17 @@ class Schema {
   trim() {
     return this.derive((s) => {
       s.isTrimmed = true;
+    });
+  }
+
+  /**
+   * Rewrites the value before length/pattern checks, so a field may accept a
+   * human-typed spelling and validate the canonical one it is stored as
+   * (phone numbers: `+84 91 234-5678` -> `+84912345678`).
+   */
+  normalize(fn) {
+    return this.derive((s) => {
+      s.normalizer = fn;
     });
   }
 
@@ -396,6 +424,9 @@ class Schema {
     if (this.isTrimmed) {
       value = value.trim();
     }
+    if (this.normalizer) {
+      value = this.normalizer(value);
+    }
     if (this.minValue !== null && value.length < this.minValue) {
       issues.push(
         makeIssue(path, this.minMessage || `Giá trị phải có ít nhất ${this.minValue} ký tự.`)
@@ -562,8 +593,12 @@ const v = {
   literal: (value, config = {}) => new Schema('literal', { value, message: config.message || null }),
   /** ISO calendar date string (`YYYY-MM-DD`) that must exist on the calendar. */
   dateISO: (message = null) => new Schema('string', {}).dateISO(message),
-  /** Phone number: digits plus `+ - ( ) . space`, 8-20 characters. */
-  phone: (message = null) => new Schema('string', {}).regex(PHONE_RE, message || MESSAGES.phone),
+  /**
+   * Vietnamese phone number: separators (spaces, `-`) are stripped, then the
+   * value must be domestic `0xxxxxxxxx` or E.164 `+...`.
+   */
+  phone: (message = null) =>
+    new Schema('string', {}).normalize(normalizePhone).regex(PHONE_RE, message || MESSAGES.phone),
   array: (items, config = {}) => new Schema('array', { items, ...config }),
   object: (shape) => new Schema('object', { shape }),
   coerce: {
@@ -579,4 +614,4 @@ const v = {
   },
 };
 
-module.exports = { v, MESSAGES, Schema, PHONE_RE, DATE_RE, isRealDate };
+module.exports = { v, MESSAGES, Schema, PHONE_RE, DATE_RE, isRealDate, normalizePhone };

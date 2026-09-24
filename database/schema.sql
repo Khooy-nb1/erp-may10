@@ -779,6 +779,13 @@ ALTER TABLE nguoi_dung
     ADD CONSTRAINT fk_nguoi_dung_nguoi_tao FOREIGN KEY (nguoi_tao) REFERENCES nguoi_dung(id),
     ADD CONSTRAINT fk_nguoi_dung_nguoi_cap_nhat FOREIGN KEY (nguoi_cap_nhat) REFERENCES nguoi_dung(id);
 
+-- Liên kết thành phẩm -> mặt hàng tồn kho (tích hợp PH1 -> PH4).
+-- Kho chỉ quản lý `vat_tu`, nên một sản phẩm bán được phải chỉ định rõ mặt hàng
+-- tồn kho mà nó được xuất ra. NULL = sản phẩm chưa được cấu hình tồn kho: xuất
+-- kho giao khách sẽ từ chối với PRODUCT_STOCK_ITEM_NOT_FOUND cho tới khi cấu hình.
+ALTER TABLE san_pham
+    ADD COLUMN IF NOT EXISTS ma_vat_tu_ton_kho BIGINT REFERENCES vat_tu(id);
+
 -- =============================================================================
 -- PHẦN 8: CHỈ MỤC TỐI ƯU HÓA (INDEXES)
 -- =============================================================================
@@ -885,3 +892,21 @@ CREATE INDEX IF NOT EXISTS idx_cong_no_loai ON cong_no(loai_cong_no);
 CREATE INDEX IF NOT EXISTS idx_gia_thanh_san_pham_san_pham ON gia_thanh_san_pham(ma_san_pham);
 CREATE INDEX IF NOT EXISTS idx_gia_thanh_san_pham_lenh ON gia_thanh_san_pham(ma_lenh_san_xuat);
 CREATE INDEX IF NOT EXISTS idx_bao_cao_tai_chinh_loai_ky ON bao_cao_tai_chinh(loai_bao_cao, ky_bao_cao);
+
+-- =============================================================================
+-- PHẦN 9: RÀNG BUỘC NGHIỆP VỤ BỔ SUNG (BÁN HÀNG - TÍCH HỢP LIÊN PHÂN HỆ)
+-- =============================================================================
+
+-- Mã số thuế khách hàng là duy nhất khi có giá trị (khách hàng không có mã số
+-- thuế vẫn được phép trùng nhau qua giá trị NULL).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_khach_hang_ma_so_thue
+    ON khach_hang (ma_so_thue)
+    WHERE ma_so_thue IS NOT NULL;
+
+-- Mỗi hóa đơn bán hàng chỉ sở hữu đúng một dòng công nợ phải thu (tích hợp PH1 -> PH5).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_cong_no_phai_thu_theo_hoa_don
+    ON cong_no (ma_hoa_don, bang_hoa_don)
+    WHERE loai_cong_no = 'phai_thu' AND ma_hoa_don IS NOT NULL;
+
+-- Tra cứu mặt hàng tồn kho của một sản phẩm (xuất kho giao khách).
+CREATE INDEX IF NOT EXISTS idx_san_pham_vat_tu_ton_kho ON san_pham(ma_vat_tu_ton_kho);

@@ -328,12 +328,20 @@ async function main() {
       db.query(`SELECT COALESCE(SUM(so_luong_ton), 0)::numeric AS ton, (SELECT COUNT(*) FROM chi_tiet_phieu_xuat)::int AS xuat_lines FROM ton_kho`);
     const stockBefore = await stockSnapshot();
     const completed = await call(baseUrl, 'POST', `/api/v1/sales/giao-hang/${delivery.id}/complete`, { token: TOKENS.kho, body: {} });
-    const recompleted = await call(baseUrl, 'POST', `/api/v1/sales/giao-hang/${delivery.id}/complete`, { token: TOKENS.kho, body: {} });
     const stockAfter = await stockSnapshot();
-    rememberErrorBody('double complete', recompleted.body);
-    check('completing twice -> 409 DELIVERY_INVALID_STATE', completed.status === 200 && completed.body.data.trang_thai === 'da_giao' && recompleted.status === 409 && recompleted.body.errorCode === 'DELIVERY_INVALID_STATE', { completed: completed.body && completed.body.data, recompleted: recompleted.body });
+    rememberErrorBody('complete without a stock-linked product', completed.body);
+    // Completion is the sales-to-warehouse hand-off: the stock item is resolved
+    // through `san_pham.ma_vat_tu_ton_kho` and the deduction happens in the same
+    // transaction. A catalogue row with no stock link is refused rather than
+    // guessed, so this delivery cannot be fulfilled and nothing is written - the
+    // deducting happy path lives in `test_ph1_fulfillment_integration.js`.
     check(
-      'the module never mutates PH4 stock (delivery lifecycle leaves ton_kho and issue documents untouched)',
+      'completing a delivery for a product with no stock item -> 422 PRODUCT_STOCK_ITEM_NOT_FOUND',
+      completed.status === 422 && completed.body.errorCode === 'PRODUCT_STOCK_ITEM_NOT_FOUND',
+      completed.body
+    );
+    check(
+      'a refused completion leaves PH4 stock and issue documents untouched',
       String(stockBefore.rows[0].ton) === String(stockAfter.rows[0].ton) && stockBefore.rows[0].xuat_lines === stockAfter.rows[0].xuat_lines,
       { before: stockBefore.rows[0], after: stockAfter.rows[0] }
     );
@@ -546,10 +554,18 @@ async function main() {
     for (const entry of cleanup.productStatus) {
       await safeWrite('restore product status', 'UPDATE san_pham SET trang_thai = $2 WHERE id = $1', [entry.id, entry.trang_thai]);
     }
-    if (cleanup.invoices.length) await safeWrite('delete invoices', `DELETE FROM hoa_don_ban_hang WHERE id = ANY($1::int[])`, [cleanup.invoices]);
+    if (cleanup.invoices.length) {
+      // Issuing an invoice posts a `phai_thu` receivable row pointing at it (no
+      // FK, so the order matters): remove the ledger row with its invoice.
+      await safeWrite('delete invoice receivables', `DELETE FROM cong_no WHERE ma_hoa_don = ANY($1::int[])`, [cleanup.invoices]);
+      await safeWrite('delete invoices', `DELETE FROM hoa_don_ban_hang WHERE id = ANY($1::int[])`, [cleanup.invoices]);
+    }
     if (cleanup.deliveries.length) await safeWrite('delete deliveries', `DELETE FROM giao_hang WHERE id = ANY($1::int[])`, [cleanup.deliveries]);
     if (cleanup.congNo.length) await safeWrite('delete aging probes', `DELETE FROM cong_no WHERE id = ANY($1::int[])`, [cleanup.congNo]);
     if (cleanup.orders.length) {
+      // Confirming an order hands it to Production, which owns `lenh_san_xuat`
+      // rows referencing it; they must go before the order they were raised for.
+      await safeWrite('delete production orders', `DELETE FROM lenh_san_xuat WHERE ma_don_ban_hang = ANY($1::int[])`, [cleanup.orders]);
       await safeWrite('delete order lines', `DELETE FROM chi_tiet_don_ban_hang WHERE ma_don_ban_hang = ANY($1::int[])`, [cleanup.orders]);
       await safeWrite('delete orders', `DELETE FROM don_ban_hang WHERE id = ANY($1::int[])`, [cleanup.orders]);
     }

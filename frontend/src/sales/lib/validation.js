@@ -70,8 +70,20 @@ export function serverFieldErrors(error, knownFields) {
  * wherever the check ran. Message parity is asserted in `validation.test.js`.
  * ------------------------------------------------------------------------- */
 
-/** Mirrors `PHONE_RE` in `backend/src/utils/sales/validate.js`. */
-export const PHONE_PATTERN = /^[0-9+\-(). ]{8,20}$/;
+/**
+ * Mirrors `PHONE_RE` in `backend/src/utils/sales/validate.js`: a Vietnamese
+ * number is either domestic (`0` + 9 digits) or E.164 (`+` + country code 1-9,
+ * at most 15 digits). Separators are stripped first by `normalizePhone`.
+ */
+export const PHONE_PATTERN = /^(?:0\d{9}|\+[1-9]\d{7,14})$/;
+
+/** Mirrors `normalizePhone`: spaces and `-` separate digits, they are not content. */
+export function normalizePhone(value) {
+  return typeof value === 'string' ? value.trim().replace(/[\s-]+/g, '') : value;
+}
+
+/** Mirrors `TAX_CODE_RE` in `customer.service.js`: 10 digits or 10 digits-3 digits. */
+export const TAX_CODE_PATTERN = /^\d{10}(-\d{3})?$/;
 
 /** `MESSAGES.required` — the answer for a missing field with no default. */
 export const GENERIC_REQUIRED = 'Trường này là bắt buộc.';
@@ -79,9 +91,12 @@ export const GENERIC_REQUIRED = 'Trường này là bắt buộc.';
 /** Field bounds mirrored from the backend schemas. */
 export const LIMITS = {
   customerName: 200,
+  customerNameMin: 2,
   taxCode: 20,
   customerAddress: 500,
+  customerAddressMin: 5,
   city: 100,
+  cityMin: 2,
   contact: 150,
   email: 100,
   note: 2000,
@@ -165,6 +180,18 @@ export function maxLengthError(value, max, message) {
   return typeof value === 'string' && value.trim().length > max ? message : null;
 }
 
+/**
+ * Bounds check for a trimmed text field, in the backend's order: an absent value
+ * answers the generic required message, then the lower bound, then the upper one.
+ */
+export function textBoundsError(value, { min = 0, max = null, minMessage, maxMessage }) {
+  if (value === undefined || value === null) return GENERIC_REQUIRED;
+  const text = trimmed(value);
+  if (text.length < min) return minMessage;
+  if (max !== null && text.length > max) return maxMessage;
+  return null;
+}
+
 /** Message when a required text field is empty; `null` when it has content. */
 export function requiredError(value, message) {
   return isBlank(value) ? message : null;
@@ -179,15 +206,15 @@ export function firstFieldError(fieldErrors) {
 }
 
 /**
- * Mirrors `v.phone().trim().min(8).max(20)`: the validator runs length before the
- * pattern, so a short or long value answers the length message and only a value
- * of the right length is tested against `PHONE_RE`. A missing field (no
- * `.optional()`) answers the generic required message; the form always sends a
- * string, where a blank one is simply too short.
+ * Mirrors `v.phone().trim().min(8).max(20)` with the VN/E.164 pattern: the
+ * value is normalised (spaces and `-` stripped) before the length and format
+ * checks, so the message a user sees is the one the API would answer. A missing
+ * field (no `.optional()`) answers the generic required message; the form
+ * always sends a string, where a blank one is simply too short.
  */
 function phoneFieldError(value) {
   if (value === undefined || value === null) return GENERIC_REQUIRED;
-  const phone = trimmed(value);
+  const phone = normalizePhone(value);
   if (phone.length < LIMITS.phoneMin) return 'Số điện thoại phải từ 8 ký tự';
   if (phone.length > LIMITS.phoneMax) return 'Số điện thoại tối đa 20 ký tự';
   return PHONE_PATTERN.test(phone) ? null : 'Số điện thoại không đúng định dạng.';
@@ -199,10 +226,23 @@ const CUSTOMER_TYPE_VALUES = ['ca_nhan', 'to_chuc', 'dai_ly', 'xuat_khau'];
 export const CUSTOMER_TYPES = CUSTOMER_TYPE_VALUES;
 
 const CUSTOMER_RULES = [
-  ['ten_khach_hang', (v) => requiredError(v, 'Tên khách hàng không được để trống') ||
-    maxLengthError(v, LIMITS.customerName, 'Tên khách hàng tối đa 200 ký tự')],
+  ['ten_khach_hang', (v) => textBoundsError(v, {
+    min: LIMITS.customerNameMin,
+    max: LIMITS.customerName,
+    minMessage: 'Tên khách hàng phải từ 2 ký tự',
+    maxMessage: 'Tên khách hàng tối đa 200 ký tự',
+  })],
   ['loai_khach_hang', (v) => ([...CUSTOMER_TYPE_VALUES].includes(v) ? null : 'Giá trị không nằm trong danh sách cho phép.')],
-  ['ma_so_thue', (v) => maxLengthError(v, LIMITS.taxCode, 'Mã số thuế tối đa 20 ký tự')],
+  ['ma_so_thue', (v) => {
+    // Optional: absent, `null` and an exact empty string mean "no tax id" — the
+    // API accepts those through `.or(v.literal(''))`. That literal matches `''`
+    // only, so a whitespace-only value is a format failure, not an absent field,
+    // and `.trim()` before `.max()` means the length cap measures the trimmed id.
+    if (v === undefined || v === null || v === '') return null;
+    const taxCode = trimmed(v);
+    if (taxCode.length > LIMITS.taxCode) return 'Mã số thuế tối đa 20 ký tự';
+    return TAX_CODE_PATTERN.test(taxCode) ? null : 'Mã số thuế không đúng định dạng (10 số hoặc 10 số-3 số)';
+  }],
   ['so_dien_thoai', phoneFieldError],
   ['email', (v) => {
     // `parseString` trims before `.email()`, and `.or(v.literal(''))` only accepts
@@ -212,10 +252,18 @@ const CUSTOMER_RULES = [
     if (email.length > LIMITS.email) return 'Email tối đa 100 ký tự';
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? null : 'Email không đúng định dạng';
   }],
-  ['dia_chi', (v) => requiredError(v, 'Địa chỉ không được để trống') ||
-    maxLengthError(v, LIMITS.customerAddress, 'Địa chỉ tối đa 500 ký tự')],
-  ['tinh_thanh_pho', (v) => requiredError(v, 'Tỉnh/thành phố không được để trống') ||
-    maxLengthError(v, LIMITS.city, 'Tỉnh/thành phố tối đa 100 ký tự')],
+  ['dia_chi', (v) => textBoundsError(v, {
+    min: LIMITS.customerAddressMin,
+    max: LIMITS.customerAddress,
+    minMessage: 'Địa chỉ phải từ 5 ký tự',
+    maxMessage: 'Địa chỉ tối đa 500 ký tự',
+  })],
+  ['tinh_thanh_pho', (v) => textBoundsError(v, {
+    min: LIMITS.cityMin,
+    max: LIMITS.city,
+    minMessage: 'Tỉnh/thành phố phải từ 2 ký tự',
+    maxMessage: 'Tỉnh/thành phố tối đa 100 ký tự',
+  })],
   ['nguoi_lien_he', (v) => maxLengthError(v, LIMITS.contact, 'Người liên hệ tối đa 150 ký tự')],
   ['han_muc_cong_no', (v) => {
     // The dialog sends `toWireAmount(v)`, so a cleared field is 0 — never a
@@ -297,8 +345,9 @@ export function orderFieldErrors({ customerId, orderDate, requestedDeliveryDate,
   } else if (isRealDate(orderDate) && requestedDeliveryDate < orderDate) {
     out.ngay_giao_hang_yc = 'Ngày giao hàng yêu cầu không được trước ngày đặt hàng';
   }
-  if (isBlank(deliveryAddress)) out.dia_chi_giao_hang = 'Địa chỉ giao hàng không được để trống';
-  else if (trimmed(deliveryAddress).length > LIMITS.customerAddress) {
+  const deliveryAddressLength = isBlank(deliveryAddress) ? 0 : trimmed(deliveryAddress).length;
+  if (deliveryAddressLength < 5) out.dia_chi_giao_hang = 'Địa chỉ giao hàng phải từ 5 ký tự';
+  else if (deliveryAddressLength > LIMITS.customerAddress) {
     out.dia_chi_giao_hang = 'Địa chỉ giao hàng tối đa 500 ký tự';
   }
   if (maxLengthError(notes, LIMITS.note, 'Ghi chú tối đa 2000 ký tự')) out.ghi_chu = 'Ghi chú tối đa 2000 ký tự';

@@ -53,7 +53,7 @@ const createOrderSchema = v
     dia_chi_giao_hang: v
       .string()
       .trim()
-      .min(1, 'Địa chỉ giao hàng không được để trống')
+      .min(5, 'Địa chỉ giao hàng phải từ 5 ký tự')
       .max(500, 'Địa chỉ giao hàng tối đa 500 ký tự'),
     ghi_chu: v.string().trim().max(2000, 'Ghi chú tối đa 2000 ký tự').optional().nullable(),
     lines: v
@@ -93,7 +93,7 @@ const updateOrderSchema = v
     dia_chi_giao_hang: v
       .string()
       .trim()
-      .min(1, 'Địa chỉ giao hàng không được để trống')
+      .min(5, 'Địa chỉ giao hàng phải từ 5 ký tự')
       .max(500, 'Địa chỉ giao hàng tối đa 500 ký tự')
       .optional(),
     ghi_chu: v.string().trim().max(2000, 'Ghi chú tối đa 2000 ký tự').optional().nullable(),
@@ -130,6 +130,31 @@ const orderQuerySchema = v
     search: v.string().trim().max(100, 'Từ khóa tìm kiếm tối đa 100 ký tự').optional(),
     ma_khach_hang: v.coerce.number().int().positive('Mã khách hàng không hợp lệ').optional(),
     trang_thai: v.enum(ORDER_STATUSES, 'Trạng thái đơn hàng không hợp lệ').optional(),
+    // Several statuses at once, comma-separated (`da_xac_nhan,dang_san_xuat`).
+    // Used by the pickers that may only offer orders in a set of states.
+    trang_thai_in: v
+      .string()
+      .trim()
+      .max(200, 'Danh sách trạng thái không hợp lệ')
+      // Field-level refinement: the issue already carries this field's path, so
+      // naming it again here would report `trang_thai_in.trang_thai_in`. An empty
+      // value parses to an empty list, which the repository treats as no filter.
+      .refine(
+        (value) =>
+          value
+            .split(',')
+            .map((token) => token.trim())
+            .filter((token) => token.length > 0)
+            .every((token) => ORDER_STATUSES.includes(token)),
+        { message: 'Trạng thái đơn hàng không hợp lệ' }
+      )
+      .transform((value) =>
+        value
+          .split(',')
+          .map((token) => token.trim())
+          .filter((token) => token.length > 0)
+      )
+      .optional(),
     nguoi_ban: v.coerce.number().int().positive('Người bán không hợp lệ').optional(),
     fromDate: v.dateISO('Ngày bắt đầu không đúng định dạng (YYYY-MM-DD)').optional(),
     toDate: v.dateISO('Ngày kết thúc không đúng định dạng (YYYY-MM-DD)').optional(),
@@ -373,12 +398,31 @@ async function confirmOrder(id, rawInput, updaterId) {
     }
   }
 
-  const updated = await orderRepository.updateStatus(id, 'da_xac_nhan', updaterId);
-  if (!updated) {
+  const updated = await orderRepository.confirmOrderAtomic(id, updaterId);
+  if (!updated.order) {
     throw new NotFoundError('ORDER_NOT_FOUND', `Không tìm thấy đơn bán hàng có ID ${id}.`);
   }
+  if (updated.invalidState) {
+    throw new AppError(
+      422,
+      'ORDER_INVALID_STATE',
+      'Chỉ đơn hàng ở trạng thái "Chờ xác nhận" mới có thể xác nhận.'
+    );
+  }
 
-  return updated;
+  // The Production hand-off happened in the same transaction; report the new
+  // workshop orders (empty when the order already owned them).
+  return {
+    ...updated.order,
+    production_orders: updated.production
+      ? updated.production.orders.map((row) => ({
+          id: row.id,
+          ma_lenh_san_xuat: row.ma_lenh_san_xuat,
+          ma_san_pham: row.ma_san_pham,
+          so_luong_yeu_cau: row.so_luong_yeu_cau,
+        }))
+      : [],
+  };
 }
 
 async function cancelOrder(id, rawInput, updaterId, userRole) {

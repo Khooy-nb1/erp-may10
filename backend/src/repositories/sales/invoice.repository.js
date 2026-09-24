@@ -2,6 +2,7 @@
 
 const db = require('../../config/database');
 const { withTransaction } = require('../../utils/sales/transaction');
+const financeIntegration = require('../../services/sales/integration/finance.integration');
 
 /**
  * Invoice repository (ported from PH1 `repositories/invoice.repository.ts`).
@@ -411,7 +412,14 @@ async function createInvoiceAtomic(params) {
       params.creatorId,
     ]);
 
-    return { invoice: insertRes.rows[0] };
+    // 9. Finance side of the same transaction: the invoice owns exactly one
+    //    `phai_thu` receivable (created here, refreshed if it already existed).
+    const receivable = await financeIntegration.syncInvoiceReceivable(client, {
+      invoice: insertRes.rows[0],
+      actorId: params.creatorId,
+    });
+
+    return { invoice: insertRes.rows[0], receivable };
   });
 }
 

@@ -2,6 +2,7 @@
 
 const db = require('../../config/database');
 const { withTransaction } = require('../../utils/sales/transaction');
+const productionIntegration = require('../../services/sales/integration/production.integration');
 
 /**
  * Order repository (ported from PH1 `repositories/order.repository.ts`).
@@ -46,6 +47,11 @@ async function list(filters = {}) {
   if (filters.trang_thai) {
     params.push(filters.trang_thai);
     conditions.push(`o.trang_thai = $${params.length}`);
+  }
+
+  if (Array.isArray(filters.trang_thai_in) && filters.trang_thai_in.length > 0) {
+    params.push(filters.trang_thai_in);
+    conditions.push(`o.trang_thai = ANY($${params.length}::text[])`);
   }
 
   if (filters.nguoi_ban) {
@@ -334,6 +340,65 @@ async function update(id, headerUpdates = {}, lines, updaterId) {
 }
 
 /**
+ * Confirms an order atomically.
+ *
+ * One transaction covers the state check (under `FOR UPDATE`, so two
+ * confirmations cannot both pass), the Production hand-off - one `lenh_san_xuat`
+ * per order line, linked back through `ma_don_ban_hang` - and the status write.
+ * The production sync is idempotent, so a retried confirmation never duplicates
+ * workshop demand.
+ *
+ * @param {number} id
+ * @param {number|null} updaterId
+ * @returns {Promise<{order: object|null, invalidState: boolean, production: object|null}>}
+ */
+async function confirmOrderAtomic(id, updaterId) {
+  return withTransaction(async (client) => {
+    const headerRes = await client.query(
+      `SELECT id, ma_don_ban, ma_khach_hang, ngay_dat_hang, ngay_giao_hang_yc,
+              trang_thai, ghi_chu, nguoi_ban
+       FROM don_ban_hang
+       WHERE id = $1
+       FOR UPDATE`,
+      [id]
+    );
+    const order = headerRes.rows[0] || null;
+    if (!order) {
+      return { order: null, invalidState: false, production: null };
+    }
+    if (order.trang_thai !== 'cho_xac_nhan') {
+      return { order, invalidState: true, production: null };
+    }
+
+    const linesRes = await client.query(
+      `SELECT id, ma_san_pham, so_luong
+       FROM chi_tiet_don_ban_hang
+       WHERE ma_don_ban_hang = $1
+       ORDER BY id`,
+      [id]
+    );
+
+    const production = await productionIntegration.syncOrderProductionOrders(client, {
+      order,
+      lines: linesRes.rows,
+      actorId: updaterId,
+    });
+
+    const updateRes = await client.query(
+      `UPDATE don_ban_hang
+       SET trang_thai = 'da_xac_nhan',
+           nguoi_cap_nhat = $2,
+           ngay_cap_nhat = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id, updaterId]
+    );
+
+    return { order: updateRes.rows[0], invalidState: false, production };
+  });
+}
+
+/**
  * Updates the status of an order and optional extra fields.
  * @param {number} id
  * @param {string} status
@@ -386,6 +451,7 @@ module.exports = {
   findByCode,
   create,
   update,
+  confirmOrderAtomic,
   updateStatus,
   getCustomerOutstanding,
 };

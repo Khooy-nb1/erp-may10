@@ -2,6 +2,7 @@
 
 const db = require('../../config/database');
 const { withTransaction } = require('../../utils/sales/transaction');
+const warehouseIntegration = require('../../services/sales/integration/warehouse.integration');
 
 /**
  * Delivery repository (ported from PH1 `repositories/delivery.repository.ts`).
@@ -265,6 +266,73 @@ async function transitionStatus(id, expectedStatus, newStatus, updaterId, extra)
 }
 
 /**
+ * Completes a delivery atomically.
+ *
+ * One transaction covers the whole fulfilment: the delivery row is locked, the
+ * warehouse integration writes the `giao_khach` issue note, deducts `ton_kho`
+ * and advances `so_luong_giao`, and only then does the delivery move to
+ * `da_giao` (the warehouse integration also marks the order delivered).
+ *
+ * Idempotent: a delivery that is already `da_giao` is returned untouched, so a
+ * retried request can never deduct stock a second time.
+ *
+ * @param {number} id
+ * @param {number|null} updaterId
+ * @returns {Promise<{success: boolean, alreadyCompleted: boolean, currentRecord: object|null, fulfillment: object|null}>}
+ */
+async function completeDeliveryAtomic(id, updaterId) {
+  return withTransaction(async (client) => {
+    const selectSql = `
+        SELECT g.id, g.ma_giao_hang, g.ma_don_ban_hang, o.ma_don_ban, c.ten_khach_hang,
+               g.ma_kho, k.ten_kho, g.ngay_giao, g.ten_nguoi_nhan, g.dia_chi_giao,
+               g.phuong_tien_van_chuyen, g.nguoi_giao_hang, u.ho_ten AS ten_nguoi_giao,
+               g.ghi_chu, g.trang_thai, g.ngay_tao, g.ngay_cap_nhat, g.nguoi_tao, g.nguoi_cap_nhat
+        FROM giao_hang g
+        LEFT JOIN don_ban_hang o ON o.id = g.ma_don_ban_hang
+        LEFT JOIN khach_hang c ON c.id = o.ma_khach_hang
+        LEFT JOIN kho k ON k.id = g.ma_kho
+        LEFT JOIN nguoi_dung u ON u.id = g.nguoi_giao_hang
+        WHERE g.id = $1
+        FOR UPDATE OF g
+      `;
+    const selectRes = await client.query(selectSql, [id]);
+    const current = selectRes.rows[0] || null;
+
+    if (!current) {
+      return { success: false, alreadyCompleted: false, currentRecord: null, fulfillment: null };
+    }
+    if (current.trang_thai === 'da_giao') {
+      return { success: true, alreadyCompleted: true, currentRecord: current, fulfillment: null };
+    }
+    if (current.trang_thai !== 'dang_giao') {
+      return { success: false, alreadyCompleted: false, currentRecord: current, fulfillment: null };
+    }
+
+    const fulfillment = await warehouseIntegration.fulfillDelivery(client, {
+      delivery: current,
+      actorId: updaterId,
+    });
+
+    const updateSql = `
+        UPDATE giao_hang
+        SET trang_thai = 'da_giao',
+            nguoi_cap_nhat = $2,
+            ngay_cap_nhat = NOW()
+        WHERE id = $1
+        RETURNING *
+      `;
+    const updateRes = await client.query(updateSql, [id, updaterId]);
+
+    return {
+      success: true,
+      alreadyCompleted: false,
+      currentRecord: { ...current, ...updateRes.rows[0] },
+      fulfillment,
+    };
+  });
+}
+
+/**
  * Checks whether warehouse exists and has status 'hoat_dong'.
  * @param {number} warehouseId
  * @returns {Promise<boolean>}
@@ -298,6 +366,7 @@ module.exports = {
   create,
   updateStatus,
   transitionStatus,
+  completeDeliveryAtomic,
   checkWarehouseActive,
   checkOrderForDelivery,
 };
